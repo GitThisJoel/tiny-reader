@@ -17,7 +17,7 @@ describe("speedChoices", () => {
 describe("statusText", () => {
   it("says where the reading is", () => {
     expect(statusText({ status: "playing", index: 2, total: 12 })).toBe("Sentence 3 of 12");
-    expect(statusText({ status: "paused", index: 0, total: 3 })).toBe("Paused. Sentence 1 of 3");
+    expect(statusText({ status: "paused", index: 0, total: 3 })).toBe("Sentence 1 of 3");
     expect(statusText({ status: "error", index: 0, total: 0, message: "No." })).toBe("No.");
   });
 });

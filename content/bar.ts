@@ -70,10 +70,10 @@ export function statusText(state: ReaderState): string {
   switch (state.status) {
     case "loading":
       return "Loading…";
+    // Paused shows the same place: the play button already says that it is paused.
     case "playing":
-      return place;
     case "paused":
-      return `Paused. ${place}`;
+      return place;
     case "blocked":
       return "Press play to start";
     case "done":

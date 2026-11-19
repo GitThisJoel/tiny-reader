@@ -172,7 +172,7 @@ describe.each([
   it("pauses, resumes and skips", async () => {
     await press(tab, "Pause");
     expect(await barWhen(tab, `bar.status === "paused"`)).toMatchObject({
-      text: "Paused. Sentence 1 of 3",
+      text: "Sentence 1 of 3",
       toggle: "Play",
     });
     await press(tab, "Play");
