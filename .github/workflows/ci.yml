@@ -45,4 +45,6 @@ jobs:
         with:
           name: tiny-reader-firefox
           path: .output/*.zip
+          # .output is a dot-directory, which upload-artifact skips unless told otherwise.
+          include-hidden-files: true
           if-no-files-found: error
