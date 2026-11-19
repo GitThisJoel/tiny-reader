@@ -27,6 +27,11 @@ document.getElementById("controls")?.append(
   iconButton("stop", "Stop reading", () => void send("stop")),
 );
 
+document.getElementById("pdf")?.addEventListener("click", async () => {
+  await browser.tabs.create({ url: browser.runtime.getURL("/document.html") });
+  window.close();
+});
+
 document.getElementById("shortcuts")?.addEventListener("click", async () => {
   await browser.runtime.openOptionsPage();
   window.close();

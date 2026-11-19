@@ -9,6 +9,9 @@ leaves the machine, and the add-on makes no network requests at runtime.
 
 - Click the Tiny Reader button in the toolbar and press **Read aloud**: it reads the selection, or the page's main
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
+- To hear a PDF, open the popup and choose **Read a PDF…**. A Tiny Reader page opens: pick the file, or drop it on
+  the page, and it shows the PDF's text as plain paragraphs and reads them with the same highlighting, control bar,
+  context menu and shortcuts as a web page. The file is read on your computer and never uploaded.
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
 - Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
@@ -74,9 +77,11 @@ export default defineWebExtConfig({
 | `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
 | `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
 
-`pnpm lint:ext` reports no errors and two accepted warnings:
+`pnpm lint:ext` reports no errors and four accepted warnings:
 
 - `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: the add-on is desktop only.
+- `UNSAFE_VAR_ASSIGNMENT` in the document page's script and in `pdf.worker.min-*.mjs`: both are pdf.js, bundled
+  unmodified from the `pdfjs-dist` npm package.
 - `UNSAFE_VAR_ASSIGNMENT` in `engine-worker.js`: ONNX Runtime loads its own wasm loader with a
   dynamic `import()`. The URL is always `ort/ort-wasm-simd-threaded.mjs` inside the add-on
   package, an unmodified file from the `onnxruntime-web` npm package.
@@ -179,6 +184,10 @@ flowchart LR
   marked.
 - **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
   add-on adds to a page.
+- **Document page** ([entrypoints/document/](entrypoints/document/), [content/pdf-text.ts](content/pdf-text.ts)): a
+  page of the add-on's own that parses a PDF you open with a bundled copy of pdf.js, rebuilds paragraphs from the
+  positioned text runs, and reads them with the same controller as the content script
+  ([content/controller.ts](content/controller.ts)).
 - **Toolbar popup** ([entrypoints/popup/](entrypoints/popup/)): the panel behind the toolbar button. Its buttons send
   a command to the background, which passes it to the reader in the active tab; its settings form is the one the
   options page uses ([content/settings-form.ts](content/settings-form.ts)).
@@ -215,8 +224,11 @@ does not extend to such frames.
 - English only. Text in another script is skipped; if nothing can be read the bar says so. Text
   that Firefox's local language detector identifies as another language gets a warning in the bar
   and is read anyway, with English sounds.
-- Firefox's Reader View and its PDF viewer cannot be read, nor can Firefox's own pages or addons.mozilla.org: Firefox
-  lets no add-on into them, whatever its permissions. The toolbar button then shows a "!" badge with the reason, and the popup says so.
+- Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
+  addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. For PDFs, use **Read a PDF…**.
+- PDFs are read as text only: no figures or layout. Paragraphs are rebuilt from the positions of the text, which works
+  for single-column prose. Columns, tables, footnotes and running headers may come out in the wrong order, and a
+  scanned PDF (pages stored as pictures) has no text to read. The toolbar button then shows a "!" badge with the reason, and the popup says so.
   Leave Reader View and read the original page instead.
 - Text selected inside a frame from another site cannot be read (see Permissions).
 - A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
@@ -249,5 +261,7 @@ placeholder. Change it before submitting to addons.mozilla.org.
 
 - tiny-voca model and JavaScript phonemizer: Apache-2.0, © Muhammed Nazeem
 - Phonemizer dictionary: derived from the CMU Pronouncing Dictionary (BSD-style licence)
+- pdf.js (`pdfjs-dist`): Apache-2.0, © Mozilla Foundation
+- ONNX Runtime Web: MIT, © Microsoft
 
 The licence texts are bundled in the add-on under `assets/licenses/`.

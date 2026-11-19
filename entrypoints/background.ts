@@ -23,6 +23,8 @@ export default defineBackground(() => {
 
   /** Puts the reader and the highlight colours into one frame, or every reachable frame. */
   async function inject(tabId: number, frameId: number | undefined) {
+    // The add-on's own document page has the reader built in, and no add-on can inject into it.
+    if ((await browser.tabs.get(tabId)).url?.startsWith(browser.runtime.getURL("/document.html"))) return;
     const target = frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] };
     const injections = await browser.scripting.executeScript({ target, files: ["/content-scripts/reader.js"] });
     // First injection into a document: add the highlight colours too.

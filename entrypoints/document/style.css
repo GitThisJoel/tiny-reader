@@ -1,0 +1,60 @@
+:root {
+  color-scheme: light dark;
+  font:
+    16px / 1.5 system-ui,
+    sans-serif;
+}
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+}
+header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+}
+header img {
+  border-radius: 6px;
+}
+h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+/* The name of the open file. It is not part of the text that is read. */
+#name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: GrayText;
+}
+button {
+  font: inherit;
+  padding: 0.35rem 0.8rem;
+}
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  /* Room for the control bar at the bottom of the window. */
+  padding: 1.5rem 1rem 6rem;
+}
+#status {
+  color: GrayText;
+}
+#status[data-kind="error"] {
+  color: light-dark(#a4000f, #ff9aa2);
+}
+body[data-dropping] {
+  outline: 3px dashed Highlight;
+  outline-offset: -8px;
+}
+article {
+  font-size: 1.15rem;
+  line-height: 1.65;
+}

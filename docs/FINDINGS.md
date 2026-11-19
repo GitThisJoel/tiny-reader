@@ -456,3 +456,23 @@ Two ways to actually read such text, neither built:
 2. Ask for access to the article's site (`optional_host_permissions`, a prompt per site), leave
    Reader View and read the original page. Reads whole pages; costs a permission prompt and
    takes the user out of Reader View.
+
+## 16. Reading PDFs
+
+Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a page of its own
+(`document.html`), where the user opens or drops the file.
+
+- **No permission and no network.** The file comes from a file picker or a drop, is parsed by
+  pdf.js (`pdfjs-dist` 6.5.438, bundled, 1.7 MB) in a Worker of the page, and never leaves it.
+  pdf.js is told not to fetch anything: `useWorkerFetch: false`, `useWasm: false`,
+  `disableFontFace: true`. An add-on cannot `fetch` a `file://` URL, so the PDF open in another
+  tab cannot be picked up automatically; the user has to choose the file again.
+- **Text, not layout.** `getTextContent()` gives positioned runs. Lines are found by baseline,
+  paragraphs by vertical gap and font size, a word hyphenated at a line end is rejoined, page
+  numbers are dropped, and a sentence that runs over a page break is carried on. Verified on a
+  generated two-page PDF in real Firefox; not yet tried on a range of real-world PDFs.
+- **Everything else is shared.** The page uses the same controller as the content script, and
+  `tabs.sendMessage` reaches an add-on page shown in a tab, so the popup, the shortcuts and both
+  context menu entries (including `menus.getTargetElement`) work there unchanged. The background
+  only has to skip injection for that page.
+- `web-ext lint` gains two `UNSAFE_VAR_ASSIGNMENT` warnings, both inside pdf.js.

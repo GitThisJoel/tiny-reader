@@ -206,6 +206,16 @@ export class Firefox {
     await this.send("WebDriver:Refresh", {});
   }
 
+  /** Chooses a file in an <input type="file">, as the file picker would. */
+  async upload(tab: string, selector: string, path: string) {
+    const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
+      selector,
+    ]);
+    const id = Object.values(element ?? {})[0];
+    if (!id) throw new Error(`no element matches ${selector}`);
+    await this.send("WebDriver:ElementSendKeys", { id, text: path });
+  }
+
   /** Presses the left button at one viewport point, moves to another and releases. */
   async drag(tab: string, from: [x: number, y: number], to: [x: number, y: number]) {
     await this.focus(tab);
