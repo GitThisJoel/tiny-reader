@@ -1,0 +1,9 @@
+node_modules/
+.output/
+.wxt/
+web-ext-artifacts/
+# Downloaded by `pnpm fetch-assets`, never committed.
+public/assets/
+vendor/
+# Machine-specific browser binary paths for `pnpm dev`.
+web-ext.config.ts
