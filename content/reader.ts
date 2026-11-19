@@ -1,9 +1,9 @@
-import type { SpokenWord, SynthOptions } from "@/engine/protocol.ts";
+import type { SynthOptions, WordTiming } from "@/engine/protocol.ts";
 
 export interface Utterance {
 	pcm: Float32Array;
 	sampleRate: number;
-	words: SpokenWord[];
+	words: WordTiming[];
 }
 
 /** Where audio goes. Items play back to back, in the order they were enqueued. */

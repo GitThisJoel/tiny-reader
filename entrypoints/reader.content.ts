@@ -2,11 +2,12 @@
 import { browser } from "wxt/browser";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { createBar } from "@/content/bar.ts";
-import { highlightSentence } from "@/content/highlight.ts";
+import { highlightSentence, highlightWord } from "@/content/highlight.ts";
 import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
 import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange } from "@/content/text-map.ts";
+import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
 import {
 	DEFAULT_OPTIONS,
@@ -51,6 +52,25 @@ export default defineContentScript({
 				browser.runtime.connect({ name: PORT_NAME }),
 			);
 			const sink = new WebAudioSink();
+			// A highlight that jumps from word to word is motion; with reduced motion only the
+			// sentence is marked.
+			const reducedMotion = matchMedia(
+				"(prefers-reduced-motion: reduce)",
+			).matches;
+			let spoken: (typeof sentences)[number] | undefined;
+			const tracker = new WordTracker(
+				() => sink.position,
+				(word) =>
+					highlightWord(
+						word && spoken
+							? map.rangeOf(
+									spoken.start + word.charStart,
+									spoken.start + word.charEnd,
+								)
+							: null,
+					),
+			);
+			let followed: unknown = null;
 			const reader = new Reader(
 				{
 					synthesize: (sentence, synthOptions, signal) =>
@@ -63,6 +83,17 @@ export default defineContentScript({
 						highlightSentence(
 							sentence ? map.rangeOf(sentence.start, sentence.end) : null,
 						);
+						// Follow words only while this utterance is sounding.
+						const utterance =
+							state.status === "playing" && !reducedMotion
+								? state.utterance
+								: undefined;
+						if (utterance !== followed) {
+							followed = utterance;
+							spoken = sentence;
+							if (utterance) tracker.follow(utterance.words);
+							else tracker.stop();
+						}
 						// Keep the engine loaded while reading; let Firefox unload it otherwise.
 						client.keepAlive(
 							state.status === "playing" || state.status === "loading",
@@ -90,7 +121,9 @@ export default defineContentScript({
 				if (ended) return;
 				ended = true;
 				reader.stop();
+				tracker.stop();
 				highlightSentence(null);
+				highlightWord(null);
 				sink.close();
 				client.close();
 				bar.remove();

@@ -319,3 +319,15 @@ Consequences:
 - Source newlines inside a paragraph must be mapped to spaces (length-preserving) before
   segmentation: `Intl.Segmenter` treats a line feed as a sentence end.
 - Not done: scrolling the page to follow the highlight. It was not asked for; say if you want it.
+
+## 12. Milestone 5 results
+
+- Word-level highlighting is implemented as planned in §5: token durations give exact times
+  for spoken words, and longest-common-subsequence anchors map them to source words. In the
+  real add-on the word highlight changes as the audio plays and always lies inside the sentence
+  highlight.
+- The alignment runs in the engine Worker, per piece of at most 300 characters, so its
+  quadratic table stays small (a few thousand cells).
+- The playback position is `AudioContext.currentTime − outputLatency − start time of the
+  utterance`. Not verified by ear in this headless setup: whether the highlight is perceptibly
+  early or late on real speakers.

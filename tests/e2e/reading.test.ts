@@ -145,6 +145,61 @@ describe.each([
 		await barWhen(tab, `bar.status === "playing"`);
 	}, 60_000);
 
+	it("highlights the word being spoken, inside the sentence, and moves on", async () => {
+		const WORD = `
+			const [word] = CSS.highlights.get("tiny-reader-word") ?? [];
+			const [sentence] = CSS.highlights.get("tiny-reader-sentence") ?? [];
+			if (!word || !sentence) return null;
+			return {
+				word: word.toString(),
+				sentence: sentence.toString(),
+				inside: sentence.compareBoundaryPoints(Range.START_TO_START, word) <= 0
+					&& sentence.compareBoundaryPoints(Range.END_TO_END, word) >= 0,
+				priority: CSS.highlights.get("tiny-reader-word").priority,
+			};`;
+		interface Word {
+			word: string;
+			sentence: string;
+			inside: boolean;
+			priority: number;
+		}
+		await press(tab, "Previous sentence");
+		const first = await firefox.waitFor<Word>(tab, WORD);
+		expect(first.sentence).toBe("Second paragraph.");
+		expect(["Second", "paragraph"]).toContain(first.word);
+		expect(first.inside).toBe(true);
+		expect(first.priority).toBe(1);
+		// Wait for a different word: the highlight follows the audio.
+		const seen = new Set([first.word]);
+		for (let tries = 0; tries < 100 && seen.size < 4; tries++) {
+			const now = await firefox.evaluate<Word | null>(tab, WORD);
+			if (now) {
+				expect(now.inside).toBe(true);
+				seen.add(now.word);
+			}
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+		expect(seen.size).toBeGreaterThanOrEqual(4);
+		for (const word of seen)
+			expect([
+				"Second",
+				"paragraph",
+				"It",
+				"has",
+				"3",
+				"sentences",
+				"Bye",
+			]).toContain(word);
+
+		// Paused: the word stays put. Stopped: it is gone.
+		await press(tab, "Pause");
+		await barWhen(tab, `bar.status === "paused"`);
+		await press(tab, "Previous sentence");
+		await press(tab, "Previous sentence");
+		await press(tab, "Play");
+		await barWhen(tab, `bar.status === "playing" && bar.text.includes(" 1 ")`);
+	}, 60_000);
+
 	it("pauses, resumes and skips", async () => {
 		await press(tab, "Pause");
 		expect(await barWhen(tab, `bar.status === "paused"`)).toMatchObject({
@@ -196,6 +251,29 @@ describe.each([
 				"return document.documentElement.childElementCount;",
 			),
 		).toBe(2);
+	}, 60_000);
+
+	it("with reduced motion, marks the sentence but does not chase words", async () => {
+		await firefox.chrome(
+			`Services.prefs.setIntPref("ui.prefersReducedMotion", 1);`,
+		);
+		try {
+			await select(tab, "#second");
+			await firefox.contextMenu(tab, "#second", MENU);
+			await barWhen(tab, `bar.status === "playing"`);
+			await new Promise((resolve) => setTimeout(resolve, 700));
+			expect(
+				await firefox.evaluate(
+					tab,
+					`return [CSS.highlights.has("tiny-reader-sentence"), CSS.highlights.has("tiny-reader-word")];`,
+				),
+			).toEqual([true, false]);
+			await press(tab, "Stop reading");
+		} finally {
+			await firefox.chrome(
+				`Services.prefs.clearUserPref("ui.prefersReducedMotion");`,
+			);
+		}
 	}, 60_000);
 
 	it("explains when the selection has nothing it can read", async () => {

@@ -5,9 +5,9 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 4 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
-and the add-on reads it aloud, highlighting each sentence, with a control bar for pause, skip,
-speed and voice. Research behind the design is in
+**Status:** Milestone 5 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
+and the add-on reads it aloud, highlighting the sentence and the word being spoken, with a
+control bar for pause, skip, speed and voice. Research behind the design is in
 [docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Requirements
@@ -121,6 +121,14 @@ Web Audio queue, control bar
   registered with the CSS Custom Highlight API; its colours are injected with
   `scripting.insertCSS`. No element is wrapped or inserted. The selection is cleared when reading
   starts, because a selection paints over a highlight.
+- **Word timing** ([engine/align.ts](engine/align.ts),
+  [content/word-tracker.ts](content/word-tracker.ts)): the model returns a duration for every
+  phoneme token and the phonemizer knows which tokens belong to which spoken word, so each spoken
+  word has an exact time span. Spoken words are matched back to the words of the source text by
+  longest common subsequence. Text the phonemizer rewrites (`$42.50` is spoken as "forty two
+  dollars and fifty cents") is highlighted as one span for as long as it is spoken. The word
+  highlight follows the audio clock, corrected for output latency. With
+  `prefers-reduced-motion: reduce` only the sentence is highlighted.
 - **Background event page**: context menu, keyboard commands, and routing between content
   scripts and the engine. It owns the engine Worker, because a content script cannot start an
   extension Worker (FINDINGS §7).

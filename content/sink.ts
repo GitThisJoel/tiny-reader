@@ -55,12 +55,17 @@ export class WebAudioSink implements AudioSink {
 		item.onStart();
 	}
 
-	/** Seconds into the utterance that is sounding now. */
+	/** Seconds into the utterance that is being heard now. */
 	get position(): number {
 		const [item] = this.items;
-		return item && this.context
-			? Math.max(0, this.context.currentTime - item.startTime)
-			: 0;
+		if (!item || !this.context) return 0;
+		// currentTime runs ahead of the speakers by the output latency.
+		return Math.max(
+			0,
+			this.context.currentTime -
+				(this.context.outputLatency || 0) -
+				item.startTime,
+		);
 	}
 
 	clear() {
