@@ -1,4 +1,7 @@
+import { createRequire } from "node:module";
 import { defineConfig } from "wxt";
+
+const require = createRequire(import.meta.url);
 
 export default defineConfig({
 	browser: "firefox",
@@ -8,6 +11,31 @@ export default defineConfig({
 	alias: { "tiny-voca": "vendor/tiny-voca/js" },
 	// The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
 	zip: { excludeSources: ["public/assets/**", "vendor/**"] },
+	vite: () => ({
+		resolve: {
+			// Selects onnxruntime-web's build that loads its wasm from a URL. The default build
+			// would inline the 15 MB binary into the worker script as base64.
+			conditions: [
+				"onnxruntime-web-use-extern-wasm",
+				"module",
+				"browser",
+				"development|production",
+			],
+		},
+	}),
+	hooks: {
+		// ONNX Runtime's wasm binary and its loader ship inside the add-on, unmodified.
+		"build:publicAssets"(_, files) {
+			for (const name of [
+				"ort-wasm-simd-threaded.wasm",
+				"ort-wasm-simd-threaded.mjs",
+			])
+				files.push({
+					absoluteSrc: require.resolve(`onnxruntime-web/${name}`),
+					relativeDest: `ort/${name}`,
+				});
+		},
+	},
 	manifest: {
 		name: "Tiny Reader",
 		description:
