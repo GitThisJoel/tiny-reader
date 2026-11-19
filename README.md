@@ -5,8 +5,8 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 1 of 7 (repository scaffold and infrastructure). The add-on builds and
-loads but does not read anything yet. Research behind the design is in
+**Status:** Milestone 2 of 7. The speech engine works inside the add-on and can be tried from
+a test page; reading web pages comes next. Research behind the design is in
 [docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Requirements
@@ -33,7 +33,8 @@ are never committed. Running it again only re-verifies what is on disk.
 pnpm dev
 ```
 
-Builds in watch mode and starts Firefox with the add-on installed in a temporary profile.
+Builds in watch mode and starts Firefox with the add-on installed in a temporary profile. It
+opens the engine test page (`playground.html`), where you can type a sentence and hear it.
 
 If Firefox is installed as a snap, `web-ext` cannot reach it. Create `web-ext.config.ts`
 (gitignored) pointing at the real binary:
@@ -60,13 +61,43 @@ export default defineWebExtConfig({
 | `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
 | `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
 
-`pnpm lint:ext` reports one accepted warning about Firefox for Android; the add-on is desktop
-only. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of the above and uploads
-the zip as an artifact.
+`pnpm lint:ext` reports no errors and two accepted warnings:
+
+- `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: the add-on is desktop only.
+- `UNSAFE_VAR_ASSIGNMENT` in `engine-worker.js`: ONNX Runtime loads its own wasm loader with a
+  dynamic `import()`. The URL is always `ort/ort-wasm-simd-threaded.mjs` inside the add-on
+  package, an unmodified file from the `onnxruntime-web` npm package.
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs everything above except
+`test:e2e` and uploads the zip as an artifact. The end-to-end tests are left out of CI because
+they have only been run locally; set `FIREFOX` to the binary if it is not found.
+
+## Phonemizer parity
+
+Text is turned into phoneme ids by upstream's JavaScript port of the
+[dizione](https://github.com/n4ze3m/dizione) phonemizer. `pnpm test:parity` checks that it gives
+exactly the ids and stress values of the Python reference for every sentence in
+[tests/parity/fixtures.json](tests/parity/fixtures.json).
+
+To regenerate the fixtures (needs `git`, Python 3.10+ and `numpy`):
+
+```bash
+python3 scripts/gen-parity-fixtures.py
+```
+
+The script checks out dizione at the commit pinned inside it, downloads the phonemizer data at
+the pinned Hugging Face revision (SHA-256 verified) into `~/.cache/tiny-reader-parity`, and
+phonemizes dizione's own tricky-sentence list plus [tests/parity/extra.txt](tests/parity/extra.txt).
+Add sentences to `extra.txt`, not to the JSON.
+
+Two inputs are known to differ on purpose (initials such as "H. C. Sirr": the JavaScript port has
+a fix that Python dizione has not published yet). They are listed in `KNOWN_DIVERGENT` in
+[tests/parity/parity.test.ts](tests/parity/parity.test.ts) with the recorded JavaScript output,
+and a test fails once that list is no longer needed.
 
 ## Architecture
 
-Planned; each part lands in its own milestone.
+The engine Worker and the background routing exist; the content script is planned.
 
 ```
 page (content script)                background event page            engine Worker
@@ -83,8 +114,16 @@ Web Audio queue, control bar
 - **Background event page**: context menu, keyboard commands, and routing between content
   scripts and the engine. It owns the engine Worker, because a content script cannot start an
   extension Worker (FINDINGS §7).
-- **Engine Worker**: phonemiser and ONNX Runtime Web (single-threaded wasm). It stays loaded
-  while a page is reading and is unloaded by Firefox 30 seconds after reading stops.
+- **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts),
+  [engine/](engine/)): phonemizer and ONNX Runtime Web (single-threaded wasm). One request is one
+  sentence; the reply is Float32 PCM at 24 kHz plus the time span of every spoken word. Text too
+  long for one model call (200 tokens) is cut at commas, then between words, and the audio joined.
+  The Worker stays loaded while a page is reading and is unloaded by Firefox 30 seconds after
+  reading stops.
+- **Protocol** ([engine/protocol.ts](engine/protocol.ts)): typed messages with request ids.
+  `cancel` and `cancelAll` drop queued work and discard the result of work in progress; nothing is
+  sent for a cancelled request. The background prefixes ids per page, so pages cannot see or cancel
+  each other's requests, and cancels a page's work when its port closes.
 
 ## Permissions
 

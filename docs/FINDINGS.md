@@ -277,3 +277,19 @@ Consequences:
   revision.
 - The model reads the same text the same way every time (no prosody sampling), so a re-synthesis
   after a skip or a cache miss has the same durations and word timings.
+
+## 9. Milestone 2 measurements (real add-on, headless Firefox 158)
+
+- The engine runs under the add-on CSP `script-src 'self' 'wasm-unsafe-eval'` with no changes:
+  ONNX Runtime's loader is fetched with a dynamic `import()` from the add-on package inside a
+  classic Worker.
+- `onnxruntime-web/wasm` must be resolved with the export condition
+  `onnxruntime-web-use-extern-wasm`. The default build embeds the wasm binary, and Vite then
+  inlined it as base64, giving a 40 MB worker script.
+- First sentence after a cold start (Worker start, model and phonemizer load, synthesis):
+  **1.08 s** for 1.9 s of audio. Warm: 82 ms for 1.9 s, 236 ms for 5.2 s, 729 ms for 11.6 s
+  (about 16–24× real time).
+- Built add-on: 44.4 MB unpacked, 26.6 MB zipped.
+- WebDriver BiDi cannot navigate to `moz-extension://` pages ("not allowed in this context").
+  The end-to-end tests use Marionette instead, which can, and whose clicks are real input
+  events.
