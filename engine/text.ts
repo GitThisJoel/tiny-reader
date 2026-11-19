@@ -32,14 +32,17 @@ export interface Piece {
 export function splitLong(text: string, tooLong: (piece: string) => boolean, offset = 0): Piece[] {
   if (!text.trim()) return [];
   if (!tooLong(text)) return [{ text, offset }];
-  const cuts = [...text.matchAll(/[,;:—]\s+/g)].map((match) => match.index + match[0].length);
+  // Only cuts strictly inside the text count: each one leaves two shorter pieces, so this ends.
+  const cutsAfter = (pattern: RegExp) =>
+    [...text.matchAll(pattern)].map((match) => match.index + match[0].length).filter((cut) => cut < text.length);
+  let cuts = cutsAfter(/[,;:—]\s+/g);
   if (!cuts.length) {
-    const gaps = [...text.matchAll(/\s+/g)].map((match) => match.index + match[0].length);
+    const gaps = cutsAfter(/\s+/g);
     const middle = gaps[Math.floor((gaps.length - 1) / 2)];
-    if (middle === undefined || middle >= text.length) return [];
-    cuts.push(middle);
+    if (middle === undefined) return [];
+    cuts = [middle];
   }
-  const bounds = [0, ...cuts.filter((cut) => cut < text.length), text.length];
+  const bounds = [0, ...cuts, text.length];
   return bounds
     .slice(0, -1)
     .flatMap((start, index) => splitLong(text.slice(start, bounds[index + 1]), tooLong, offset + start));

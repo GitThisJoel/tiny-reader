@@ -62,6 +62,15 @@ describe("splitLong", () => {
     expect(splitLong("ok Pneumonoultramicroscopic", longerThan(5)).map((piece) => piece.text)).toEqual(["ok "]);
   });
 
+  it("cuts a long clause whose only comma is at its end", () => {
+    // The cut after that comma is the end of the piece: it must fall back to cutting between words.
+    const text = "one two three four five six, ";
+    const pieces = rebuilt(text, 12);
+    expect(pieces.map((piece) => piece.text).join("")).toBe(text);
+    for (const piece of pieces) expect(piece.text.trim().length).toBeLessThanOrEqual(12);
+    expect(rebuilt(`${text}seven eight`, 12).length).toBeGreaterThan(3);
+  });
+
   it("always terminates", () => {
     expect(splitLong("a ".repeat(500), () => true)).toEqual([]);
   });

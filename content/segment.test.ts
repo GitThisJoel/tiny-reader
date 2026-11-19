@@ -46,6 +46,17 @@ describe("segment", () => {
     expect(sentences.map((sentence) => sentence.text).join(" ")).toBe(text);
   });
 
+  it("cuts a clause longer than the limit that ends in a comma", () => {
+    const clause = "the river kept on running past the old mill and under the stone bridge ".repeat(6).trim();
+    const text = `${clause}, and then it reached the sea.`;
+    const sentences = segment(text, 100);
+    expect(sentences.length).toBeGreaterThan(4);
+    for (const sentence of sentences) {
+      expect(sentence.text.length).toBeLessThanOrEqual(100);
+      expect(text.slice(sentence.start, sentence.end)).toBe(sentence.text);
+    }
+  });
+
   it("never overlaps and stays in order", () => {
     const text = "Dr. A. B. Cee said: “Go.” Then (after 3.5 s) she left… Did she? Yes!\n\nNew paragraph, no stop";
     let previous = 0;
