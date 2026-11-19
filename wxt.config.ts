@@ -4,6 +4,8 @@ export default defineConfig({
 	browser: "firefox",
 	manifestVersion: 3,
 	imports: false,
+	// Upstream's JS phonemizer, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
+	alias: { "tiny-voca": "vendor/tiny-voca/js" },
 	// The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
 	zip: { excludeSources: ["public/assets/**", "vendor/**"] },
 	manifest: {
