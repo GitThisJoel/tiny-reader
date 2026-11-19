@@ -54,6 +54,7 @@ export class Firefox {
       "browser.shell.checkDefaultBrowser": false,
       "datareporting.policy.dataSubmissionEnabled": false,
       "media.autoplay.default": 5, // Firefox's default: block audible autoplay
+      "media.volume_scale": "0.0", // silent: audio still plays through Web Audio, at zero volume
     };
     await writeFile(
       join(this.profile, "user.js"),
