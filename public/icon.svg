@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <title>Tiny Reader</title>
+  <rect width="48" height="48" rx="10" fill="#ffc83d"/>
+  <path fill="#1c1b22" fill-rule="evenodd" d="M8 36 17 12h4l9 24h-4.6l-1.9-5.4h-9L12.6 36zm8-9.4h6l-3-8.6z"/>
+  <path fill="none" stroke="#1c1b22" stroke-width="3.2" stroke-linecap="round" d="M33.5 19a7 7 0 0 1 0 10m4.5-14.5a13 13 0 0 1 0 19"/>
+</svg>

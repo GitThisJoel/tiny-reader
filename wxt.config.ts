@@ -30,6 +30,9 @@ export default defineConfig({
   },
   manifest: {
     name: "Tiny Reader",
+    icons: { 48: "icon.svg", 96: "icon.svg" },
+    // The toolbar button. Its popup is entrypoints/popup.
+    action: { default_title: "Tiny Reader", default_icon: "icon.svg" },
     // Each permission is justified in the README.
     permissions: ["activeTab", "scripting", "menus", "storage"],
     // Defaults only; every key can be changed in Firefox's "Manage Extension Shortcuts".
