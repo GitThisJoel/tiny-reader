@@ -1,10 +1,11 @@
 import type * as Ort from "onnxruntime-web";
+import { alignWords } from "./align.ts";
 import { loadPhonemizer, type Phonemes, phonemize } from "./phonemizer.ts";
 import {
 	HOP,
 	SAMPLE_RATE,
-	type SpokenWord,
 	type SynthOptions,
+	type WordTiming,
 } from "./protocol.ts";
 import { finished, normalize, splitLong } from "./text.ts";
 
@@ -25,7 +26,7 @@ export class NothingToPronounce extends Error {
 export interface Utterance {
 	pcm: Float32Array;
 	sampleRate: number;
-	words: SpokenWord[];
+	words: WordTiming[];
 }
 
 export interface Engine {
@@ -97,7 +98,7 @@ export async function createEngine(
 			);
 
 			const chunks: Float32Array[] = [];
-			const words: SpokenWord[] = [];
+			const words: WordTiming[] = [];
 			let samples = 0;
 			for (const piece of pieces) {
 				const phonemes = phonemesOf(piece.text);
@@ -111,11 +112,17 @@ export async function createEngine(
 				});
 				const seconds = (token: number) =>
 					(samples + (starts[token] ?? 0) * HOP) / SAMPLE_RATE;
-				for (const word of phonemes.words)
+				const spoken = phonemes.words.map((word) => ({
+					text: word.text,
+					start: seconds(word.tokenStart),
+					end: seconds(word.tokenEnd),
+				}));
+				// Positions are in the text the page sent: pieces keep their offsets.
+				for (const timing of alignWords(piece.text, spoken))
 					words.push({
-						text: word.text,
-						start: seconds(word.tokenStart),
-						end: seconds(word.tokenEnd),
+						...timing,
+						charStart: timing.charStart + piece.offset,
+						charEnd: timing.charEnd + piece.offset,
 					});
 				chunks.push(pcm);
 				samples += pcm.length;

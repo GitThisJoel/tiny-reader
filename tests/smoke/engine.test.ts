@@ -54,13 +54,10 @@ describe("engine", () => {
 		expect(peak).toBeGreaterThan(0.05);
 		expect(peak).toBeLessThanOrEqual(0.99 + 1e-6);
 
-		expect(result.words.map((word) => word.text)).toEqual([
-			"hello",
-			"this",
-			"is",
-			"tiny",
-			"voca",
-		]);
+		const text = "Hello! This is tiny voca.";
+		expect(
+			result.words.map((word) => text.slice(word.charStart, word.charEnd)),
+		).toEqual(["Hello", "This", "is", "tiny", "voca"]);
 		let previous = 0;
 		for (const word of result.words) {
 			expect(word.start).toBeGreaterThanOrEqual(previous);
@@ -83,11 +80,36 @@ describe("engine", () => {
 		if (!result) throw new Error("no result");
 		expect(result.pcm.length / result.sampleRate).toBeGreaterThan(20);
 		expect(result.words.length).toBe(12 * 9 + 2);
+		// Word positions stay correct across the pieces the sentence was cut into.
+		expect(
+			result.words
+				.map((word) => text.slice(word.charStart, word.charEnd))
+				.join(" "),
+		).toBe(text.replace(/[,.]/g, ""));
+		for (let index = 1; index < result.words.length; index++)
+			expect(result.words[index]?.start).toBeGreaterThanOrEqual(
+				result.words[index - 1]?.end ?? 0,
+			);
 		expect(result.words.at(-1)?.end).toBeLessThanOrEqual(
 			result.pcm.length / result.sampleRate,
 		);
 		expect(peakOf(result.pcm)).toBeLessThanOrEqual(0.99 + 1e-6);
 	}, 60_000);
+
+	it("times an expanded number as one span over its source text", async () => {
+		const text = "It costs $42.50 today.";
+		const result = await engine.speak(text, DEFAULT_OPTIONS);
+		if (!result) throw new Error("no result");
+		expect(
+			result.words.map((word) => text.slice(word.charStart, word.charEnd)),
+		).toEqual(["It", "costs", "42.50", "today"]);
+		const [, costs, amount, today] = result.words;
+		// "forty two dollars and fifty cents" takes far longer than "costs".
+		expect((amount?.end ?? 0) - (amount?.start ?? 0)).toBeGreaterThan(
+			3 * ((costs?.end ?? 0) - (costs?.start ?? 0)),
+		);
+		expect(today?.start).toBeGreaterThanOrEqual(amount?.end ?? 0);
+	});
 
 	it("refuses text with nothing to pronounce", async () => {
 		await expect(

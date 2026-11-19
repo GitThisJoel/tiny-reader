@@ -2,15 +2,15 @@ import type {
 	EngineErrorCode,
 	EngineRequest,
 	EngineResponse,
-	SpokenWord,
 	SynthOptions,
+	WordTiming,
 } from "./protocol.ts";
 import type { PortLike } from "./router.ts";
 
 export interface Utterance {
 	pcm: Float32Array;
 	sampleRate: number;
-	words: SpokenWord[];
+	words: WordTiming[];
 }
 
 export class EngineError extends Error {

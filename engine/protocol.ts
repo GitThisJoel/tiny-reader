@@ -1,3 +1,7 @@
+import type { WordTiming } from "./align.ts";
+
+export type { WordTiming };
+
 // Messages between a page (content script or extension page) and the engine.
 // Page ⇄ background travels over a runtime.Port named PORT_NAME; background ⇄ Worker over
 // postMessage. Both legs carry the same shapes.
@@ -40,13 +44,6 @@ export type EngineRequest =
 	/** Keeps the background event page, and so the loaded engine, alive. */
 	| { type: "ping" };
 
-/** One spoken word and when it is heard, in seconds from the start of `pcm`. */
-export interface SpokenWord {
-	text: string;
-	start: number;
-	end: number;
-}
-
 export type EngineErrorCode = "nothing-to-pronounce" | "failed";
 
 export type EngineResponse =
@@ -55,7 +52,7 @@ export type EngineResponse =
 			id: string;
 			pcm: Float32Array;
 			sampleRate: number;
-			words: SpokenWord[];
+			words: WordTiming[];
 	  }
 	| { type: "error"; id: string; code: EngineErrorCode; message: string }
 	/** Sent while the model is being loaded for the first request, and when it is ready. */
