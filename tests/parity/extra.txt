@@ -1,0 +1,25 @@
+# Extra parity sentences, one per line. Lines starting with # are ignored.
+# The first twenty are tiny-voca's own test sentences (js/test/sentences.json).
+Hello! This is tiny voca.
+The weather is nice today, and I feel very relaxed.
+Did you really pay $42.50 for that on March 3rd, 2024?
+She sells seashells by the seashore; the shells she sells are surely seashells.
+After a long and difficult journey across the mountains, the travellers finally reached the small village, where they were welcomed with warm food, a place to sleep and many questions about the road behind them.
+No.
+What time does the last train leave?
+I read the book you gave me, and I will read the next one soon.
+The quick brown fox jumps over the lazy dog near the quiet river bank.
+It runs in a web page, with no libraries at all: one script and one file.
+# Web-page prose: quotes, dashes, parentheses, URLs, mixed scripts.
+“Smart quotes,” she said — and then paused… for a moment.
+The meeting (originally planned for 9:30 a.m.) moved to 2 p.m. on Jan. 5th.
+Visit https://example.com/docs?page=2 or email support@example.com for help.
+It’s 72°F outside, i.e. about 22 °C; that’s 50% warmer than yesterday.
+Version 2.0.1 of the API returns HTTP 404 when the user's ID isn't found.
+NASA's budget rose from $18.5B in 2015 to $25.4 billion in 2024.
+Chapter IV: The 3rd of May, 1808.
+Read the read-me before you read the book I read yesterday.
+The wind was too strong to wind the sail.
+Привет, мир!
+こんにちは世界
+:) :-( <3

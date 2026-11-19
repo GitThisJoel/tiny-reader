@@ -36,6 +36,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:parity
+      - run: pnpm test:smoke
       - run: pnpm build
       - run: pnpm lint:ext
       - run: pnpm zip
@@ -43,4 +45,6 @@ jobs:
         with:
           name: tiny-reader-firefox
           path: .output/*.zip
+          # .output is a dot-directory, which upload-artifact skips unless told otherwise.
+          include-hidden-files: true
           if-no-files-found: error

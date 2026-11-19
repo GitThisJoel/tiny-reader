@@ -277,3 +277,152 @@ Consequences:
   revision.
 - The model reads the same text the same way every time (no prosody sampling), so a re-synthesis
   after a skip or a cache miss has the same durations and word timings.
+
+## 9. Milestone 2 measurements (real add-on, headless Firefox 158)
+
+- The engine runs under the add-on CSP `script-src 'self' 'wasm-unsafe-eval'` with no changes:
+  ONNX Runtime's loader is fetched with a dynamic `import()` from the add-on package inside a
+  classic Worker.
+- `onnxruntime-web/wasm` must be resolved with the export condition
+  `onnxruntime-web-use-extern-wasm`. The default build embeds the wasm binary, and Vite then
+  inlined it as base64, giving a 40 MB worker script.
+- First sentence after a cold start (Worker start, model and phonemizer load, synthesis):
+  **1.08 s** for 1.9 s of audio. Warm: 82 ms for 1.9 s, 236 ms for 5.2 s, 729 ms for 11.6 s
+  (about 16–24× real time).
+- Built add-on: 44.4 MB unpacked, 30.5 MB zipped.
+- WebDriver BiDi cannot navigate to `moz-extension://` pages ("not allowed in this context").
+  The end-to-end tests use Marionette instead, which can, and whose clicks are real input
+  events.
+
+## 10. Milestone 3 results (real pages, headless Firefox 158)
+
+- **Autoplay risk resolved.** Right-clicking the selection to open the context menu gives the
+  page user activation (`navigator.userActivation.hasBeenActive` is true afterwards), and the
+  content script's `AudioContext` runs with no further click, under Firefox's default
+  `media.autoplay.default = 5`. The "Press play to start" state stays as a fallback.
+- **Xray pitfall.** In a content script, `AudioBuffer.getChannelData(0).set(pcm)` throws
+  "Permission denied to access object": the channel array belongs to the page, and page code
+  may not read the content script's array. `AudioBuffer.copyToChannel(pcm, 0)` works.
+- A page CSP of `default-src 'none'` with `script-src`, `style-src`, `media-src`, `worker-src`,
+  `frame-src` and `connect-src` all `'none'` changes nothing: the bar's constructed stylesheet
+  applies, audio plays, and the engine is reached. The end-to-end suite runs every reading test
+  on such a page.
+- `wxt/browser` types have `contextMenus` but not Firefox's `menus` alias. Firefox supports
+  both, so the add-on uses `contextMenus`.
+
+## 11. Milestone 4 results
+
+- `CSS.highlights.set(name, new Highlight(range))` from the content script and a
+  `::highlight()` rule added with `scripting.insertCSS` paint correctly, also on a page whose
+  CSP has `style-src 'none'`. `document.body.innerHTML` is identical before and after a reading.
+- `::selection` paints over `::highlight()`, so the selection is cleared when reading starts.
+- Source newlines inside a paragraph must be mapped to spaces (length-preserving) before
+  segmentation: `Intl.Segmenter` treats a line feed as a sentence end.
+- Not done: scrolling the page to follow the highlight. It was not asked for; say if you want it.
+
+## 12. Milestone 5 results
+
+- Word-level highlighting is implemented as planned in §5: token durations give exact times
+  for spoken words, and longest-common-subsequence anchors map them to source words. In the
+  real add-on the word highlight changes as the audio plays and always lies inside the sentence
+  highlight.
+- The alignment runs in the engine Worker, per piece of at most 300 characters, so its
+  quadratic table stays small (a few thousand cells).
+- The playback position is `AudioContext.currentTime − outputLatency − start time of the
+  utterance`. Not verified by ear in this headless setup: whether the highlight is perceptibly
+  early or late on real speakers.
+
+## 13. Milestone 6 results
+
+- "Read from here" needs to know where the context menu was opened, but the content script is
+  only injected after the click (activeTab). Firefox's `menus.getTargetElement(targetElementId)`
+  solves this from the content script. It exists only under the `menus` namespace, so the
+  permission is `menus`, not the `contextMenus` alias chosen in §10.
+- The start is the beginning of the block that holds the clicked element, not the clicked
+  word: the pointer position is not available to a script injected after the click.
+- A keyboard command grants activeTab like a menu click. Audio started from a shortcut plays
+  when the page has been interacted with before (verified after one real click in the page).
+  The end-to-end tests trigger the registered `<key>` element rather than typing the keys:
+  synthesized key presses do not reach Firefox's shortcut handling in headless mode. Triggering
+  by "Alt+Shift+R" fails unless that exact shortcut is registered, so the defaults are covered.
+- A shortcut is sent to every frame the add-on can reach, since any frame may hold the
+  selection. A reading started in one frame does not stop one already running in another.
+
+## 14. Milestone 7 results
+
+### Long pages
+
+"Read from here" maps and segments the whole rest of the article before the bar appears.
+Measured in headless Firefox 158, from the menu click to the bar appearing (this includes
+opening the menu and injecting the script, about 250 ms on their own):
+
+| Paragraphs | Sentences | Click to bar |
+| ---------: | --------: | -----------: |
+|        100 |       300 |       251 ms |
+|      2,000 |     6,000 |       311 ms |
+|     10,000 |    30,000 |       651 ms |
+
+So the up-front work costs about 40 µs per paragraph: 60 ms for a very long article, 0.4 s
+for a book-sized page. It is left as it is; the code names the upgrade path (map block by
+block). After the start, every step is logarithmic or constant in the page size: skipping
+two sentences on the 6,000-sentence page takes as long as on a short one.
+
+### Long and awkward sentences
+
+- The content script cuts sentences longer than 300 characters at commas, then between words,
+  so a 2,900-character run-on sentence starts playing as fast as a short one (13 pieces).
+- The engine cuts again by tokens (200) for text that expands, such as long digit strings.
+- A single word over the token limit with no space in it is dropped and the rest is read.
+  Measured: a 1,500-letter "word" is no problem (the phonemizer gives it a short guess); a
+  150-digit number is dropped.
+
+### Other languages
+
+- Other scripts: the phonemizer reports nothing to pronounce, the sentence is skipped, and if
+  nothing at all could be read the bar says so.
+- Other languages in Latin script would be read with English sounds. `i18n.detectLanguage`
+  (Firefox's built-in detector; it runs locally and works in a content script) is given the
+  first 4,000 characters. A reliable non-English result puts a warning in the bar, naming the
+  language. Reading continues: the user asked for it, and detection can be wrong.
+
+### Errors in the UI
+
+Every failure ends in the bar's status line: engine errors, a lost engine after one retry,
+playback exceptions, nothing readable, nothing to read. The one case with no UI is a page
+where add-ons may not run at all (about: pages, addons.mozilla.org): nothing can be injected,
+so the failure is only logged in the background page's console.
+
+### int8 experiment
+
+`scripts/quantize-experiment.py`, onnxruntime 1.32.0 `quantize_dynamic` with int8 weights,
+18 of tiny-voca's test sentences in both voices (38 utterances, 165 s of audio):
+
+|                                                     |                          float32 |    int8 (MatMul + Conv) |      int8 (MatMul only) |
+| --------------------------------------------------- | -------------------------------: | ----------------------: | ----------------------: |
+| File size                                           |                         21.39 MB |          8.12 MB (38 %) |          8.55 MB (40 %) |
+| Speed, onnxruntime-web wasm, 1 thread (Node)        |                  21.9× real time |                   30.1× |                   30.1× |
+| Session creation, same                              |                          1017 ms |                  562 ms |                  447 ms |
+| Speed, native onnxruntime, 1 thread                 |                            60.1× |                   62.8× |                   67.2× |
+| Utterances whose durations are identical to float32 |                      (reference) |                 2 of 38 |                 1 of 38 |
+| Change in utterance length                          |                                  | 1.23 % mean, 2.51 % max | 1.30 % mean, 2.51 % max |
+| Log-spectral distance to float32                    | 6.30 dB (float32 against itself) |                 7.67 dB |                 7.59 dB |
+
+Reading the table:
+
+- **Size**: 13 MB smaller, which would take the unpacked add-on from 44 MB to about 31 MB.
+- **Speed**: about 37 % faster in the browser runtime, and the session starts in half the time.
+- **Quality**: not established. I cannot listen to audio, so there is no A/B by ear from me.
+  The numbers say the output is not the same speech: the duration predictor gives different
+  lengths in 36 of 38 utterances (by about 1 %, so rhythm shifts slightly), and where the
+  durations do match, the spectrum is 1.3 dB further from float32 than float32 is from itself
+  with new noise. The spectral figure rests on only 1–2 utterances, so it is weak evidence.
+  Upstream saw the same pattern: its Q8 file with one scale per 32 weights keeps durations in
+  19 of 20 utterances, and a coarser scale kept only 14. onnxruntime's dynamic quantization
+  uses one scale per tensor, which is coarser still.
+- Leaving the convolutions in float32 (the "MatMul only" column) does not help.
+
+**Decision: the add-on keeps float32.** 44 MB is far under AMO's limit, synthesis is already
+16–24× real time, and the int8 output is measurably different with no listening test behind
+it. To judge it yourself, run the script and compare the WAV pairs in
+`.output/int8-experiment/`. If size becomes a goal, the better route is upstream's
+block-scaled Q8 weights, which would need a custom ONNX export.
