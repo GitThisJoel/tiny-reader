@@ -51,6 +51,9 @@ footer button {
   border-radius: 16px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
 }
+#read-hint[role="alert"] {
+  color: light-dark(#a4000f, #ff9aa2);
+}
 #read-hint {
   margin: 0 1rem 0.75rem;
   text-align: center;

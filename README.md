@@ -215,6 +215,9 @@ does not extend to such frames.
 - English only. Text in another script is skipped; if nothing can be read the bar says so. Text
   that Firefox's local language detector identifies as another language gets a warning in the bar
   and is read anyway, with English sounds.
+- Firefox's Reader View cannot be read, nor can Firefox's own pages or addons.mozilla.org: Firefox lets no add-on into
+  them, whatever its permissions. The toolbar button then shows a "!" badge with the reason, and the popup says so.
+  Leave Reader View and read the original page instead.
 - Text selected inside a frame from another site cannot be read (see Permissions).
 - A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
   150-digit number, is left out. Everything around it is read.

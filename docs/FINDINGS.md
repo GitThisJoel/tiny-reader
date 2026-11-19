@@ -426,3 +426,29 @@ Reading the table:
 it. To judge it yourself, run the script and compare the WAV pairs in
 `.output/int8-experiment/`. If size becomes a goal, the better route is upstream's
 block-scaled Q8 weights, which would need a custom ONNX export.
+
+## 15. Reader View and other pages add-ons cannot enter
+
+Tested in headless Firefox 158 on `about:reader?url=…`:
+
+- `scripting.executeScript` and `scripting.insertCSS` fail with "Missing host permission for
+  the tab", both with `activeTab` granted by a context-menu click and with `<all_urls>` granted
+  as a host permission. No permission opens Reader View to an add-on.
+- The context menu entries still appear there, and `tab.isInReaderMode` and `tab.url` are
+  readable, so the add-on can tell where it is.
+- `tabs.toggleReaderMode(tabId)` works, but leaving Reader View is a navigation and drops the
+  `activeTab` grant: straight afterwards `tab.url` is hidden again and injection fails. The
+  add-on cannot leave Reader View and carry on reading in one step without a host permission
+  for the article's site.
+
+What the add-on does: a reading that cannot start marks the toolbar button for that tab with a
+"!" badge and the reason as its tooltip, and the popup shows the reason instead of closing.
+
+Two ways to actually read such text, neither built:
+
+1. Read the selection in a page of the add-on's own. The context menu click delivers the
+   selected text (`info.selectionText`), which could be shown and read, with highlighting, in a
+   small add-on window. No new permission; selections only; nothing happens inside Reader View.
+2. Ask for access to the article's site (`optional_host_permissions`, a prompt per site), leave
+   Reader View and read the original page. Reads whole pages; costs a permission prompt and
+   takes the user out of Reader View.

@@ -8,7 +8,11 @@ export type Command = (typeof COMMANDS)[number];
 
 export const isCommand = (value: unknown): value is Command => (COMMANDS as readonly unknown[]).includes(value);
 
-/** Popup → background. */
+/** Said where a reading cannot start because the add-on is not allowed into the page. */
+export const BLOCKED =
+  "Tiny Reader cannot read here. Firefox keeps add-ons out of Reader View, its own pages, addons.mozilla.org and frames from another site.";
+
+/** Popup → background. The reply is false when a reading could not be started. */
 export interface CommandMessage {
   type: "command";
   name: Command;

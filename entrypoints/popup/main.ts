@@ -1,17 +1,23 @@
 // The panel that opens from the toolbar button: start a reading, control it, change settings.
 // Opening it is a user action on the tab, so the add-on may reach that tab (activeTab).
 import { browser } from "wxt/browser";
-import type { Command, CommandMessage } from "@/content/commands.ts";
+import { BLOCKED, type Command, type CommandMessage } from "@/content/commands.ts";
 import { iconButton } from "@/content/icons.ts";
 import { mountSettingsForm } from "@/content/settings-form.ts";
 
-/** Asks the background to pass a command to the reader in the active tab. */
-const send = (name: Command) => browser.runtime.sendMessage({ type: "command", name } satisfies CommandMessage);
+/** Asks the background to pass a command to the reader in the active tab. False: it could not start. */
+const send = (name: Command): Promise<boolean> =>
+  browser.runtime.sendMessage({ type: "command", name } satisfies CommandMessage);
 
 document.getElementById("read")?.addEventListener("click", async () => {
-  await send("read");
-  // Out of the way: the page shows the control bar now.
-  window.close();
+  if (await send("read")) {
+    // Out of the way: the page shows the control bar now.
+    window.close();
+    return;
+  }
+  const hint = document.getElementById("read-hint") as HTMLElement;
+  hint.textContent = BLOCKED;
+  hint.setAttribute("role", "alert");
 });
 
 document.getElementById("controls")?.append(
