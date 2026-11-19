@@ -166,6 +166,14 @@ describe("mapRange", () => {
       expect(squash(rangeText(map.rangeOf(sentence.start, sentence.end)))).toBe(squash(sentence.text));
   });
 
+  it("gives null instead of throwing when the page shortened a mapped text node", () => {
+    const map = page("<p>One two three four.</p><p>Five.</p>");
+    const node = document.querySelector("p")?.firstChild as Text;
+    node.data = "One";
+    expect(map.rangeOf(...span(map.text, "three four."))).toBeNull();
+    expect(rangeText(map.rangeOf(...span(map.text, "Five.")))).toBe("Five.");
+  });
+
   it("gives an empty map for an empty or fully hidden range", () => {
     expect(page("").text).toBe("");
     expect(page("<p hidden>Nothing</p>").rangeOf(0, 5)).toBeNull();

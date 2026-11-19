@@ -7,7 +7,7 @@ import { highlightSentence, highlightWord } from "@/content/highlight.ts";
 import { languageWarning, SAMPLE_LENGTH } from "@/content/language.ts";
 import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
-import { loadSettings, saveSettings } from "@/content/settings.ts";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/content/settings.ts";
 import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
@@ -70,7 +70,8 @@ export default defineContentScript({
 
     async function start(range: Range) {
       // The only await comes first, so two quick starts cannot interleave below.
-      let { prefetch, ...options } = await loadSettings();
+      // Unreadable storage must not stop a reading: the defaults will do.
+      let { prefetch, ...options } = await loadSettings().catch(() => DEFAULT_SETTINGS);
       session?.end();
       // ponytail: the whole range is mapped and segmented up front. Measured 0.4 s for
       // 10,000 paragraphs (docs/FINDINGS.md §14); map block by block if that ever hurts.

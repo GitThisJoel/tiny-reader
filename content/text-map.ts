@@ -139,8 +139,13 @@ export function mapRange(range: Range): TextMap {
       const endOffset = Math.min(end - endRun.textStart, endRun.length);
       if (endRun.textStart + endOffset <= startRun.textStart + startOffset) return null;
       const result = startRun.node.ownerDocument.createRange();
-      result.setStart(startRun.node, startRun.nodeStart + startOffset);
-      result.setEnd(endRun.node, endRun.nodeStart + endOffset);
+      try {
+        result.setStart(startRun.node, startRun.nodeStart + startOffset);
+        result.setEnd(endRun.node, endRun.nodeStart + endOffset);
+      } catch {
+        // The page has changed this text since it was mapped. Reading goes on without a highlight here.
+        return null;
+      }
       return result;
     },
   };
