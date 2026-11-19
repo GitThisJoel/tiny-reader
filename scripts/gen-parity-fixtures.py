@@ -9,6 +9,7 @@ then phonemizes every sentence and records the token ids and stress values.
 
 Sentences: dizione's own tests/data/tricky_sentences.txt (the TEXT lines) followed by
 tests/parity/extra.txt. Re-run after changing either pin or extra.txt, and commit the result.
+The output keeps the layout written here (one case per line); Biome is told to leave it alone.
 """
 
 import hashlib
