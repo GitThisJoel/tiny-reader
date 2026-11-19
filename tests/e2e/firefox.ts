@@ -195,6 +195,61 @@ export class Firefox {
     await this.send("WebDriver:Refresh", {});
   }
 
+  /** Presses the left button at one viewport point, moves to another and releases. */
+  async drag(tab: string, from: [x: number, y: number], to: [x: number, y: number]) {
+    await this.focus(tab);
+    const point = ([x, y]: [number, number]) => ({
+      type: "pointerMove",
+      origin: "viewport",
+      x: Math.round(x),
+      y: Math.round(y),
+    });
+    await this.send("WebDriver:PerformActions", {
+      actions: [
+        {
+          type: "pointer",
+          id: "mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            point(from),
+            { type: "pointerDown", button: 0 },
+            // A step in between: one jump could be taken for a click.
+            point([(from[0] + to[0]) / 2, (from[1] + to[1]) / 2]),
+            point(to),
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  }
+
+  /** Types keys into whatever has focus in the page. Names such as "ArrowRight" are understood. */
+  async press(tab: string, ...keys: string[]) {
+    await this.focus(tab);
+    const codes: Record<string, string> = {
+      ArrowLeft: "\uE012",
+      ArrowUp: "\uE013",
+      ArrowRight: "\uE014",
+      ArrowDown: "\uE015",
+      Escape: "\uE00C",
+    };
+    await this.send("WebDriver:PerformActions", {
+      actions: [
+        {
+          type: "key",
+          id: "keyboard",
+          actions: keys.flatMap((key) => {
+            const value = codes[key] ?? key;
+            return [
+              { type: "keyDown", value },
+              { type: "keyUp", value },
+            ];
+          }),
+        },
+      ],
+    });
+  }
+
   /** Right-clicks the element and picks the page context menu item with this label. */
   async contextMenu(tab: string, selector: string, label: string) {
     const element = await this.evaluate<Record<string, string>>(

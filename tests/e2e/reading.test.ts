@@ -25,7 +25,7 @@ const BAR = `
   return {
     status: toolbar.dataset.status,
     text: root.querySelector("[role=status]").textContent,
-    toggle: root.querySelectorAll("button")[1].getAttribute("aria-label"),
+    toggle: root.querySelector('button[aria-label="Pause"], button[aria-label="Play"]').getAttribute("aria-label"),
     background: getComputedStyle(toolbar).borderRadius,
     position: getComputedStyle(host).position,
   };`;

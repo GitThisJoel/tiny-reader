@@ -12,6 +12,8 @@ leaves the machine, and the add-on makes no network requests at runtime.
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
 - The control bar at the bottom of the page has previous, play/pause, next, speed, voice and stop.
   <kbd>Esc</kbd> stops while the bar has focus.
+- Drag the bar by its grip, or by any part that is not a button, to move it. With the grip focused, the arrow keys
+  move it too. It stays inside the window and reopens where you left it on that page.
 - <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> pauses and resumes, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>
   stops. Next and previous sentence have commands without default keys. All keys can be changed in
   Firefox under Add-ons and themes → gear menu → Manage Extension Shortcuts.
