@@ -1,0 +1,33 @@
+{
+	"name": "tiny-reader",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Firefox add-on that reads web page text aloud with tiny-voca, fully offline",
+	"license": "Apache-2.0",
+	"type": "module",
+	"packageManager": "pnpm@12.21.0",
+	"engines": {
+		"node": ">=22.18"
+	},
+	"scripts": {
+		"dev": "wxt",
+		"build": "wxt build",
+		"zip": "wxt zip",
+		"fetch-assets": "tsx scripts/fetch-assets.ts",
+		"lint": "biome check .",
+		"format": "biome check --write .",
+		"typecheck": "wxt prepare && tsc --noEmit",
+		"test": "vitest run",
+		"lint:ext": "web-ext lint --source-dir .output/firefox-mv3",
+		"postinstall": "wxt prepare"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.8",
+		"@types/node": "22.20.5",
+		"tsx": "4.23.15",
+		"typescript": "7.0.2",
+		"vitest": "5.1.1",
+		"web-ext": "10.8.0",
+		"wxt": "0.21.5"
+	}
+}

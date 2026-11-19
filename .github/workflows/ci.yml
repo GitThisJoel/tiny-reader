@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Reads the pnpm version from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The pinned revisions and hashes live in the script, so its hash is the cache key.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            public/assets
+            vendor
+          key: assets-${{ hashFiles('scripts/fetch-assets.ts') }}
+      # Always runs: on a cache hit it only re-verifies the SHA-256 of every file.
+      - run: pnpm fetch-assets
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm lint:ext
+      - run: pnpm zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tiny-reader-firefox
+          path: .output/*.zip
+          if-no-files-found: error
