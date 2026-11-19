@@ -39,7 +39,24 @@ export default defineConfig({
 	manifest: {
 		name: "Tiny Reader",
 		// Each permission is justified in the README.
-		permissions: ["activeTab", "scripting", "contextMenus"],
+		permissions: ["activeTab", "scripting", "menus", "storage"],
+		// Defaults only; every key can be changed in Firefox's "Manage Extension Shortcuts".
+		commands: {
+			"read-selection": {
+				suggested_key: { default: "Alt+Shift+R" },
+				description: "Read the selected text",
+			},
+			toggle: {
+				suggested_key: { default: "Alt+Shift+P" },
+				description: "Pause or resume reading",
+			},
+			stop: {
+				suggested_key: { default: "Alt+Shift+X" },
+				description: "Stop reading",
+			},
+			next: { description: "Next sentence" },
+			previous: { description: "Previous sentence" },
+		},
 		description:
 			"Reads selected web page text aloud with the tiny-voca model. Runs fully offline.",
 		// Only 'self' plus wasm compilation for ONNX Runtime. No eval, no remote code.
