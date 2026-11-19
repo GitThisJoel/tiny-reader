@@ -21,22 +21,33 @@ export interface TextMap {
 const SKIPPED = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "TEXTAREA", "SELECT", "TITLE"]);
 const PRESERVES_NEWLINES = /^(pre|pre-wrap|pre-line|break-spaces)$/;
 
+/** A computed `display` that flows inside a line rather than starting a box of its own. */
+export const isInlineDisplay = (display: string): boolean => /^(inline|contents|ruby)/.test(display);
+
 export function mapRange(range: Range): TextMap {
-  const view = range.startContainer.ownerDocument?.defaultView;
-  if (!view) return { text: "", rangeOf: () => null };
+  const window = range.startContainer.ownerDocument?.defaultView;
+  if (!window) return { text: "", rangeOf: () => null };
+  const view = window;
   // Computed styles are looked up once per element, which matters on long pages.
+  const styles = new Map<Element, CSSStyleDeclaration>();
   const removed = new Map<Element, boolean>();
   const blocks = new Map<Element, Element | null>();
+
+  function styleOf(element: Element): CSSStyleDeclaration {
+    let style = styles.get(element);
+    if (!style) {
+      style = view.getComputedStyle(element);
+      styles.set(element, style);
+    }
+    return style;
+  }
 
   /** display: none on the element or an ancestor, or an element we never read. */
   function isRemoved(element: Element | null): boolean {
     if (!element) return false;
     let known = removed.get(element);
     if (known === undefined) {
-      known =
-        SKIPPED.has(element.tagName) ||
-        view?.getComputedStyle(element).display === "none" ||
-        isRemoved(element.parentElement);
+      known = SKIPPED.has(element.tagName) || styleOf(element).display === "none" || isRemoved(element.parentElement);
       removed.set(element, known);
     }
     return known;
@@ -47,11 +58,9 @@ export function mapRange(range: Range): TextMap {
     if (!element) return null;
     let known = blocks.get(element);
     if (known === undefined) {
-      const display = view?.getComputedStyle(element).display ?? "";
-      known =
-        /^(inline|contents|ruby)/.test(display) && display !== "inline-block"
-          ? blockOf(element.parentElement)
-          : element;
+      const display = styleOf(element).display;
+      // An inline-block sits in a line but lays out its own content, so it counts as a block here.
+      known = isInlineDisplay(display) && display !== "inline-block" ? blockOf(element.parentElement) : element;
       blocks.set(element, known);
     }
     return known;
@@ -84,7 +93,7 @@ export function mapRange(range: Range): TextMap {
     const textNode = node as Text;
     const parent = textNode.parentElement;
     if (!parent || isRemoved(parent)) continue;
-    const style = view.getComputedStyle(parent);
+    const style = styleOf(parent);
     if (style.visibility === "hidden" || style.visibility === "collapse") continue;
 
     const from = textNode === range.startContainer ? range.startOffset : 0;
