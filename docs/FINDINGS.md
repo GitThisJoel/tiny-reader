@@ -441,6 +441,10 @@ Tested in headless Firefox 158 on `about:reader?url=…`:
   add-on cannot leave Reader View and carry on reading in one step without a host permission
   for the article's site.
 
+**PDFs are the same.** A PDF opened in Firefox's built-in viewer, from `http://` or from
+`file://`, has a selectable text layer and shows the context menu entries, but injection fails
+with the same "Missing host permission for the tab", again also with `<all_urls>` granted.
+
 What the add-on does: a reading that cannot start marks the toolbar button for that tab with a
 "!" badge and the reason as its tooltip, and the popup shows the reason instead of closing.
 
