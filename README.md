@@ -5,10 +5,21 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 5 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
-and the add-on reads it aloud, highlighting the sentence and the word being spoken, with a
-control bar for pause, skip, speed and voice. Research behind the design is in
-[docs/FINDINGS.md](docs/FINDINGS.md).
+**Status:** Milestone 6 of 7. Hardening is next. Research and measurements behind the design are
+in [docs/FINDINGS.md](docs/FINDINGS.md).
+
+## Using it
+
+- Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
+- Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
+  the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
+- The control bar at the bottom of the page has previous, play/pause, next, speed, voice and stop.
+  <kbd>Esc</kbd> stops while the bar has focus.
+- <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> pauses and resumes, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>
+  stops. Next and previous sentence have commands without default keys. All keys can be changed in
+  Firefox under Add-ons and themes → gear menu → Manage Extension Shortcuts.
+- Settings (add-on's Preferences): voice, speed, pitch, expressiveness (pitch range) and how many
+  sentences are prepared ahead. Speed and voice chosen in the bar are remembered too.
 
 ## Requirements
 
@@ -145,11 +156,12 @@ Web Audio queue, control bar
 
 ## Permissions
 
-| Permission     | Why                                                                                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `activeTab`    | Access to the one tab where you choose **Read with tiny-voca**, only after you do so. This replaces any host permission: the add-on cannot touch pages you have not asked it to read. |
-| `scripting`    | Injects the reader into that tab on demand (`scripting.executeScript`). No content script is declared for any site.                                                                   |
-| `contextMenus` | Adds the **Read with tiny-voca** entry to the context menu for selected text.                                                                                                         |
+| Permission  | Why                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activeTab` | Access to the one tab where you choose **Read with tiny-voca**, only after you do so. This replaces any host permission: the add-on cannot touch pages you have not asked it to read. |
+| `scripting` | Injects the reader into that tab on demand (`scripting.executeScript`). No content script is declared for any site.                                                                   |
+| `menus`     | Adds **Read with tiny-voca** (on a selection) and **Read from here with tiny-voca** (on the page) to the context menu, and tells the reader which element the menu was opened on.     |
+| `storage`   | Remembers your settings (voice, speed, pitch, prefetch depth) in `storage.local`. Nothing else is stored.                                                                             |
 
 There are no host permissions and no `web_accessible_resources`. The extension CSP is
 `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing

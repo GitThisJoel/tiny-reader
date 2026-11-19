@@ -331,3 +331,19 @@ Consequences:
 - The playback position is `AudioContext.currentTime − outputLatency − start time of the
   utterance`. Not verified by ear in this headless setup: whether the highlight is perceptibly
   early or late on real speakers.
+
+## 13. Milestone 6 results
+
+- "Read from here" needs to know where the context menu was opened, but the content script is
+  only injected after the click (activeTab). Firefox's `menus.getTargetElement(targetElementId)`
+  solves this from the content script. It exists only under the `menus` namespace, so the
+  permission is `menus`, not the `contextMenus` alias chosen in §10.
+- The start is the beginning of the block that holds the clicked element, not the clicked
+  word: the pointer position is not available to a script injected after the click.
+- A keyboard command grants activeTab like a menu click. Audio started from a shortcut plays
+  when the page has been interacted with before (verified after one real click in the page).
+  The end-to-end tests trigger the registered `<key>` element rather than typing the keys:
+  synthesized key presses do not reach Firefox's shortcut handling in headless mode. Triggering
+  by "Alt+Shift+R" fails unless that exact shortcut is registered, so the defaults are covered.
+- A shortcut is sent to every frame the add-on can reach, since any frame may hold the
+  selection. A reading started in one frame does not stop one already running in another.

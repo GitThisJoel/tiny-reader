@@ -210,6 +210,31 @@ export class Firefox {
 		await this.send("WebDriver:ElementClick", { id });
 	}
 
+	/**
+	 * Triggers the add-on command bound to a shortcut such as "Alt+Shift+R", the way Firefox
+	 * does when the keys are pressed (including the activeTab grant). Fails when no add-on
+	 * command is registered for those keys. Synthesized key presses do not reach the browser's
+	 * shortcut handling in headless mode, so the keys themselves are not typed.
+	 */
+	async shortcut(tab: string, keys: string) {
+		await this.focus(tab);
+		const parts = keys.toLowerCase().split("+");
+		const fired = await this.chrome<boolean>(
+			`const [modifiers, letter] = arguments;
+			 const key = [...document.querySelectorAll("keyset[id^='ext-keyset-id'] key")].find(
+			   (element) => element.getAttribute("modifiers") === modifiers && element.getAttribute("key")?.toLowerCase() === letter);
+			 key?.dispatchEvent(new CustomEvent("command", { bubbles: true }));
+			 return Boolean(key);`,
+			[parts.slice(0, -1).join(","), parts.at(-1)],
+		);
+		if (!fired) throw new Error(`no add-on command is registered for ${keys}`);
+	}
+
+	async reload(tab: string) {
+		await this.focus(tab);
+		await this.send("WebDriver:Refresh", {});
+	}
+
 	/** Right-clicks the element and picks the page context menu item with this label. */
 	async contextMenu(tab: string, selector: string, label: string) {
 		const element = await this.evaluate<Record<string, string>>(
