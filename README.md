@@ -102,6 +102,7 @@ imperative, lower case, on one line.
 | `ci`                | The GitHub Actions workflow and Dependabot config    |
 | `build`             | Build tooling, asset fetching and dependency bumps   |
 | `chore`             | Repository upkeep that fits none of the above        |
+| `perf`              | A change that only makes something faster or lighter |
 | `refactor`, `style` | Code changes with no change in behaviour; formatting |
 
 Scopes in use: `engine`, `content`, `highlight`, `options`, `e2e`, `parity`, `assets`, `scripts`, `deps`, `dependabot`.
