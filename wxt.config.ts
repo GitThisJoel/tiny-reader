@@ -38,6 +38,8 @@ export default defineConfig({
 	},
 	manifest: {
 		name: "Tiny Reader",
+		// Each permission is justified in the README.
+		permissions: ["activeTab", "scripting", "contextMenus"],
 		description:
 			"Reads selected web page text aloud with the tiny-voca model. Runs fully offline.",
 		// Only 'self' plus wasm compilation for ONNX Runtime. No eval, no remote code.
