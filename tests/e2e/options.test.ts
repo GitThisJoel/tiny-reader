@@ -71,7 +71,8 @@ describe("options page", () => {
       prefetch: "2",
     });
     await set("voice", "1");
-    await set("speed", "1.5");
+    // Not one of the bar's preset speeds: the bar must still show it.
+    await set("speed", "1.3");
     await set("pitchShift", "-2");
     await set("prefetch", "99"); // clamped
     await firefox.waitFor(options, `return document.getElementById("saved").textContent.startsWith("Saved");`);
@@ -82,7 +83,7 @@ describe("options page", () => {
     await firefox.waitFor(options, `return document.getElementById("form")?.elements.voice.value === "1";`);
     expect(await values()).toEqual({
       voice: "1",
-      speed: "1.5",
+      speed: "1.3",
       pitchShift: "-2",
       pitchRange: "1",
       prefetch: "5",
@@ -107,7 +108,7 @@ describe("keyboard shortcuts", () => {
     expect(bar).toMatchObject({
       status: "playing",
       text: "Sentence 1 of 3",
-      speed: "1.5",
+      speed: "1.3",
       voice: "1",
     });
   }, 60_000);

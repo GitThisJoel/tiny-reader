@@ -12,6 +12,10 @@ export interface BarHandlers {
 
 export const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
+/** The speeds on offer, with the one in use added when it is not a preset (set on the options page). */
+export const speedChoices = (current: number): number[] =>
+  SPEEDS.includes(current) ? SPEEDS : [...SPEEDS, current].sort((a, b) => a - b);
+
 const ICONS = {
   play: "M7 4v16l13-8z",
   pause: "M6 4h4v16H6zM14 4h4v16h-4z",
@@ -105,7 +109,7 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
     status,
     select(
       "Speed",
-      SPEEDS.map((speed) => [speed, `${speed}×`]),
+      speedChoices(options.speed).map((speed) => [speed, `${speed}×`]),
       options.speed,
       (speed) => handlers.setOptions({ speed }),
     ),
