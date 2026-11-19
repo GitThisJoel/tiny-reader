@@ -1,9 +1,41 @@
+# Dependencies
 node_modules/
+
+# Build output
 .output/
 .wxt/
 web-ext-artifacts/
-# Downloaded by `pnpm fetch-assets`, never committed.
+stats.html
+*.tsbuildinfo
+
+# Downloaded by `pnpm fetch-assets`, never committed
 public/assets/
 vendor/
-# Machine-specific browser binary paths for `pnpm dev`.
+*.part
+
+# Machine-specific browser binary paths for `pnpm dev`
 web-ext.config.ts
+
+# Tests
+coverage/
+
+# Python (parity fixture generation)
+__pycache__/
+*.pyc
+.venv/
+
+# Logs
+*.log
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
