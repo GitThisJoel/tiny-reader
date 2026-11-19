@@ -22,29 +22,29 @@ export default defineBackground(() => {
   const router = createRouter(() => new Worker(browser.runtime.getURL("/engine-worker.js")) as unknown as WorkerLike);
   browser.runtime.onConnect.addListener((port) => router.connect(port));
 
+  /** Puts the reader and the highlight colours into one frame, or every reachable frame. */
+  async function inject(tabId: number, frameId: number | undefined) {
+    const target = frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] };
+    const injections = await browser.scripting.executeScript({ target, files: ["/content-scripts/reader.js"] });
+    // First injection into a document: add the highlight colours too.
+    const fresh = injections.filter((injection) => injection.result === true).map((injection) => injection.frameId);
+    if (fresh.length) await browser.scripting.insertCSS({ target: { tabId, frameIds: fresh }, css: HIGHLIGHT_CSS });
+  }
+
   /**
-   * Injects the reader (allowed by activeTab after a menu click or a shortcut) and sends it
-   * a command: into one frame, or into every frame the add-on may reach when `frameId` is
-   * undefined. Fails quietly where add-ons may not run, such as about: pages and frames from
-   * another site.
+   * Sends the reader a command: to one frame, or to every frame the add-on may reach when
+   * `frameId` is undefined. A command that starts a reading injects the reader first (allowed
+   * by activeTab after a menu click or a shortcut). Fails quietly where add-ons may not run,
+   * such as about: pages and frames from another site.
    */
   async function send(tabId: number, frameId: number | undefined, command: ReaderCommand) {
+    const starts = command.type === "read-selection" || command.type === "read-from-here";
     try {
-      const target = frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] };
-      const injections = await browser.scripting.executeScript({
-        target,
-        files: ["/content-scripts/reader.js"],
-      });
-      // First injection into a document: add the highlight colours too.
-      const fresh = injections.filter((injection) => injection.result === true).map((injection) => injection.frameId);
-      if (fresh.length)
-        await browser.scripting.insertCSS({
-          target: { tabId, frameIds: fresh },
-          css: HIGHLIGHT_CSS,
-        });
+      if (starts) await inject(tabId, frameId);
       await browser.tabs.sendMessage(tabId, command, frameId === undefined ? {} : { frameId });
     } catch (error) {
-      console.warn("Tiny Reader cannot read this page:", error);
+      // Pause, stop and skip are for a reader that is already there. With none, there is nothing to do.
+      if (starts) console.warn("Tiny Reader cannot read this page:", error);
     }
   }
 

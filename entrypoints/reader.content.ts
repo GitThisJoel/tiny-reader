@@ -98,6 +98,7 @@ export default defineContentScript({
           ),
       );
       let followed: unknown = null;
+      let marked: (typeof sentences)[number] | undefined;
       const reader = new Reader(
         {
           synthesize: (sentence, synthOptions, signal) => client.synthesize(sentence, synthOptions, signal),
@@ -107,7 +108,11 @@ export default defineContentScript({
             bar.update(state);
             const reading = state.status !== "done" && state.status !== "error";
             const sentence = reading ? sentences[state.index] : undefined;
-            highlightSentence(sentence ? map.rangeOf(sentence.start, sentence.end) : null);
+            // State is reported far more often than the sentence changes.
+            if (sentence !== marked) {
+              marked = sentence;
+              highlightSentence(sentence ? map.rangeOf(sentence.start, sentence.end) : null);
+            }
             // Follow words only while this utterance is sounding.
             const utterance = state.status === "playing" && !reducedMotion ? state.utterance : undefined;
             if (utterance !== followed) {
