@@ -16,6 +16,15 @@ export interface WorkerLike {
   onerror: ((event: unknown) => void) | null;
 }
 
+const INVALID = "The request was not valid: the text is too long or a setting is out of range.";
+
+/** The id of a message that asks for synthesis, however malformed the rest of it is. */
+function asked(message: unknown): string | null {
+  if (typeof message !== "object" || message === null) return null;
+  const { type, id } = message as { type?: unknown; id?: unknown };
+  return type === "synthesize" && typeof id === "string" ? id : null;
+}
+
 /**
  * Routes requests from any number of ports to one engine Worker and results back.
  * Request ids are prefixed with a per-port number on the way in and stripped on the way out,
@@ -57,7 +66,14 @@ export function createRouter(startWorker: () => WorkerLike) {
       ports.set(prefix, port);
       port.onMessage.addListener((message) => {
         const request = parseRequest(message);
-        if (!request || request.type === "ping") return; // a ping only has to arrive
+        if (!request) {
+          // Someone is waiting on a synthesize request: tell them, rather than leave them hanging.
+          const id = asked(message);
+          if (id !== null)
+            port.postMessage({ type: "error", id, code: "failed", message: INVALID } satisfies EngineResponse);
+          return;
+        }
+        if (request.type === "ping") return; // a ping only has to arrive
         if (request.type === "cancelAll")
           worker?.postMessage({
             type: "cancelAll",

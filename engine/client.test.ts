@@ -99,6 +99,30 @@ describe("EngineClient", () => {
     await expect(again).resolves.toBeDefined();
   });
 
+  it("resends on a new port when the old one died silently, without failing that request", async () => {
+    const { client, ports, reply } = setup();
+    const earlier = client.synthesize("One.", DEFAULT_OPTIONS);
+    // The background went away and onDisconnect has not fired yet: postMessage throws.
+    (ports[0] as FakePort).disconnected = true;
+    const fresh = client.synthesize("Two.", DEFAULT_OPTIONS);
+    // What was sent on the dead port is lost; the new request is not.
+    await expect(earlier).rejects.toMatchObject({ code: "disconnected" });
+    expect(ports).toHaveLength(2);
+    expect(ports[1]?.sent).toEqual([{ type: "synthesize", id: "1", text: "Two.", options: DEFAULT_OPTIONS }]);
+    reply("1");
+    await expect(fresh).resolves.toMatchObject({ sampleRate: 24000 });
+  });
+
+  it("rejects an invalid request through the router instead of hanging", async () => {
+    const router = createRouter(() => new FakeWorker());
+    const client = new EngineClient(() => {
+      const [page, background] = portPair();
+      router.connect(background);
+      return page;
+    });
+    await expect(client.synthesize("Hi.", { ...DEFAULT_OPTIONS, speed: 9 })).rejects.toMatchObject({ code: "failed" });
+  });
+
   it("reports status changes", () => {
     const { client, ports, statuses } = setup();
     client.synthesize("One.", DEFAULT_OPTIONS).catch(() => {});

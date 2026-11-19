@@ -108,6 +108,23 @@ describe("router", () => {
     expect(workers).toHaveLength(0);
   });
 
+  it("answers an invalid synthesize request with an error instead of silence", () => {
+    const { workers, connect } = setup();
+    const port = connect();
+    port.deliver({ ...synthesize("7"), options: { ...DEFAULT_OPTIONS, speed: 3 } });
+    port.deliver({ ...synthesize("8"), text: "x".repeat(20_001) });
+    expect(workers).toHaveLength(0);
+    expect(port.sent).toEqual([
+      { type: "error", id: "7", code: "failed", message: expect.stringContaining("not valid") },
+      { type: "error", id: "8", code: "failed", message: expect.stringContaining("not valid") },
+    ]);
+    // Nobody waits on these, so nothing is sent back.
+    port.deliver({ type: "cancel" });
+    port.deliver({ type: "synthesize", id: 9 });
+    port.deliver(null);
+    expect(port.sent).toHaveLength(2);
+  });
+
   it("recovers from a worker crash: drops the ports, then starts a new worker", () => {
     const { workers, connect } = setup();
     const port = connect();

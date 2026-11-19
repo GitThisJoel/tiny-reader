@@ -88,8 +88,13 @@ export class EngineClient {
     try {
       this.open().postMessage(message);
     } catch {
-      // The port died without telling us yet. Open a new one and try once more.
+      // The port died without telling us yet. Everything sent on it is lost, but not this
+      // message: it never left, so its request stays pending and goes out on a new port.
+      const id = message.type === "synthesize" ? message.id : null;
+      const mine = id === null ? undefined : this.pending.get(id);
+      if (id !== null) this.pending.delete(id);
       this.lost(this.port);
+      if (id !== null && mine) this.pending.set(id, mine);
       this.open().postMessage(message);
     }
   }
