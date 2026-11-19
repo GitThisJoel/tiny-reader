@@ -476,3 +476,9 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
   context menu entries (including `menus.getTargetElement`) work there unchanged. The background
   only has to skip injection for that page.
 - `web-ext lint` gains two `UNSAFE_VAR_ASSIGNMENT` warnings, both inside pdf.js.
+- **Telling the user.** Nothing can be shown inside the PDF viewer, and the add-on only learns
+  what a tab holds once the user invokes it there, so there is no warning while merely viewing a
+  PDF. When a reading cannot start, `action.openPopup()` opens the toolbar popup (verified: the
+  panel opens after a failed context-menu read). The popup finds out whether its tab can be read
+  by running a script that does nothing; if that fails and the address ends in `.pdf`, it offers
+  the document page and passes the file name along, since the user has to pick the file again.

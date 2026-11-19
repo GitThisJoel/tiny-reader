@@ -12,6 +12,31 @@ export const isCommand = (value: unknown): value is Command => (COMMANDS as read
 export const BLOCKED =
   "Tiny Reader cannot read here. Firefox keeps add-ons out of Reader View, its PDF viewer, its own pages, addons.mozilla.org and frames from another site. For a PDF, use Read a PDF in the toolbar popup.";
 
+/** Said in the popup on a PDF shown by Firefox's own viewer. */
+export const PDF_BLOCKED =
+  "This is a PDF. Firefox does not let add-ons read inside its PDF viewer, so Tiny Reader reads PDFs on a page of its own.";
+
+/** What the popup needs to know about the tab it was opened on. */
+export type PageState =
+  | { kind: "readable" }
+  /** Firefox's PDF viewer. `name` is the file's name, taken from the address. */
+  | { kind: "pdf"; name: string }
+  /** Another page the add-on is not allowed into. */
+  | { kind: "blocked" };
+
+/** Popup → background: "what is the active tab?" The reply is a PageState. */
+export const PAGE_STATE = "page-state";
+
+/** The file name of a PDF address, such as "report.pdf", or null when the address does not end in one. */
+export function pdfName(url: string): string | null {
+  try {
+    const last = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
+    return /\.pdf$/i.test(last) ? last : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Popup → background. The reply is false when a reading could not be started. */
 export interface CommandMessage {
   type: "command";

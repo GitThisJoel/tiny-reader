@@ -56,6 +56,11 @@ async function open(file: File) {
   }
 }
 
+// Opened from a PDF tab: the add-on cannot take the file from there, but it can say which one to pick.
+const wanted = new URLSearchParams(location.hash.slice(1)).get("name");
+if (wanted)
+  say(`Choose “${wanted}” with Open a PDF, or drop it on this page. Firefox does not let an add-on open it by itself.`);
+
 byId("open").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {
   const [file] = fileInput.files ?? [];

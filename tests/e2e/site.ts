@@ -1,6 +1,7 @@
 // A local web site for the end-to-end tests: a plain page and one with a strict CSP.
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { buildPdf } from "./pdf.ts";
 
 const PAGE = `<!doctype html>
 <html lang="en">
@@ -19,6 +20,14 @@ travaux devraient commencer au printemps prochain et durer environ deux ans.</p>
 <p id="runon">${"the river kept on running past the old mill and under the stone bridge and through the quiet town ".repeat(30)}until it reached the sea</p>
 <p id="empty"><img alt=""> — … —</p>
 </html>`;
+
+/** Served for any address ending in .pdf. Firefox shows it in its own PDF viewer. */
+const SAMPLE_PDF = buildPdf([
+  [
+    ["A sample document", 720, 20],
+    ["This file exists to be shown in the PDF viewer of the browser.", 680],
+  ],
+]);
 
 /** Blocks everything a page CSP can block. The add-on must work regardless. */
 const STRICT_CSP =
@@ -49,6 +58,10 @@ export async function startSite(): Promise<{
       "content-type": "text/html; charset=utf-8",
     };
     if (request.url?.startsWith("/strict")) headers["content-security-policy"] = STRICT_CSP;
+    if (request.url?.endsWith(".pdf")) {
+      response.writeHead(200, { "content-type": "application/pdf" }).end(SAMPLE_PDF);
+      return;
+    }
     const long = /^\/long\/(\d+)/.exec(request.url ?? "");
     response.writeHead(200, headers).end(long ? longPage(Number(long[1])) : PAGE);
   });

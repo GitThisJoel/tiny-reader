@@ -126,6 +126,11 @@ export class Firefox {
     this.current = tab;
   }
 
+  /** The handles of all open tabs. */
+  async tabs(): Promise<string[]> {
+    return this.send<string[]>("WebDriver:GetWindowHandles", {});
+  }
+
   /** Opens a tab and waits for the page to load. Returns the tab's handle. */
   async open(url: string): Promise<string> {
     const { handle } = await this.send<{ handle: string }>("WebDriver:NewWindow", { type: "tab" });

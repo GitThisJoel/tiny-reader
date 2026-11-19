@@ -9,7 +9,9 @@ leaves the machine, and the add-on makes no network requests at runtime.
 
 - Click the Tiny Reader button in the toolbar and press **Read aloud**: it reads the selection, or the page's main
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
-- To hear a PDF, open the popup and choose **Read a PDF…**. A Tiny Reader page opens: pick the file, or drop it on
+- To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
+  in Tiny Reader…**, and it opens by itself if you try to read the PDF from the context menu or a shortcut. A Tiny
+  Reader page opens: pick the file, or drop it on
   the page, and it shows the PDF's text as plain paragraphs and reads them with the same highlighting, control bar,
   context menu and shortcuts as a web page. The file is read on your computer and never uploaded.
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.

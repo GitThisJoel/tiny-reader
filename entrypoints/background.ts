@@ -1,6 +1,6 @@
 import { type Browser, browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
-import { BLOCKED, isCommand, isCommandMessage } from "@/content/commands.ts";
+import { BLOCKED, isCommand, isCommandMessage, PAGE_STATE, type PageState, pdfName } from "@/content/commands.ts";
 import type { ReaderCommand } from "@/content/controller.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
@@ -86,12 +86,9 @@ export default defineBackground(() => {
   menus.onClicked.addListener((info: MenuClick, tab) => {
     if (tab?.id === undefined) return;
     const frameId = info.frameId ?? 0;
-    if (info.menuItemId === MENU_SELECTION) void send(tab.id, frameId, { type: "read-selection" });
+    if (info.menuItemId === MENU_SELECTION) void send(tab.id, frameId, { type: "read-selection" }).then(explain);
     else if (info.menuItemId === MENU_FROM_HERE && info.targetElementId !== undefined)
-      void send(tab.id, frameId, {
-        type: "read-from-here",
-        target: info.targetElementId,
-      });
+      void send(tab.id, frameId, { type: "read-from-here", target: info.targetElementId }).then(explain);
   });
 
   /** Passes a command to the reader in the tab the user is looking at. */
@@ -102,9 +99,30 @@ export default defineBackground(() => {
     // the reading. Starting a reading in one frame does not stop one in another frame.
     return tab?.id !== undefined && send(tab.id, undefined, { type: name });
   }
-  // Keyboard shortcuts, and the buttons of the toolbar popup.
-  browser.commands.onCommand.addListener((name) => void toActiveTab(name));
+
+  /** A reading could not start, and nothing can be shown in the page: open the popup, which explains. */
+  const explain = (started: boolean) => {
+    if (!started) browser.action.openPopup().catch(() => {});
+  };
+
+  /** Whether the active tab can be read in place, found out by trying to run a script that does nothing. */
+  async function pageState(): Promise<PageState> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id === undefined) return { kind: "blocked" };
+    if (tab.url?.startsWith(browser.runtime.getURL("/document.html"))) return { kind: "readable" };
+    try {
+      await browser.scripting.executeScript({ target: { tabId: tab.id }, func: () => true });
+      return { kind: "readable" };
+    } catch {
+      const name = pdfName(tab.url ?? "");
+      return name ? { kind: "pdf", name } : { kind: "blocked" };
+    }
+  }
+
+  // Keyboard shortcuts, and the toolbar popup: its buttons, and its question about the tab.
+  browser.commands.onCommand.addListener((name) => void toActiveTab(name).then(explain));
   browser.runtime.onMessage.addListener((message: unknown) => {
     if (isCommandMessage(message)) return toActiveTab(message.name);
+    if ((message as { type?: unknown } | null)?.type === PAGE_STATE) return pageState();
   });
 });
