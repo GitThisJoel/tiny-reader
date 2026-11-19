@@ -8,34 +8,7 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <form id="form">
-      <label for="voice">Voice</label>
-      <select id="voice" name="voice"></select>
-
-      <label for="speed">Speed</label>
-      <input id="speed" name="speed" type="range" step="0.05" list="speed-marks" />
-      <output for="speed"></output>
-      <datalist id="speed-marks"><option value="1"></option></datalist>
-
-      <label for="pitchShift">Pitch</label>
-      <input id="pitchShift" name="pitchShift" type="range" min="-6" max="6" step="0.5" list="zero" />
-      <output for="pitchShift"></output>
-      <datalist id="zero"><option value="0"></option></datalist>
-
-      <label for="pitchRange">Expressiveness</label>
-      <input id="pitchRange" name="pitchRange" type="range" step="0.05" list="one" />
-      <output for="pitchRange"></output>
-      <datalist id="one"><option value="1"></option></datalist>
-
-      <label for="prefetch">Sentences prepared ahead</label>
-      <input id="prefetch" name="prefetch" type="number" step="1" />
-      <span class="hint" id="prefetch-hint">More gives smoother playback and uses more memory.</span>
-
-      <div class="row">
-        <button type="button" id="reset">Reset to defaults</button>
-        <span id="saved" role="status" aria-live="polite"></span>
-      </div>
-    </form>
+    <form id="form"></form>
     <section>
       <h2>Shortcuts</h2>
       <dl>
