@@ -7,7 +7,16 @@ updates:
     groups:
       dev-tooling:
         dependency-type: development
+    ignore:
+      # Node's types follow the Node version the project runs on. Bump them by hand, together
+      # with "engines" in package.json and node-version in the CI workflow.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # One pull request for all action bumps: they all edit the same workflow file.
+      actions:
+        patterns: ["*"]
