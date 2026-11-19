@@ -111,6 +111,33 @@ describe("engine", () => {
 		expect(today?.start).toBeGreaterThanOrEqual(amount?.end ?? 0);
 	});
 
+	it("reads around a single word too long for the model", async () => {
+		// Read digit by digit this is several hundred tokens, and it cannot be cut anywhere.
+		const text = `${"7".repeat(150)} then normal words follow.`;
+		const result = await engine.speak(text, DEFAULT_OPTIONS);
+		if (!result) throw new Error("no result");
+		expect(
+			result.words.map((word) => text.slice(word.charStart, word.charEnd)),
+		).toEqual(["then", "normal", "words", "follow"]);
+		expect(result.pcm.length / result.sampleRate).toBeLessThan(5);
+	}, 60_000);
+
+	it("survives text that expands far beyond its length", async () => {
+		// Long digit strings are read digit by digit: few characters, very many tokens.
+		const text = `Call ${"1234567890 ".repeat(25)}now.`;
+		const result = await engine.speak(text, DEFAULT_OPTIONS);
+		if (!result) throw new Error("no result");
+		expect(result.pcm.every(Number.isFinite)).toBe(true);
+		expect(peakOf(result.pcm)).toBeLessThanOrEqual(0.99 + 1e-6);
+		expect(result.pcm.length / result.sampleRate).toBeGreaterThan(30);
+		expect(
+			text.slice(result.words[0]?.charStart, result.words[0]?.charEnd),
+		).toBe("Call");
+		expect(
+			text.slice(result.words.at(-1)?.charStart, result.words.at(-1)?.charEnd),
+		).toBe("now");
+	}, 120_000);
+
 	it("refuses text with nothing to pronounce", async () => {
 		await expect(
 			engine.speak("こんにちは世界", DEFAULT_OPTIONS),
