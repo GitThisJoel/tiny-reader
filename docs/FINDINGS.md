@@ -289,7 +289,7 @@ Consequences:
 - First sentence after a cold start (Worker start, model and phonemizer load, synthesis):
   **1.08 s** for 1.9 s of audio. Warm: 82 ms for 1.9 s, 236 ms for 5.2 s, 729 ms for 11.6 s
   (about 16–24× real time).
-- Built add-on: 44.4 MB unpacked, 26.6 MB zipped.
+- Built add-on: 44.4 MB unpacked, 30.5 MB zipped.
 - WebDriver BiDi cannot navigate to `moz-extension://` pages ("not allowed in this context").
   The end-to-end tests use Marionette instead, which can, and whose clicks are real input
   events.
@@ -347,3 +347,82 @@ Consequences:
   by "Alt+Shift+R" fails unless that exact shortcut is registered, so the defaults are covered.
 - A shortcut is sent to every frame the add-on can reach, since any frame may hold the
   selection. A reading started in one frame does not stop one already running in another.
+
+## 14. Milestone 7 results
+
+### Long pages
+
+"Read from here" maps and segments the whole rest of the article before the bar appears.
+Measured in headless Firefox 158, from the menu click to the bar appearing (this includes
+opening the menu and injecting the script, about 250 ms on their own):
+
+| Paragraphs | Sentences | Click to bar |
+| ---------: | --------: | -----------: |
+|        100 |       300 |       251 ms |
+|      2,000 |     6,000 |       311 ms |
+|     10,000 |    30,000 |       651 ms |
+
+So the up-front work costs about 40 µs per paragraph: 60 ms for a very long article, 0.4 s
+for a book-sized page. It is left as it is; the code names the upgrade path (map block by
+block). After the start, every step is logarithmic or constant in the page size: skipping
+two sentences on the 6,000-sentence page takes as long as on a short one.
+
+### Long and awkward sentences
+
+- The content script cuts sentences longer than 300 characters at commas, then between words,
+  so a 2,900-character run-on sentence starts playing as fast as a short one (13 pieces).
+- The engine cuts again by tokens (200) for text that expands, such as long digit strings.
+- A single word over the token limit with no space in it is dropped and the rest is read.
+  Measured: a 1,500-letter "word" is no problem (the phonemizer gives it a short guess); a
+  150-digit number is dropped.
+
+### Other languages
+
+- Other scripts: the phonemizer reports nothing to pronounce, the sentence is skipped, and if
+  nothing at all could be read the bar says so.
+- Other languages in Latin script would be read with English sounds. `i18n.detectLanguage`
+  (Firefox's built-in detector; it runs locally and works in a content script) is given the
+  first 4,000 characters. A reliable non-English result puts a warning in the bar, naming the
+  language. Reading continues: the user asked for it, and detection can be wrong.
+
+### Errors in the UI
+
+Every failure ends in the bar's status line: engine errors, a lost engine after one retry,
+playback exceptions, nothing readable, nothing to read. The one case with no UI is a page
+where add-ons may not run at all (about: pages, addons.mozilla.org): nothing can be injected,
+so the failure is only logged in the background page's console.
+
+### int8 experiment
+
+`scripts/quantize-experiment.py`, onnxruntime 1.32.0 `quantize_dynamic` with int8 weights,
+18 of tiny-voca's test sentences in both voices (38 utterances, 165 s of audio):
+
+|                                                     |                          float32 |    int8 (MatMul + Conv) |      int8 (MatMul only) |
+| --------------------------------------------------- | -------------------------------: | ----------------------: | ----------------------: |
+| File size                                           |                         21.39 MB |          8.12 MB (38 %) |          8.55 MB (40 %) |
+| Speed, onnxruntime-web wasm, 1 thread (Node)        |                  21.9× real time |                   30.1× |                   30.1× |
+| Session creation, same                              |                          1017 ms |                  562 ms |                  447 ms |
+| Speed, native onnxruntime, 1 thread                 |                            60.1× |                   62.8× |                   67.2× |
+| Utterances whose durations are identical to float32 |                      (reference) |                 2 of 38 |                 1 of 38 |
+| Change in utterance length                          |                                  | 1.23 % mean, 2.51 % max | 1.30 % mean, 2.51 % max |
+| Log-spectral distance to float32                    | 6.30 dB (float32 against itself) |                 7.67 dB |                 7.59 dB |
+
+Reading the table:
+
+- **Size**: 13 MB smaller, which would take the unpacked add-on from 44 MB to about 31 MB.
+- **Speed**: about 37 % faster in the browser runtime, and the session starts in half the time.
+- **Quality**: not established. I cannot listen to audio, so there is no A/B by ear from me.
+  The numbers say the output is not the same speech: the duration predictor gives different
+  lengths in 36 of 38 utterances (by about 1 %, so rhythm shifts slightly), and where the
+  durations do match, the spectrum is 1.3 dB further from float32 than float32 is from itself
+  with new noise. The spectral figure rests on only 1–2 utterances, so it is weak evidence.
+  Upstream saw the same pattern: its Q8 file with one scale per 32 weights keeps durations in
+  19 of 20 utterances, and a coarser scale kept only 14. onnxruntime's dynamic quantization
+  uses one scale per tensor, which is coarser still.
+- Leaving the convolutions in float32 (the "MatMul only" column) does not help.
+
+**Decision: the add-on keeps float32.** 44 MB is far under AMO's limit, synthesis is already
+16–24× real time, and the int8 output is measurably different with no listening test behind
+it. To judge it yourself, run the script and compare the WAV pairs in
+`.output/int8-experiment/`. If size becomes a goal, the better route is upstream's
+block-scaled Q8 weights, which would need a custom ONNX export.

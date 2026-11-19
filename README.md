@@ -5,8 +5,8 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 6 of 7. Hardening is next. Research and measurements behind the design are
-in [docs/FINDINGS.md](docs/FINDINGS.md).
+**Status:** all seven milestones are done. Research and measurements behind the design are in
+[docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Using it
 
@@ -171,7 +171,34 @@ never in a page, so a page's CSP cannot affect them.
 Known limit: text selected inside a frame from another site cannot be read, because `activeTab`
 does not extend to such frames.
 
+## Limits
+
+- English only. Text in another script is skipped; if nothing can be read the bar says so. Text
+  that Firefox's local language detector identifies as another language gets a warning in the bar
+  and is read anyway, with English sounds.
+- Text selected inside a frame from another site cannot be read (see Permissions).
+- A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
+  150-digit number, is left out. Everything around it is read.
+- The page does not scroll to follow the highlight.
+- With `prefers-reduced-motion: reduce`, only the sentence is highlighted, not each word.
+- "Read from here" starts at the beginning of the paragraph, not at the word under the pointer.
+
+## int8 model experiment
+
+```bash
+python3 scripts/quantize-experiment.py
+```
+
+Needs `onnxruntime`, `onnx` and `numpy`. It writes two dynamically quantized copies of the model
+and WAV files for listening into `.output/int8-experiment/`, and prints size, speed and how far
+the output drifts from the float32 model. The add-on ships the float32 model; the comparison and
+the reasons are in [docs/FINDINGS.md](docs/FINDINGS.md) §14.
+
 ## Before publishing
+
+The engine test page (`playground.html`) is part of every build, reachable only by its
+`moz-extension://` address. Remove [entrypoints/playground/](entrypoints/playground/) if you do not
+want to ship it; `tests/e2e/playground.test.ts` goes with it.
 
 The add-on ID in [wxt.config.ts](wxt.config.ts) (`tiny-reader@tiny-reader.invalid`) is a
 placeholder. Change it before submitting to addons.mozilla.org.
