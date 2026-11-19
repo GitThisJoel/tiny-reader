@@ -1,10 +1,10 @@
 {
-	"extends": "./.wxt/tsconfig.json",
-	"compilerOptions": {
-		"strict": true,
-		"noUncheckedIndexedAccess": true,
-		"noImplicitOverride": true,
-		"erasableSyntaxOnly": true,
-		"types": ["node"]
-	}
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "erasableSyntaxOnly": true,
+    "types": ["node"]
+  }
 }

@@ -22,7 +22,7 @@ travaux devraient commencer au printemps prochain et durer environ deux ans.</p>
 
 /** Blocks everything a page CSP can block. The add-on must work regardless. */
 const STRICT_CSP =
-	"default-src 'none'; script-src 'none'; style-src 'none'; media-src 'none'; worker-src 'none'; frame-src 'none'; connect-src 'none'";
+  "default-src 'none'; script-src 'none'; style-src 'none'; media-src 'none'; worker-src 'none'; frame-src 'none'; connect-src 'none'";
 
 /** An article of `paragraphs` paragraphs, each with inline markup, a link and three sentences. */
 const longPage = (paragraphs: number) => `<!doctype html>
@@ -32,34 +32,31 @@ const longPage = (paragraphs: number) => `<!doctype html>
 <article>
 <h1 id="title">A very long article</h1>
 ${Array.from(
-	{ length: paragraphs },
-	(_, index) =>
-		`<p id="p${index}">Paragraph ${index + 1} begins <em>here</em>. It links to <a href="#">another page</a> and goes on a little. Then it ends.</p>`,
+  { length: paragraphs },
+  (_, index) =>
+    `<p id="p${index}">Paragraph ${index + 1} begins <em>here</em>. It links to <a href="#">another page</a> and goes on a little. Then it ends.</p>`,
 ).join("\n")}
 </article>
 </html>`;
 
 export async function startSite(): Promise<{
-	url: string;
-	strictUrl: string;
-	close(): void;
+  url: string;
+  strictUrl: string;
+  close(): void;
 }> {
-	const server: Server = createServer((request, response) => {
-		const headers: Record<string, string> = {
-			"content-type": "text/html; charset=utf-8",
-		};
-		if (request.url?.startsWith("/strict"))
-			headers["content-security-policy"] = STRICT_CSP;
-		const long = /^\/long\/(\d+)/.exec(request.url ?? "");
-		response
-			.writeHead(200, headers)
-			.end(long ? longPage(Number(long[1])) : PAGE);
-	});
-	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-	const { port } = server.address() as AddressInfo;
-	return {
-		url: `http://127.0.0.1:${port}/`,
-		strictUrl: `http://127.0.0.1:${port}/strict`,
-		close: () => server.close(),
-	};
+  const server: Server = createServer((request, response) => {
+    const headers: Record<string, string> = {
+      "content-type": "text/html; charset=utf-8",
+    };
+    if (request.url?.startsWith("/strict")) headers["content-security-policy"] = STRICT_CSP;
+    const long = /^\/long\/(\d+)/.exec(request.url ?? "");
+    response.writeHead(200, headers).end(long ? longPage(Number(long[1])) : PAGE);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}/`,
+    strictUrl: `http://127.0.0.1:${port}/strict`,
+    close: () => server.close(),
+  };
 }

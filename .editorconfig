@@ -1,0 +1,21 @@
+# Editor defaults. Keep in step with biome.json, which is what `pnpm format` and the
+# pre-commit hook enforce.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+[*.py]
+indent_size = 4
+# No formatter runs on the Python scripts, and some lines are longer.
+max_line_length = off
+
+[*.md]
+# Two trailing spaces are a line break in Markdown.
+trim_trailing_whitespace = false

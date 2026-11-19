@@ -55,7 +55,7 @@ If Firefox is installed as a snap, `web-ext` cannot reach it. Create `web-ext.co
 import { defineWebExtConfig } from "wxt";
 
 export default defineWebExtConfig({
-	binaries: { firefox: "/snap/firefox/current/usr/lib/firefox/firefox" },
+  binaries: { firefox: "/snap/firefox/current/usr/lib/firefox/firefox" },
 });
 ```
 
@@ -83,6 +83,33 @@ export default defineWebExtConfig({
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs everything above except
 `test:e2e` and uploads the zip as an artifact. The end-to-end tests are left out of CI because
 they have only been run locally; set `FIREFOX` to the binary if it is not found.
+
+## Pre-commit hook
+
+[lefthook](https://lefthook.dev) installs a Git pre-commit hook when dependencies are installed (`pnpm install`).
+It is configured in [lefthook.yml](lefthook.yml) and runs Biome (lint and formatting) on the staged files; a
+finding stops the commit. Fix with `pnpm format`, stage again and commit. `git commit --no-verify` skips it once,
+and `pnpm exec lefthook install` reinstalls the hook if it is ever missing.
+
+## Commit messages
+
+Commits use semantic commit messages: `type(scope): subject`, with the scope optional and the subject in the
+imperative, lower case, on one line.
+
+| Type                | For                                                  |
+| ------------------- | ---------------------------------------------------- |
+| `feat`              | A new capability of the add-on                       |
+| `fix`               | A bug fix                                            |
+| `test`              | Tests only                                           |
+| `docs`              | Documentation only                                   |
+| `ci`                | The GitHub Actions workflow and Dependabot config    |
+| `build`             | Build tooling, asset fetching and dependency bumps   |
+| `chore`             | Repository upkeep that fits none of the above        |
+| `refactor`, `style` | Code changes with no change in behaviour; formatting |
+
+Scopes in use: `engine`, `content`, `highlight`, `options`, `e2e`, `parity`, `assets`, `scripts`, `deps`, `dependabot`.
+Examples: `feat(engine): align spoken words to source text`, `test(e2e): add reading tests on strict-CSP pages`,
+`docs: document the pre-commit hook`.
 
 ## Phonemizer parity
 

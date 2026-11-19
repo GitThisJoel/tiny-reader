@@ -1,4 +1,6 @@
 allowBuilds:
   esbuild: true
+  # Its postinstall installs the Git hooks from lefthook.yml (skipped in CI).
+  lefthook: true
   # Its postinstall only prints a version notice.
   protobufjs: false

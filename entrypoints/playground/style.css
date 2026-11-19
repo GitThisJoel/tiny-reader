@@ -1,26 +1,26 @@
 :root {
-	color-scheme: light dark;
-	font:
-		16px / 1.5 system-ui,
-		sans-serif;
+  color-scheme: light dark;
+  font:
+    16px / 1.5 system-ui,
+    sans-serif;
 }
 main {
-	max-width: 40rem;
-	margin: 2rem auto;
-	padding: 0 1rem;
+  max-width: 40rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
 }
 textarea {
-	width: 100%;
-	box-sizing: border-box;
-	font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
 }
 .row {
-	display: flex;
-	gap: 1rem;
-	align-items: center;
-	flex-wrap: wrap;
-	margin-top: 0.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
 }
 input[type="number"] {
-	width: 4.5rem;
+  width: 4.5rem;
 }

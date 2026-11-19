@@ -15,18 +15,16 @@ export const HIGHLIGHT_CSS = `
 
 /** Shows `range` under `name`, or clears that highlight with null. */
 function show(name: string, range: Range | null, priority: number) {
-	if (!range) {
-		CSS.highlights.delete(name);
-		return;
-	}
-	const highlight = new Highlight(range);
-	highlight.priority = priority;
-	CSS.highlights.set(name, highlight);
+  if (!range) {
+    CSS.highlights.delete(name);
+    return;
+  }
+  const highlight = new Highlight(range);
+  highlight.priority = priority;
+  CSS.highlights.set(name, highlight);
 }
 
 /** The sentence being read. */
-export const highlightSentence = (range: Range | null) =>
-	show(SENTENCE_HIGHLIGHT, range, 0);
+export const highlightSentence = (range: Range | null) => show(SENTENCE_HIGHLIGHT, range, 0);
 /** The word being spoken, painted over the sentence. */
-export const highlightWord = (range: Range | null) =>
-	show(WORD_HIGHLIGHT, range, 1);
+export const highlightWord = (range: Range | null) => show(WORD_HIGHLIGHT, range, 1);

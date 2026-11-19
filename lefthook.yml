@@ -1,0 +1,8 @@
+# Git hooks, installed into .git/hooks by lefthook when dependencies are installed.
+pre-commit:
+  commands:
+    biome:
+      # Lint and formatting on the staged files only. A finding stops the commit:
+      # fix with `pnpm format`, stage again, commit.
+      glob: "*.{ts,js,mjs,cjs,json,jsonc,css,html,md,yml,yaml}"
+      run: node_modules/.bin/biome check --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
