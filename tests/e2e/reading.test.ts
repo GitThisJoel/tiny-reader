@@ -80,6 +80,71 @@ describe.each([
 		expect(playing.background).toBe("10px");
 	}, 60_000);
 
+	it("highlights the sentence being read, across inline elements, without touching the DOM", async () => {
+		const before = await firefox.evaluate<string>(
+			tab,
+			"return document.body.innerHTML;",
+		);
+		await press(tab, "Stop reading");
+		await select(tab, "#first");
+		await firefox.contextMenu(tab, "#first", MENU);
+		await barWhen(tab, `bar.status === "playing"`);
+		const HIGHLIGHT = `
+			const highlight = CSS.highlights.get("tiny-reader-sentence");
+			const [range] = highlight ?? [];
+			return range ? range.toString().replace(/\\s+/g, " ") : null;`;
+		expect(await firefox.evaluate(tab, HIGHLIGHT)).toBe(
+			"The quick brown fox jumps over the lazy dog.",
+		);
+		// The selection is dropped so it does not hide the highlight, and the colours apply.
+		expect(
+			await firefox.evaluate(tab, "return getSelection().isCollapsed;"),
+		).toBe(true);
+		expect(
+			await firefox.evaluate(
+				tab,
+				`return getComputedStyle(document.querySelector("#first"), "::highlight(tiny-reader-sentence)").backgroundColor;`,
+			),
+		).not.toBe("rgba(0, 0, 0, 0)");
+
+		// Second sentence: starts in the paragraph's text, crosses a link and an <em>.
+		await press(tab, "Next sentence");
+		await barWhen(tab, `bar.status === "playing" && bar.text.includes(" 2 ")`);
+		expect(await firefox.evaluate(tab, HIGHLIGHT)).toBe(
+			"It was a sunny day, and nobody minded.",
+		);
+		expect(
+			await firefox.evaluate(
+				tab,
+				`const [range] = CSS.highlights.get("tiny-reader-sentence");
+				 return [range.startContainer.parentElement.id, range.endContainer.parentElement.id, range.endContainer.data.trim()];`,
+			),
+		).toEqual(["first", "first", "minded."]);
+
+		// Third: after the <br>.
+		await press(tab, "Next sentence");
+		await barWhen(tab, `bar.status === "playing" && bar.text.includes(" 3 ")`);
+		expect(await firefox.evaluate(tab, HIGHLIGHT)).toBe(
+			"A new line starts here!",
+		);
+
+		await press(tab, "Stop reading");
+		expect(
+			await firefox.evaluate(
+				tab,
+				`return CSS.highlights.has("tiny-reader-sentence");`,
+			),
+		).toBe(false);
+		expect(
+			await firefox.evaluate<string>(tab, "return document.body.innerHTML;"),
+		).toBe(before);
+
+		// Leave a reading in progress for the tests below.
+		await select(tab, "#second");
+		await firefox.contextMenu(tab, "#second", MENU);
+		await barWhen(tab, `bar.status === "playing"`);
+	}, 60_000);
+
 	it("pauses, resumes and skips", async () => {
 		await press(tab, "Pause");
 		expect(await barWhen(tab, `bar.status === "paused"`)).toMatchObject({

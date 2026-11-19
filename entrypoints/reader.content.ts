@@ -2,9 +2,11 @@
 import { browser } from "wxt/browser";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { createBar } from "@/content/bar.ts";
+import { highlightSentence } from "@/content/highlight.ts";
 import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
 import { WebAudioSink } from "@/content/sink.ts";
+import { mapRange } from "@/content/text-map.ts";
 import { EngineClient } from "@/engine/client.ts";
 import {
 	DEFAULT_OPTIONS,
@@ -29,17 +31,21 @@ export default defineContentScript({
 	registration: "runtime",
 	main() {
 		// executeScript may run this file again in the same page; set up only once.
+		// The return value tells the background whether this was the first time.
 		const scope = globalThis as { [LOADED]?: boolean };
-		if (scope[LOADED]) return;
+		if (scope[LOADED]) return false;
 		scope[LOADED] = true;
 
 		let session: Session | null = null;
 		let options: SynthOptions = { ...DEFAULT_OPTIONS };
 
-		function start(text: string) {
+		function start(range: Range) {
 			session?.end();
-			const sentences = segment(text);
+			const map = mapRange(range);
+			const sentences = segment(map.text);
 			if (!sentences.length) return;
+			// The selection would paint over the highlight, so it is dropped.
+			getSelection()?.removeAllRanges();
 
 			const client = new EngineClient(() =>
 				browser.runtime.connect({ name: PORT_NAME }),
@@ -52,6 +58,11 @@ export default defineContentScript({
 					sink,
 					onState(state) {
 						bar.update(state);
+						const reading = state.status !== "done" && state.status !== "error";
+						const sentence = reading ? sentences[state.index] : undefined;
+						highlightSentence(
+							sentence ? map.rangeOf(sentence.start, sentence.end) : null,
+						);
 						// Keep the engine loaded while reading; let Firefox unload it otherwise.
 						client.keepAlive(
 							state.status === "playing" || state.status === "loading",
@@ -79,6 +90,7 @@ export default defineContentScript({
 				if (ended) return;
 				ended = true;
 				reader.stop();
+				highlightSentence(null);
 				sink.close();
 				client.close();
 				bar.remove();
@@ -90,11 +102,15 @@ export default defineContentScript({
 		}
 
 		browser.runtime.onMessage.addListener((message: ReaderCommand) => {
-			if (message?.type === "read-selection")
-				start(getSelection()?.toString() ?? "");
-			else if (message?.type === "toggle") void session?.reader.toggle();
+			if (message?.type === "read-selection") {
+				// ponytail: only the first range of a multi-range (Ctrl+drag) selection is read.
+				const selection = getSelection();
+				if (selection?.rangeCount && !selection.isCollapsed)
+					start(selection.getRangeAt(0));
+			} else if (message?.type === "toggle") void session?.reader.toggle();
 			else if (message?.type === "stop") session?.end();
 		});
 		addEventListener("pagehide", () => session?.end());
+		return true;
 	},
 });

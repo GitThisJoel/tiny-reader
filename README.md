@@ -5,9 +5,9 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 3 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
-and the add-on reads it aloud with a control bar for pause, skip, speed and voice. Highlighting
-comes next. Research behind the design is in
+**Status:** Milestone 4 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
+and the add-on reads it aloud, highlighting each sentence, with a control bar for pause, skip,
+speed and voice. Research behind the design is in
 [docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Requirements
@@ -113,7 +113,14 @@ Web Audio queue, control bar
   one playing, and schedules each on the Web Audio clock at the exact sample where the previous one
   ends. Pause, skip, stop, and a change of speed or voice abort the synthesis that is no longer
   needed. The control bar lives in a closed shadow root on a single host element, the only node
-  the add-on adds to a page. Highlighting through the CSS Custom Highlight API is planned.
+  the add-on adds to a page.
+- **Text map and highlighting** ([content/text-map.ts](content/text-map.ts),
+  [content/highlight.ts](content/highlight.ts)): the selection is read from the DOM as one string
+  (hidden nodes skipped, blocks and `<br>` as line breaks) together with a table that maps any
+  offset in that string back to a text node and offset. The sentence being read becomes a `Range`
+  registered with the CSS Custom Highlight API; its colours are injected with
+  `scripting.insertCSS`. No element is wrapped or inserted. The selection is cleared when reading
+  starts, because a selection paints over a highlight.
 - **Background event page**: context menu, keyboard commands, and routing between content
   scripts and the engine. It owns the engine Worker, because a content script cannot start an
   extension Worker (FINDINGS §7).

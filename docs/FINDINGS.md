@@ -309,3 +309,13 @@ Consequences:
   on such a page.
 - `wxt/browser` types have `contextMenus` but not Firefox's `menus` alias. Firefox supports
   both, so the add-on uses `contextMenus`.
+
+## 11. Milestone 4 results
+
+- `CSS.highlights.set(name, new Highlight(range))` from the content script and a
+  `::highlight()` rule added with `scripting.insertCSS` paint correctly, also on a page whose
+  CSP has `style-src 'none'`. `document.body.innerHTML` is identical before and after a reading.
+- `::selection` paints over `::highlight()`, so the selection is cleared when reading starts.
+- Source newlines inside a paragraph must be mapped to spaces (length-preserving) before
+  segmentation: `Intl.Segmenter` treats a line feed as a sentence end.
+- Not done: scrolling the page to follow the highlight. It was not asked for; say if you want it.

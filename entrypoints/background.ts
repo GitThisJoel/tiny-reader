@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
+import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
 import type { ReaderCommand } from "./reader.content.ts";
 
@@ -23,10 +24,14 @@ export default defineBackground(() => {
 	 */
 	async function send(tabId: number, frameId: number, command: ReaderCommand) {
 		try {
-			await browser.scripting.executeScript({
-				target: { tabId, frameIds: [frameId] },
+			const target = { tabId, frameIds: [frameId] };
+			const [injection] = await browser.scripting.executeScript({
+				target,
 				files: ["/content-scripts/reader.js"],
 			});
+			// First injection into this document: add the highlight colours too.
+			if (injection?.result === true)
+				await browser.scripting.insertCSS({ target, css: HIGHLIGHT_CSS });
 			await browser.tabs.sendMessage(tabId, command, { frameId });
 		} catch (error) {
 			console.warn("Tiny Reader cannot read this page:", error);
