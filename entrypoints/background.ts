@@ -1,9 +1,9 @@
 import { type Browser, browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
 import { BLOCKED, isCommand, isCommandMessage } from "@/content/commands.ts";
+import type { ReaderCommand } from "@/content/controller.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
-import type { ReaderCommand } from "./reader.content.ts";
 
 const MENU_SELECTION = "read-selection";
 const MENU_FROM_HERE = "read-from-here";
