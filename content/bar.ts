@@ -123,7 +123,10 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
 		event.stopPropagation();
 		handlers.stop();
 	});
-	shadow.append(toolbar);
+	const notice = document.createElement("p");
+	notice.setAttribute("role", "alert");
+	notice.hidden = true;
+	shadow.append(notice, toolbar);
 	document.documentElement.append(host);
 
 	let showsPlay = false;
@@ -140,6 +143,11 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
 				toggle.title = label;
 				toggle.replaceChildren(icon(wantsPlay ? "play" : "pause"));
 			}
+		},
+		/** A warning shown above the controls until the bar goes away. */
+		notify(message: string) {
+			notice.textContent = message;
+			notice.hidden = false;
 		},
 		focus() {
 			toggle.focus();

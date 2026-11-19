@@ -4,6 +4,7 @@ import { defineContentScript } from "wxt/utils/define-content-script";
 import { createBar } from "@/content/bar.ts";
 import { rangeFrom } from "@/content/from-here.ts";
 import { highlightSentence, highlightWord } from "@/content/highlight.ts";
+import { languageWarning, SAMPLE_LENGTH } from "@/content/language.ts";
 import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
 import { loadSettings, saveSettings } from "@/content/settings.ts";
@@ -11,7 +12,7 @@ import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
-import { PORT_NAME } from "@/engine/protocol.ts";
+import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 /** Background → content script. */
 export type ReaderCommand =
@@ -21,7 +22,7 @@ export type ReaderCommand =
 	| { type: "toggle" | "stop" | "next" | "previous" };
 
 interface Session {
-	reader: Reader;
+	reader?: Reader;
 	end(): void;
 }
 
@@ -44,14 +45,43 @@ export default defineContentScript({
 
 		let session: Session | null = null;
 
-		async function start(range: Range) {
+		/** Shows a message in the bar when there is nothing to start. */
+		function report(message: string) {
 			session?.end();
+			const end = () => {
+				bar.remove();
+				if (session === current) session = null;
+			};
+			const idle = () => {};
+			const bar = createBar(
+				{
+					toggle: idle,
+					previous: idle,
+					next: idle,
+					stop: end,
+					setOptions: idle,
+				},
+				DEFAULT_OPTIONS,
+			);
+			bar.update({ status: "error", index: 0, total: 0, message });
+			const current: Session = { end };
+			session = current;
+		}
+
+		async function start(range: Range) {
+			// The only await comes first, so two quick starts cannot interleave below.
+			let { prefetch, ...options } = await loadSettings();
+			session?.end();
+			// ponytail: the whole range is mapped and segmented up front. Measured 0.4 s for
+			// 10,000 paragraphs (docs/FINDINGS.md §14); map block by block if that ever hurts.
 			const map = mapRange(range);
 			const sentences = segment(map.text);
-			if (!sentences.length) return;
+			if (!sentences.length) {
+				report("There is no text to read here.");
+				return;
+			}
 			// The selection would paint over the highlight, so it is dropped.
 			getSelection()?.removeAllRanges();
-			let { prefetch, ...options } = await loadSettings();
 
 			const client = new EngineClient(() =>
 				browser.runtime.connect({ name: PORT_NAME }),
@@ -140,6 +170,14 @@ export default defineContentScript({
 			const current: Session = { reader, end };
 			session = current;
 			reader.read(sentences.map((sentence) => sentence.text));
+			// Firefox's built-in detector, run locally. English only is a limit of the model.
+			browser.i18n.detectLanguage(map.text.slice(0, SAMPLE_LENGTH)).then(
+				(detection) => {
+					const warning = languageWarning(detection);
+					if (warning && !ended) bar.notify(warning);
+				},
+				() => {},
+			);
 		}
 
 		browser.runtime.onMessage.addListener((message: ReaderCommand) => {
@@ -157,13 +195,13 @@ export default defineContentScript({
 					break;
 				}
 				case "toggle":
-					void session?.reader.toggle();
+					void session?.reader?.toggle();
 					break;
 				case "next":
-					session?.reader.next();
+					session?.reader?.next();
 					break;
 				case "previous":
-					session?.reader.previous();
+					session?.reader?.previous();
 					break;
 				case "stop":
 					session?.end();

@@ -239,7 +239,9 @@ export class Firefox {
 	async contextMenu(tab: string, selector: string, label: string) {
 		const element = await this.evaluate<Record<string, string>>(
 			tab,
-			"return document.querySelector(arguments[0]);",
+			`const element = document.querySelector(arguments[0]);
+			 element?.scrollIntoView({ block: "center" });
+			 return element;`,
 			[selector],
 		);
 		const [[key, id] = []] = Object.entries(element ?? {});
