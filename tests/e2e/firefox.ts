@@ -23,6 +23,9 @@ const BINARIES = [
 	"/Applications/Firefox.app/Contents/MacOS/firefox",
 ];
 
+/** Marionette runs the script as a plain function body; this lets it use `await`. */
+const ASYNC = (body: string) =>
+	`return (async function () { ${body} }).apply(null, arguments);`;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class Firefox {
@@ -161,16 +164,22 @@ export class Firefox {
 		return handle;
 	}
 
-	/** Runs a function body in the page (promises are awaited) and returns its result. */
+	/**
+	 * Runs a function body in the page (promises are awaited) and returns its result.
+	 * `privileged` runs it with browser privileges, which can see into closed shadow roots
+	 * (`element.openOrClosedShadowRoot`).
+	 */
 	async evaluate<T>(
 		tab: string,
 		body: string,
 		args: unknown[] = [],
+		privileged = false,
 	): Promise<T> {
 		await this.focus(tab);
 		const { value } = await this.send<{ value: T }>("WebDriver:ExecuteScript", {
-			script: body,
+			script: ASYNC(body),
 			args,
+			...(privileged ? { sandbox: "system" } : {}),
 		});
 		return value;
 	}
@@ -181,7 +190,7 @@ export class Firefox {
 		try {
 			const { value } = await this.send<{ value: T }>(
 				"WebDriver:ExecuteScript",
-				{ script: body, args },
+				{ script: ASYNC(body), args },
 			);
 			return value;
 		} finally {
@@ -201,12 +210,55 @@ export class Firefox {
 		await this.send("WebDriver:ElementClick", { id });
 	}
 
+	/** Right-clicks the element and picks the page context menu item with this label. */
+	async contextMenu(tab: string, selector: string, label: string) {
+		const element = await this.evaluate<Record<string, string>>(
+			tab,
+			"return document.querySelector(arguments[0]);",
+			[selector],
+		);
+		const [[key, id] = []] = Object.entries(element ?? {});
+		if (!key || !id) throw new Error(`no element matches ${selector}`);
+		await this.send("WebDriver:PerformActions", {
+			actions: [
+				{
+					type: "pointer",
+					id: "mouse",
+					parameters: { pointerType: "mouse" },
+					actions: [
+						{ type: "pointerMove", origin: { [key]: id }, x: 0, y: 0 },
+						{ type: "pointerDown", button: 2 },
+						{ type: "pointerUp", button: 2 },
+					],
+				},
+			],
+		});
+		const picked = await this.chrome<string>(
+			`const [label] = arguments;
+			 const menu = document.getElementById("contentAreaContextMenu");
+			 for (let tries = 0; tries < 50 && menu.state !== "open"; tries++)
+			   await new Promise((resolve) => setTimeout(resolve, 100));
+			 if (menu.state !== "open") return "the context menu did not open";
+			 const item = [...menu.querySelectorAll("menuitem")].find((node) => node.label === label && !node.hidden);
+			 if (!item) { menu.hidePopup(); return "no such item"; }
+			 menu.activateItem(item);
+			 return "ok";`,
+			[label],
+		);
+		if (picked !== "ok") throw new Error(`context menu "${label}": ${picked}`);
+	}
+
 	/** Polls `body` (a function body returning a value) until it is truthy. */
-	async waitFor<T>(tab: string, body: string, timeout = 30_000): Promise<T> {
+	async waitFor<T>(
+		tab: string,
+		body: string,
+		timeout = 30_000,
+		privileged = false,
+	): Promise<T> {
 		const deadline = Date.now() + timeout;
 		let last: T | null = null;
 		while (Date.now() < deadline) {
-			last = await this.evaluate<T>(tab, body);
+			last = await this.evaluate<T>(tab, body, [], privileged);
 			if (last) return last;
 			await sleep(100);
 		}
