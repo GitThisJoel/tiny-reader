@@ -1,5 +1,6 @@
 import { type SynthOptions, VOICES } from "@/engine/protocol.ts";
 import css from "./bar.css?inline";
+import { iconButton as button, icon } from "./icons.ts";
 import type { ReaderState } from "./reader.ts";
 
 export interface BarHandlers {
@@ -15,42 +16,6 @@ export const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 /** The speeds on offer, with the one in use added when it is not a preset (set on the options page). */
 export const speedChoices = (current: number): number[] =>
   SPEEDS.includes(current) ? SPEEDS : [...SPEEDS, current].sort((a, b) => a - b);
-
-const ICONS = {
-  play: "M7 4v16l13-8z",
-  pause: "M6 4h4v16H6zM14 4h4v16h-4z",
-  previous: "M6 5h2v14H6zM20 5v14l-11-7z",
-  next: "M16 5h2v14h-2zM4 5v14l11-7z",
-  stop: "M6 6l12 12M18 6L6 18",
-  grip: "M8 5h2v2H8zM14 5h2v2h-2zM8 11h2v2H8zM14 11h2v2h-2zM8 17h2v2H8zM14 17h2v2h-2z",
-};
-
-const SVG = "http://www.w3.org/2000/svg";
-
-function icon(name: keyof typeof ICONS) {
-  const svg = document.createElementNS(SVG, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS(SVG, "path");
-  path.setAttribute("d", ICONS[name]);
-  if (name === "stop") {
-    path.setAttribute("stroke", "currentColor");
-    path.setAttribute("stroke-width", "2.5");
-    path.setAttribute("stroke-linecap", "round");
-  }
-  svg.append(path);
-  return svg;
-}
-
-function button(name: keyof typeof ICONS, label: string, onClick: () => void) {
-  const element = document.createElement("button");
-  element.type = "button";
-  element.setAttribute("aria-label", label);
-  element.title = label;
-  element.append(icon(name));
-  element.addEventListener("click", onClick);
-  return element;
-}
 
 function select(
   label: string,
