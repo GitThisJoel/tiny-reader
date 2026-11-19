@@ -45,7 +45,8 @@ const read = (): Settings => ({
   speed: Number(speed.value),
   pitchShift: Number(pitchShift.value) * SEMITONE,
   pitchRange: Number(pitchRange.value),
-  prefetch: Number(prefetch.value),
+  // NaN for an emptied field, which saveSettings turns back into the default.
+  prefetch: prefetch.valueAsNumber,
 });
 
 async function save(settings: Settings) {

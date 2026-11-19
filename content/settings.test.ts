@@ -41,6 +41,8 @@ describe("parseSettings", () => {
       ...DEFAULT_SETTINGS,
       prefetch: 0,
     });
+    // An emptied number field on the options page reads as NaN.
+    expect(parseSettings({ prefetch: Number.NaN })).toEqual(DEFAULT_SETTINGS);
   });
 
   it("always yields options the engine accepts", () => {
