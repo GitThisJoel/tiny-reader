@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiny Reader</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <h1>Tiny Reader</h1>
+    <button type="button" id="read" aria-describedby="read-hint">
+      <img src="/icon.svg" alt="" width="72" height="72" />
+      <span>Read aloud</span>
+    </button>
+    <p id="read-hint">Reads the selected text, or the whole page when nothing is selected.</p>
+    <div id="controls" role="toolbar" aria-label="Reading controls"></div>
+    <form id="form"></form>
+    <footer><button type="button" id="shortcuts">Keyboard shortcuts</button></footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

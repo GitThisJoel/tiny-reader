@@ -2,6 +2,7 @@
 import { browser } from "wxt/browser";
 import { defineContentScript } from "wxt/utils/define-content-script";
 import { createBar } from "@/content/bar.ts";
+import type { Command } from "@/content/commands.ts";
 import { rangeFrom } from "@/content/from-here.ts";
 import { highlightSentence, highlightWord } from "@/content/highlight.ts";
 import { languageWarning, SAMPLE_LENGTH } from "@/content/language.ts";
@@ -16,10 +17,9 @@ import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 /** Background → content script. */
 export type ReaderCommand =
-  | { type: "read-selection" }
+  | { type: Command }
   /** `target` is the id Firefox gives the element the context menu was opened on. */
-  | { type: "read-from-here"; target: number }
-  | { type: "toggle" | "stop" | "next" | "previous" };
+  | { type: "read-from-here"; target: number };
 
 interface Session {
   reader?: Reader;
@@ -171,10 +171,15 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((message: ReaderCommand) => {
       switch (message?.type) {
+        case "read":
         case "read-selection": {
           // ponytail: only the first range of a multi-range (Ctrl+drag) selection is read.
           const selection = getSelection();
           if (selection?.rangeCount && !selection.isCollapsed) void start(selection.getRangeAt(0));
+          // "read" with nothing selected reads the page: its article if it has one. Top frame only,
+          // so a page with frames does not start several readings at once.
+          else if (message.type === "read" && window === top)
+            void start(rangeFrom(document.querySelector("article, main, [role=main]") ?? document.body));
           break;
         }
         case "read-from-here": {

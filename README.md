@@ -7,6 +7,8 @@ leaves the machine, and the add-on makes no network requests at runtime.
 
 ## Using it
 
+- Click the Tiny Reader button in the toolbar and press **Read aloud**: it reads the selection, or the page's main
+  text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
 - Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
@@ -177,6 +179,9 @@ flowchart LR
   marked.
 - **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
   add-on adds to a page.
+- **Toolbar popup** ([entrypoints/popup/](entrypoints/popup/)): the panel behind the toolbar button. Its buttons send
+  a command to the background, which passes it to the reader in the active tab; its settings form is the one the
+  options page uses ([content/settings-form.ts](content/settings-form.ts)).
 - **Background event page** ([entrypoints/background.ts](entrypoints/background.ts)): context menu, shortcuts and
   message routing. It owns the Worker, because a content script cannot start one, and prefixes request ids per page so
   pages cannot see or cancel each other's requests.
@@ -190,12 +195,12 @@ The reasoning and measurements behind these choices are in [docs/FINDINGS.md](do
 
 ## Permissions
 
-| Permission  | Why                                                                                                                                                                                   |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `activeTab` | Access to the one tab where you choose **Read with tiny-voca**, only after you do so. This replaces any host permission: the add-on cannot touch pages you have not asked it to read. |
-| `scripting` | Injects the reader into that tab on demand (`scripting.executeScript`). No content script is declared for any site.                                                                   |
-| `menus`     | Adds **Read with tiny-voca** (on a selection) and **Read from here with tiny-voca** (on the page) to the context menu, and tells the reader which element the menu was opened on.     |
-| `storage`   | Remembers your settings (voice, speed, pitch, prefetch depth) in `storage.local`. Nothing else is stored.                                                                             |
+| Permission  | Why                                                                                                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activeTab` | Access to the one tab where you start a reading (toolbar button, context menu or shortcut), only after you do so. This replaces any host permission: the add-on cannot touch pages you have not asked it to read. |
+| `scripting` | Injects the reader into that tab on demand (`scripting.executeScript`). No content script is declared for any site.                                                                                               |
+| `menus`     | Adds **Read with tiny-voca** (on a selection) and **Read from here with tiny-voca** (on the page) to the context menu, and tells the reader which element the menu was opened on.                                 |
+| `storage`   | Remembers your settings (voice, speed, pitch, prefetch depth) in `storage.local`. Nothing else is stored.                                                                                                         |
 
 There are no host permissions and no `web_accessible_resources`. The extension CSP is
 `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing

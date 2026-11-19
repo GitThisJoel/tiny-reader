@@ -149,6 +149,17 @@ export class Firefox {
     return value;
   }
 
+  /**
+   * Like evaluate, but without bringing the tab to the front: whichever tab was showing stays
+   * the active one. For a page that acts on "the active tab", such as the toolbar popup.
+   */
+  async evaluateBehind<T>(tab: string, body: string, args: unknown[] = []): Promise<T> {
+    await this.send("WebDriver:SwitchToWindow", { handle: tab, focus: false });
+    this.current = tab;
+    const { value } = await this.send<{ value: T }>("WebDriver:ExecuteScript", { script: ASYNC(body), args });
+    return value;
+  }
+
   /** Runs a function body in the browser's own (privileged) context. */
   async chrome<T>(body: string, args: unknown[] = []): Promise<T> {
     await this.send("Marionette:SetContext", { value: "chrome" });
@@ -288,6 +299,17 @@ export class Firefox {
       [label],
     );
     if (picked !== "ok") throw new Error(`context menu "${label}": ${picked}`);
+  }
+
+  /** A PNG of the element matching `selector`, as bytes. */
+  async screenshot(tab: string, selector: string): Promise<Buffer> {
+    const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
+      selector,
+    ]);
+    const id = Object.values(element ?? {})[0];
+    if (!id) throw new Error(`no element matches ${selector}`);
+    const { value } = await this.send<{ value: string }>("WebDriver:TakeScreenshot", { id, full: false });
+    return Buffer.from(value, "base64");
   }
 
   /** Polls `body` (a function body returning a value) until it is truthy. */

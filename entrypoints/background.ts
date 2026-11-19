@@ -1,13 +1,12 @@
 import { type Browser, browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
+import { isCommand, isCommandMessage } from "@/content/commands.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
 import type { ReaderCommand } from "./reader.content.ts";
 
 const MENU_SELECTION = "read-selection";
 const MENU_FROM_HERE = "read-from-here";
-/** Keyboard commands in the manifest that are passed to the page as they are. */
-const COMMANDS = ["read-selection", "toggle", "stop", "next", "previous"] as const;
 
 // Firefox's name for contextMenus. Only `menus` reports the element a menu was opened on,
 // which "read from here" needs; wxt's types know the Chrome name only.
@@ -38,7 +37,7 @@ export default defineBackground(() => {
    * such as about: pages and frames from another site.
    */
   async function send(tabId: number, frameId: number | undefined, command: ReaderCommand) {
-    const starts = command.type === "read-selection" || command.type === "read-from-here";
+    const starts = command.type.startsWith("read");
     try {
       if (starts) await inject(tabId, frameId);
       await browser.tabs.sendMessage(tabId, command, frameId === undefined ? {} : { frameId });
@@ -74,14 +73,17 @@ export default defineBackground(() => {
       });
   });
 
-  browser.commands.onCommand.addListener(async (name) => {
-    const type = COMMANDS.find((command) => command === name);
-    const [tab] = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    // ponytail: a shortcut goes to every frame, since any of them may hold the selection or
+  /** Passes a command to the reader in the tab the user is looking at. */
+  async function toActiveTab(name: unknown) {
+    if (!isCommand(name)) return;
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    // ponytail: the command goes to every frame, since any of them may hold the selection or
     // the reading. Starting a reading in one frame does not stop one in another frame.
-    if (type && tab?.id !== undefined) void send(tab.id, undefined, { type });
+    if (tab?.id !== undefined) await send(tab.id, undefined, { type: name });
+  }
+  // Keyboard shortcuts, and the buttons of the toolbar popup.
+  browser.commands.onCommand.addListener((name) => void toActiveTab(name));
+  browser.runtime.onMessage.addListener((message: unknown) => {
+    if (isCommandMessage(message)) return toActiveTab(message.name);
   });
 });

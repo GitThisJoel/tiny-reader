@@ -1,0 +1,93 @@
+:root {
+  color-scheme: light dark;
+  font:
+    14px / 1.4 system-ui,
+    sans-serif;
+}
+body {
+  margin: 0;
+  width: 22rem;
+  background: Canvas;
+  color: CanvasText;
+}
+h1 {
+  margin: 0;
+  padding: 0.6rem;
+  font-size: 1rem;
+  text-align: center;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+}
+footer {
+  display: flex;
+  justify-content: center;
+  padding: 0.25rem;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+}
+footer button {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+#read {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1rem auto 0.25rem;
+  padding: 0.5rem 1.25rem;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#read img {
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+#read-hint {
+  margin: 0 1rem 0.75rem;
+  text-align: center;
+  color: GrayText;
+}
+#controls {
+  display: flex;
+  justify-content: space-around;
+  padding: 0.25rem 1rem;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+}
+#controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+#controls svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+form {
+  padding: 1rem;
+}
+:is(#read, #controls button, footer button):hover {
+  background: color-mix(in srgb, CanvasText 12%, Canvas);
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 1px;
+}
