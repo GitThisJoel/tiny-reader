@@ -46,14 +46,17 @@ export type EngineRequest =
 
 export type EngineErrorCode = "nothing-to-pronounce" | "failed";
 
+/** One synthesized sentence. */
+export interface Utterance {
+  /** Mono samples at `sampleRate`, peak at most 0.99. */
+  pcm: Float32Array;
+  sampleRate: number;
+  /** When each word of the source text is heard. */
+  words: WordTiming[];
+}
+
 export type EngineResponse =
-  | {
-      type: "result";
-      id: string;
-      pcm: Float32Array;
-      sampleRate: number;
-      words: WordTiming[];
-    }
+  | ({ type: "result"; id: string } & Utterance)
   | { type: "error"; id: string; code: EngineErrorCode; message: string }
   /** Sent while the model is being loaded for the first request, and when it is ready. */
   | { type: "status"; state: "loading" | "ready" };

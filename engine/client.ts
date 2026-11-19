@@ -1,11 +1,7 @@
-import type { EngineErrorCode, EngineRequest, EngineResponse, SynthOptions, WordTiming } from "./protocol.ts";
+import type { EngineErrorCode, EngineRequest, EngineResponse, SynthOptions, Utterance } from "./protocol.ts";
 import type { PortLike } from "./router.ts";
 
-export interface Utterance {
-  pcm: Float32Array;
-  sampleRate: number;
-  words: WordTiming[];
-}
+export type { Utterance };
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode | "disconnected";

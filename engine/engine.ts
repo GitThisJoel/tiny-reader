@@ -1,7 +1,7 @@
 import type * as Ort from "onnxruntime-web";
 import { alignWords } from "./align.ts";
 import { loadPhonemizer, type Phonemes, phonemize } from "./phonemizer.ts";
-import { HOP, SAMPLE_RATE, type SynthOptions, type WordTiming } from "./protocol.ts";
+import { HOP, SAMPLE_RATE, type SynthOptions, type Utterance, type WordTiming } from "./protocol.ts";
 import { finished, normalize, splitLong } from "./text.ts";
 
 /**
@@ -18,11 +18,7 @@ export class NothingToPronounce extends Error {
   }
 }
 
-export interface Utterance {
-  pcm: Float32Array;
-  sampleRate: number;
-  words: WordTiming[];
-}
+export type { Utterance };
 
 export interface Engine {
   /** Resolves to null when `signal` aborts before the audio is complete. */
