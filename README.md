@@ -5,9 +5,6 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** all seven milestones are done. Research and measurements behind the design are in
-[docs/FINDINGS.md](docs/FINDINGS.md).
-
 ## Using it
 
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
@@ -136,50 +133,57 @@ and a test fails once that list is no longer needed.
 
 ## Architecture
 
-```
-page (content script)                background event page            engine Worker
----------------------                ---------------------            -------------
-selection, Intl.Segmenter   Port     context menu, commands   post    normalise → phonemise
-text offset → DOM Range   <------->  message routing        <------>  → ONNX Runtime Web (wasm)
-CSS Custom Highlight API             owns the Worker        Message   returns PCM + durations
-Web Audio queue, control bar
+```mermaid
+flowchart LR
+  subgraph page["Web page: content script, injected on demand"]
+    direction TB
+    bar["Control bar<br/>closed shadow root"]
+    text["Text map and Intl.Segmenter<br/>selection to sentences"]
+    reader["Reader queue<br/>prefetch, pause, skip, cancel"]
+    audio["Web Audio<br/>gapless playback"]
+    marks["CSS Custom Highlight API<br/>sentence and word"]
+    bar --> reader
+    text --> reader
+    reader --> audio
+    reader --> marks
+  end
+
+  subgraph background["Background event page"]
+    router["Router<br/>menus, shortcuts, per-page request ids"]
+  end
+
+  subgraph worker["Engine Worker"]
+    direction TB
+    phonemizer["Phonemizer<br/>dizione"]
+    model["tiny-voca<br/>ONNX Runtime Web, wasm"]
+    align["Word alignment"]
+    phonemizer --> model --> align
+  end
+
+  reader <-->|"runtime.Port<br/>sentence in, PCM and word timings out"| router
+  router <-->|"postMessage"| worker
 ```
 
-- **Content script** ([entrypoints/reader.content.ts](entrypoints/reader.content.ts),
-  [content/](content/)): injected on demand into the tab you asked it to read. It splits the
-  selection into sentences with `Intl.Segmenter`, asks the engine for two sentences ahead of the
-  one playing, and schedules each on the Web Audio clock at the exact sample where the previous one
-  ends. Pause, skip, stop, and a change of speed or voice abort the synthesis that is no longer
-  needed. The control bar lives in a closed shadow root on a single host element, the only node
-  the add-on adds to a page.
-- **Text map and highlighting** ([content/text-map.ts](content/text-map.ts),
-  [content/highlight.ts](content/highlight.ts)): the selection is read from the DOM as one string
-  (hidden nodes skipped, blocks and `<br>` as line breaks) together with a table that maps any
-  offset in that string back to a text node and offset. The sentence being read becomes a `Range`
-  registered with the CSS Custom Highlight API; its colours are injected with
-  `scripting.insertCSS`. No element is wrapped or inserted. The selection is cleared when reading
-  starts, because a selection paints over a highlight.
-- **Word timing** ([engine/align.ts](engine/align.ts),
-  [content/word-tracker.ts](content/word-tracker.ts)): the model returns a duration for every
-  phoneme token and the phonemizer knows which tokens belong to which spoken word, so each spoken
-  word has an exact time span. Spoken words are matched back to the words of the source text by
-  longest common subsequence. Text the phonemizer rewrites (`$42.50` is spoken as "forty two
-  dollars and fifty cents") is highlighted as one span for as long as it is spoken. The word
-  highlight follows the audio clock, corrected for output latency. With
-  `prefers-reduced-motion: reduce` only the sentence is highlighted.
-- **Background event page**: context menu, keyboard commands, and routing between content
-  scripts and the engine. It owns the engine Worker, because a content script cannot start an
-  extension Worker (FINDINGS §7).
-- **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts),
-  [engine/](engine/)): phonemizer and ONNX Runtime Web (single-threaded wasm). One request is one
-  sentence; the reply is Float32 PCM at 24 kHz plus the time span of every spoken word. Text too
-  long for one model call (200 tokens) is cut at commas, then between words, and the audio joined.
-  The Worker stays loaded while a page is reading and is unloaded by Firefox 30 seconds after
+- **Content script** ([entrypoints/reader.content.ts](entrypoints/reader.content.ts), [content/](content/)): reads the
+  selection from the DOM as one string, splits it into sentences, keeps two sentences synthesized ahead of the one
+  playing, and schedules each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a
+  change of voice or speed abort work that is no longer needed.
+- **Highlighting** ([content/text-map.ts](content/text-map.ts), [content/highlight.ts](content/highlight.ts)): offsets
+  in that string map back to DOM ranges, which are registered with the CSS Custom Highlight API. Nothing is wrapped or
+  inserted. The word highlight follows the audio clock; with `prefers-reduced-motion: reduce` only the sentence is
+  marked.
+- **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
+  add-on adds to a page.
+- **Background event page** ([entrypoints/background.ts](entrypoints/background.ts)): context menu, shortcuts and
+  message routing. It owns the Worker, because a content script cannot start one, and prefixes request ids per page so
+  pages cannot see or cancel each other's requests.
+- **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts), [engine/](engine/)): one request is
+  one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
-- **Protocol** ([engine/protocol.ts](engine/protocol.ts)): typed messages with request ids.
-  `cancel` and `cancelAll` drop queued work and discard the result of work in progress; nothing is
-  sent for a cancelled request. The background prefixes ids per page, so pages cannot see or cancel
-  each other's requests, and cancels a page's work when its port closes.
+- **Protocol** ([engine/protocol.ts](engine/protocol.ts)): typed messages with request ids. Cancelling drops queued
+  work and discards the result of work in progress.
+
+The reasoning and measurements behind these choices are in [docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Permissions
 
