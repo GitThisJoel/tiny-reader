@@ -293,3 +293,19 @@ Consequences:
 - WebDriver BiDi cannot navigate to `moz-extension://` pages ("not allowed in this context").
   The end-to-end tests use Marionette instead, which can, and whose clicks are real input
   events.
+
+## 10. Milestone 3 results (real pages, headless Firefox 158)
+
+- **Autoplay risk resolved.** Right-clicking the selection to open the context menu gives the
+  page user activation (`navigator.userActivation.hasBeenActive` is true afterwards), and the
+  content script's `AudioContext` runs with no further click, under Firefox's default
+  `media.autoplay.default = 5`. The "Press play to start" state stays as a fallback.
+- **Xray pitfall.** In a content script, `AudioBuffer.getChannelData(0).set(pcm)` throws
+  "Permission denied to access object": the channel array belongs to the page, and page code
+  may not read the content script's array. `AudioBuffer.copyToChannel(pcm, 0)` works.
+- A page CSP of `default-src 'none'` with `script-src`, `style-src`, `media-src`, `worker-src`,
+  `frame-src` and `connect-src` all `'none'` changes nothing: the bar's constructed stylesheet
+  applies, audio plays, and the engine is reached. The end-to-end suite runs every reading test
+  on such a page.
+- `wxt/browser` types have `contextMenus` but not Firefox's `menus` alias. Firefox supports
+  both, so the add-on uses `contextMenus`.

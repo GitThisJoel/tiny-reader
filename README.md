@@ -5,8 +5,9 @@ A Firefox add-on (Manifest V3) that reads web page text aloud with the
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine, and the add-on makes no network requests at runtime.
 
-**Status:** Milestone 2 of 7. The speech engine works inside the add-on and can be tried from
-a test page; reading web pages comes next. Research behind the design is in
+**Status:** Milestone 3 of 7. Select text on a page, right-click, choose **Read with tiny-voca**,
+and the add-on reads it aloud with a control bar for pause, skip, speed and voice. Highlighting
+comes next. Research behind the design is in
 [docs/FINDINGS.md](docs/FINDINGS.md).
 
 ## Requirements
@@ -97,8 +98,6 @@ and a test fails once that list is no longer needed.
 
 ## Architecture
 
-The engine Worker and the background routing exist; the content script is planned.
-
 ```
 page (content script)                background event page            engine Worker
 ---------------------                ---------------------            -------------
@@ -108,9 +107,13 @@ CSS Custom Highlight API             owns the Worker        Message   returns PC
 Web Audio queue, control bar
 ```
 
-- **Content script**: captures the selection, splits it into sentences, maps text offsets back
-  to DOM ranges, highlights through the CSS Custom Highlight API (no page DOM changes), plays
-  audio with Web Audio and a prefetch queue, and shows a control bar inside a shadow root.
+- **Content script** ([entrypoints/reader.content.ts](entrypoints/reader.content.ts),
+  [content/](content/)): injected on demand into the tab you asked it to read. It splits the
+  selection into sentences with `Intl.Segmenter`, asks the engine for two sentences ahead of the
+  one playing, and schedules each on the Web Audio clock at the exact sample where the previous one
+  ends. Pause, skip, stop, and a change of speed or voice abort the synthesis that is no longer
+  needed. The control bar lives in a closed shadow root on a single host element, the only node
+  the add-on adds to a page. Highlighting through the CSS Custom Highlight API is planned.
 - **Background event page**: context menu, keyboard commands, and routing between content
   scripts and the engine. It owns the engine Worker, because a content script cannot start an
   extension Worker (FINDINGS §7).
@@ -127,9 +130,19 @@ Web Audio queue, control bar
 
 ## Permissions
 
-None yet. Each permission will be listed here with its reason when the milestone that needs it
-adds it. The extension CSP is `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is
-required by ONNX Runtime, and nothing else is allowed.
+| Permission     | Why                                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activeTab`    | Access to the one tab where you choose **Read with tiny-voca**, only after you do so. This replaces any host permission: the add-on cannot touch pages you have not asked it to read. |
+| `scripting`    | Injects the reader into that tab on demand (`scripting.executeScript`). No content script is declared for any site.                                                                   |
+| `contextMenus` | Adds the **Read with tiny-voca** entry to the context menu for selected text.                                                                                                         |
+
+There are no host permissions and no `web_accessible_resources`. The extension CSP is
+`script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing
+else is allowed. The model, ONNX Runtime and the phonemizer run only in the add-on's own Worker,
+never in a page, so a page's CSP cannot affect them.
+
+Known limit: text selected inside a frame from another site cannot be read, because `activeTab`
+does not extend to such frames.
 
 ## Before publishing
 
