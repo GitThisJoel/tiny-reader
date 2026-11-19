@@ -21,7 +21,8 @@
 		"lint:ext": "web-ext lint --source-dir .output/firefox-mv3",
 		"postinstall": "wxt prepare",
 		"test:parity": "vitest run tests/parity",
-		"test:smoke": "vitest run tests/smoke"
+		"test:smoke": "vitest run tests/smoke",
+		"test:e2e": "vitest run tests/e2e"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.8",
