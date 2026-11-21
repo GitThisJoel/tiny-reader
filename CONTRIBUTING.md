@@ -9,18 +9,26 @@ How to build, run and test Tiny Reader, and the conventions the repository follo
 - Node.js 22.18 or newer
 - [pnpm](https://pnpm.io/installation) 12 (the exact version is pinned in `package.json`)
 - Firefox 140 or newer, desktop
+- Docker, for `pnpm build-espeak` (once, and again only when that script changes)
 
 ## Setup
 
 ```bash
 pnpm install
 pnpm fetch-assets
+pnpm build-espeak
 ```
 
 `pnpm fetch-assets` downloads the model, the phonemizer data and upstream's JavaScript
 phonemizer (about 30 MB) into `public/assets/` and `vendor/`. Every file is pinned to a commit
 and checked against a SHA-256 in [scripts/fetch-assets.ts](scripts/fetch-assets.ts). These files
 are never committed. Running it again only re-verifies what is on disk.
+
+`pnpm build-espeak` builds eSpeak NG 1.52.0 from source to WebAssembly, inside a pinned emscripten container, and
+puts its loader in `vendor/espeak/` and its binary and data in `public/assets/espeak/`
+([scripts/build-espeak.sh](scripts/build-espeak.sh)). The Spanish and French models need it. The build is
+reproducible: the script prints whether the files are the ones it has on record. Without it the add-on does not
+build.
 
 ## Development
 
@@ -45,18 +53,19 @@ export default defineWebExtConfig({
 
 ## Scripts
 
-| Command             | What it does                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm dev`          | Watch build and launch Firefox with the add-on                                            |
-| `pnpm build`        | Production build into `.output/firefox-mv3/`                                              |
-| `pnpm zip`          | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO |
-| `pnpm lint`         | Biome lint and format check                                                               |
-| `pnpm format`       | Biome, applying fixes                                                                     |
-| `pnpm typecheck`    | `tsc --noEmit` in strict mode                                                             |
-| `pnpm test`         | Vitest unit tests                                                                         |
-| `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
-| `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
-| `pnpm screenshots`  | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)  |
+| Command             | What it does                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm dev`          | Watch build and launch Firefox with the add-on                                             |
+| `pnpm build`        | Production build into `.output/firefox-mv3/`                                               |
+| `pnpm zip`          | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO  |
+| `pnpm lint`         | Biome lint and format check                                                                |
+| `pnpm format`       | Biome, applying fixes                                                                      |
+| `pnpm typecheck`    | `tsc --noEmit` in strict mode                                                              |
+| `pnpm test`         | Vitest unit tests                                                                          |
+| `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                       |
+| `pnpm fetch-assets` | Download and verify model and phonemizer assets                                            |
+| `pnpm build-espeak` | Build eSpeak NG to WebAssembly in a container; `--fixtures` rewrites its parity references |
+| `pnpm screenshots`  | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
 
 `pnpm lint:ext` reports no errors and four accepted warnings:
 
@@ -121,6 +130,15 @@ TypeScript with no dependencies and no `eval`, under a licence the add-on can ca
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and a comparison with its own reference outputs to
 [tests/parity/frontends.test.ts](tests/parity/frontends.test.ts). [docs/FINDINGS.md](docs/FINDINGS.md) §14 lists
 which community models were looked at and why most cannot be added yet.
+
+A language whose model was trained on eSpeak NG's output needs three things: its dictionary in `LANGS` in
+[scripts/build-espeak.sh](scripts/build-espeak.sh), the model's own JavaScript port of tiny-voca's `text.py`
+(fetched and given to `espeakFrontEnd`), and a reference: add its Python front end to `REFERENCES` in that script
+and sentences to [tests/parity/espeak-sentences.json](tests/parity/espeak-sentences.json), then run
+`pnpm build-espeak --fixtures`. That runs the Python front end with a native eSpeak NG from the same source and
+writes `tests/parity/espeak-<language>.json`, which `pnpm test:parity` compares the JavaScript side with. Check
+which eSpeak NG version the model was trained with: output differs between versions for about one text in a
+hundred.
 
 `pnpm test:smoke` speaks a sentence with every downloadable model that has a front end of its own. It downloads
 each one once (about 21 MB) into `.cache/models/`, verified like in the add-on.

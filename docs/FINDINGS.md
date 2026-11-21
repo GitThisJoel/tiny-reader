@@ -386,8 +386,7 @@ licence, and where there is an ONNX file, its interface.
   no `eval`. Most projects use the eSpeak NG program (GPL-3.0, natively or as wasm), Python under Pyodide, or a
   large helper model. Some have no licence, weights under a non-commercial licence, no ONNX file, or no published
   front end.
-- Two had what is needed and were added. A third, German (`apptor/apptor-tiny-tts`), has a JavaScript front end
-  plus a 12 MB letter-to-sound ONNX model: a second session in the Worker, not built.
+- Two had what is needed as they were and were added first; two more followed with eSpeak NG (below).
 
 | Language             | Model                                   | Front end                                           | Its data in the package                                  |
 | -------------------- | --------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
@@ -432,16 +431,42 @@ requested in the one prompt and given back after the download, like `huggingface
 release files to another host the download will fail until the list is updated. A release tag can be moved, so the
 SHA-256 is what pins the file.
 
-**eSpeak NG (not built).** Spanish, French and several more would follow from shipping eSpeak NG as wasm, which
-their browser demos already do. What was found by reading those projects, without building anything:
+**eSpeak NG.** Most community models were trained on phonemes from the eSpeak NG program. It is now part of the
+add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es`) and French
+(`DanielSuncost/tiny-voca-fr`).
 
-- eSpeak NG and its data are GPL-3.0-or-later, so the whole add-on would have to be relicensed.
-- No npm package wraps a tagged release verifiably. The route that fits Mozilla's source rules is a documented build
-  from the 1.52.0 tag in a pinned emscripten container, as `stdevMac/tiny-voca`'s `scripts/build_espeak_wasm.sh`
-  does: about 65 kB of glue, 0.36 MB of wasm and under 1 MB of data per handful of languages **(unverified: the
-  build was not run)**.
-- **The eSpeak NG version matters.** The Spanish model was trained with 1.52.0; the Italian and Brazilian
-  Portuguese eSpeak models with 1.51, and their makers measured 0.5 to 1.2 % of texts differing under 1.52. The
-  French model's version is not stated.
-- Each language still needs its own glue from eSpeak's output to the model's tokens (40 to 80 lines of tables, up
-  to 300 of number and title handling) and a comparison against a native eSpeak NG of the right version.
+- **Licence.** eSpeak NG and its data are GPL-3.0-or-later, so Tiny Reader changed from Apache-2.0 to
+  GPL-3.0-or-later before its first release. Everything else in the package can be carried under it (Apache-2.0,
+  MIT, BSD; the two lexicons are data files under their own Creative Commons licences).
+- **The build.** No npm package wraps a tagged eSpeak NG release verifiably, so
+  [scripts/build-espeak.sh](../scripts/build-espeak.sh) builds tag 1.52.0 (commit `4870adf`) in an emscripten 4.0.10
+  container pinned by digest, adapted from `stdevMac/tiny-voca`. It takes about a minute. Two builds on this machine
+  were identical byte for byte, and the script checks each build against those hashes. Shipped: 64 kB of loader
+  (bundled into the Worker script), 362 kB of wasm, and 498 kB of data for Spanish, French and English.
+- **In the add-on.** The loader has no `eval`, and the wasm runs in the engine Worker under the extension CSP
+  (`'wasm-unsafe-eval'`, already there for ONNX Runtime). `web-ext lint` reports nothing new. Verified in Firefox:
+  both models downloaded through the settings page and spoke.
+- **Each language has its own code around eSpeak NG**: the model's own JavaScript port of tiny-voca's `text.py`
+  (normalising, cutting at punctuation, mapping eSpeak's IPA to the model's tokens), fetched at a pinned commit.
+- **Checked against each project's Python front end**, run with a native eSpeak NG built from the same source:
+  identical ids and stress for all 50 Spanish and all 50 French sentences in
+  [tests/parity/espeak-sentences.json](../tests/parity/espeak-sentences.json), and the models' symbol tables match.
+- **The eSpeak NG version matters.** The Spanish model was trained with 1.52.0, the version built here. **The
+  French model's version is not stated anywhere** in its repository; other projects measured 0.5 to 1.2 % of texts
+  differing between 1.51 and 1.52. If it was 1.51, a few words are said with other phonemes than the model
+  learned **(unverified)**.
+- **Word timing.** eSpeak NG gives phonemes, not the words it read ("15" comes back as the sounds of "quince").
+  For each piece of text between two marks, if eSpeak NG spoke as many words as the piece has between spaces, they
+  are matched one for one; otherwise the piece is one span. In the reference sentences, which are heavy with
+  numbers and dates, 79 % of the Spanish spoken words are matched to a word.
+- **Other scripts are not skipped.** eSpeak NG names the letters of text it cannot read, as it did when the models
+  were trained, so these two front ends never report "nothing to pronounce" for Japanese or Cyrillic text.
+- Size: the package is 48.7 MB, the Worker script 232 kB.
+
+**What is left of the survey.** With eSpeak NG in the package, a model trained on its output needs its dictionary
+in the build, its front-end code and a reference. Candidates, none of them done: Turkish (`erkint/zerre-tts`),
+Bengali (`Xeven7/tiny-swara`) and Malayalam (`Cyrax321/tui-voice-mini-ml`) have only Python front ends (200 to 500
+lines each to port, eSpeak NG versions not pinned); a second Italian and a second Brazilian Portuguese model were
+trained on eSpeak NG 1.51, not the version built. German (`apptor/apptor-tiny-tts`) needs no eSpeak NG but a 12 MB
+letter-to-sound model as a second ONNX session. Russian, Polish, Japanese, Arabic, Hebrew, Korean, Urdu, Greek,
+Hindi, Swahili, Kurdish and Sanskrit stay out for the reasons at the top of this section.

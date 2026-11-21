@@ -2,7 +2,7 @@
 
 A Firefox add-on (Manifest V3) that reads web page text aloud with the
 [tiny-voca](https://github.com/n4ze3m/tiny-voca) text-to-speech model, in English and with downloaded models in
-Brazilian Portuguese and Italian, and highlights what is
+Brazilian Portuguese, Italian, Spanish and French, and highlights what is
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine. The add-on makes two kinds of network request, each only when you ask for it:
 downloading a PDF from the web so that it can read it to you, and downloading another voice from
@@ -50,12 +50,14 @@ Hugging Face.
 - More voices and languages: the English tiny-voca model with its two voices is built in. Under **More voices** in the
   settings (**Get more voices…** in the popup leads there) you can download others made from it, about 21 MB each:
 
-  | Model                                                            | Language             | By                        | Licence    |
-  | ---------------------------------------------------------------- | -------------------- | ------------------------- | ---------- |
-  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)      | English              | PatnaikAshish             | Apache-2.0 |
-  | [fiato](https://huggingface.co/cfahlgren1/fiato)                 | English              | cfahlgren1                | Apache-2.0 |
-  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr) | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
-  | [vocina](https://github.com/OfficinePixel/vocina)                | Italian              | OfficinePixel             | Apache-2.0 |
+  | Model                                                             | Language             | By                        | Licence    |
+  | ----------------------------------------------------------------- | -------------------- | ------------------------- | ---------- |
+  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)       | English              | PatnaikAshish             | Apache-2.0 |
+  | [fiato](https://huggingface.co/cfahlgren1/fiato)                  | English              | cfahlgren1                | Apache-2.0 |
+  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)  | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
+  | [vocina](https://github.com/OfficinePixel/vocina)                 | Italian              | OfficinePixel             | Apache-2.0 |
+  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)   | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
+  | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr) | French               | DanielSuncost             | Apache-2.0 |
 
   Press **Download** and accept Firefox's permission prompt; the file comes from the model's own page, is checked
   against a fingerprint Tiny Reader carries, and is kept on your computer until you press **Delete**. Then choose it
@@ -69,11 +71,13 @@ Hugging Face.
 Tiny Reader is not on addons.mozilla.org yet. Until it is, build it and load it as a temporary add-on. You need
 Node.js 22.18 or newer, [pnpm](https://pnpm.io/installation) 12 and Firefox 140 or newer on desktop.
 
-1. Install the dependencies, download the model (about 30 MB) and build:
+1. Install the dependencies, download the model (about 30 MB), build eSpeak NG (needs Docker, about a minute) and
+   build the add-on:
 
    ```bash
    pnpm install
    pnpm fetch-assets
+   pnpm build-espeak
    pnpm build
    ```
 
@@ -125,11 +129,14 @@ does not extend to such frames.
 
 ## Limits
 
-- English, Brazilian Portuguese and Italian, each with a model of its own; the last two have to be downloaded.
-  Text in a script the chosen model cannot read is skipped; if nothing can be read the bar says so. Text that
-  Firefox's local language detector identifies as another language than the model's gets a warning in the bar and
-  is read anyway, with the wrong sounds. Nobody has listened to the downloadable models in full: they were checked
-  by numbers and against their makers' reference outputs.
+- English, Brazilian Portuguese, Italian, Spanish and French, each with a model of its own; all but English have to
+  be downloaded. Text that Firefox's local language detector identifies as another language than the model's gets
+  a warning in the bar and is read anyway, with the wrong sounds. Text in a script the model cannot read is skipped
+  by the English, Portuguese and Italian models; the Spanish and French ones name its letters instead. Nobody has
+  listened to the downloadable models in full: they were checked by numbers and against their makers' reference
+  outputs.
+- In Spanish and French, a number, date or amount is highlighted together with the words around it, up to the next
+  comma or full stop, not word by word.
 - Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
   addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. The toolbar button then shows a "!"
   badge with the reason, and the popup says so. Leave Reader View and read the original page instead. For PDFs, use
@@ -157,8 +164,9 @@ does not extend to such frames.
 
 ## Licence
 
-Apache License 2.0: see [LICENSE](LICENSE). You may use, change and pass on Tiny Reader, also commercially, as long as
-you keep the licence and the [NOTICE](NOTICE) file, which credits this project.
+GNU General Public License, version 3 or later: see [LICENSE](LICENSE) and [NOTICE](NOTICE). You may use, change and
+pass on Tiny Reader, also commercially; if you pass it on, changed or not, it has to be under this same licence,
+with its source. The licence follows from eSpeak NG, which is part of the add-on and under the GPL.
 
 ## Third-party components
 
@@ -172,6 +180,8 @@ you keep the licence and the [NOTICE](NOTICE) file, which credits this project.
   lexicon: CC BY 4.0, derived from the Portuguese (Brazil) MFA dictionary by Michael McAuliffe and Morgan Sonderegger
 - Italian front end (vocina's `g2p_it`): Apache-2.0, OfficinePixel. Its Wiktionary lexicon: CC BY-SA 4.0, Wiktionary
   contributors
+- eSpeak NG 1.52.0, as WebAssembly, for Spanish and French: GPL-3.0-or-later, © the eSpeak NG authors
+- Spanish and French front ends (from tiny-voca-es and tiny-voca-fr): Apache-2.0, stdevMac and DanielSuncost
 
 The models that can be downloaded are not part of the add-on; they are fetched from their makers' pages when you
 ask for them, under the licences in the table above. tiny-voca-ptbr is CC BY 4.0: credit SemFence (Gustavo Toledo).

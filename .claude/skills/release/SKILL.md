@@ -115,7 +115,7 @@ Tell the user:
 - the release notes, to paste into the form;
 - anything a reviewer will ask about that is new in this version: a new permission, a new bundled library, a new
   linter warning;
-- the choices on the form that stay the same: Firefox for desktop only, licence Apache-2.0, no data collected;
+- the choices on the form that stay the same: Firefox for desktop only, licence GPL-3.0-or-later, no data collected;
 - the link to the GitHub release;
 - for the first release: once Mozilla has listed the add-on, the README's "Trying it" still says it is not on
   addons.mozilla.org and needs changing then.

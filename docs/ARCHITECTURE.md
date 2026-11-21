@@ -67,8 +67,10 @@ flowchart LR
   one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
 - **Front ends** ([engine/frontends.ts](../engine/frontends.ts)): text to phoneme tokens, one per language: English
-  (dizione), Brazilian Portuguese (dizione-ptbr) and Italian (vocina's `g2p_it`). Their code is in the package; each
-  model names the one it needs, and a front end is set up the first time a model asks for it.
+  (dizione), Brazilian Portuguese (dizione-ptbr), Italian (vocina's `g2p_it`), and for Spanish and French each
+  model's own code around eSpeak NG, which runs as WebAssembly ([engine/espeak.ts](../engine/espeak.ts)). Their
+  code is in the package; each model names the one it needs, and a front end is set up the first time a model asks
+  for it.
 - **Models** ([engine/models.ts](../engine/models.ts), [engine/model-store.ts](../engine/model-store.ts),
   [engine/loader.ts](../engine/loader.ts)): the list of models the add-on can use. The first ships in the package;
   the others are downloaded from the settings page, verified against the list and kept in IndexedDB, where the

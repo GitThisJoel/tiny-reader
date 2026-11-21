@@ -1,12 +1,17 @@
 Tiny Reader
 Copyright 2026 Joel Bäcker
 
-Licensed under the Apache License, Version 2.0. See the file LICENSE.
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later version.
 
-You may use, change and pass on this work, also commercially. If you pass it on,
-changed or not, keep this notice with it and credit the project:
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+The licence is in the file LICENSE, and at https://www.gnu.org/licenses/.
 
     Tiny Reader, https://github.com/GitThisJoel/tiny-reader
 
-Tiny Reader includes components by others under their own licences.
-See THIRD-PARTY-NOTICES.md.
+Tiny Reader includes components by others under their own licences, among them
+eSpeak NG, which is under the same licence. See THIRD-PARTY-NOTICES.md.
