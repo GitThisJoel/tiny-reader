@@ -66,7 +66,7 @@ export default defineConfig({
     },
     browser_specific_settings: {
       gecko: {
-        id: "tiny-reader@tiny-reader.invalid",
+        id: "tiny-reader@tiny-reader",
         // CSS Custom Highlight API. See docs/FINDINGS.md §6.
         strict_min_version: "140.0",
         data_collection_permissions: { required: ["none"] },

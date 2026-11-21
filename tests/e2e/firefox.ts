@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "../..");
-const ADDON_ID = "tiny-reader@tiny-reader.invalid";
+const ADDON_ID = "tiny-reader@tiny-reader";
 /** Fixed for the test profile, so the add-on's pages have a known address. */
 const UUID = "5b1f6e0c-6a0e-4b7c-9d7e-0f3f5a1b2c3d";
 export const ADDON_URL = `moz-extension://${UUID}`;
