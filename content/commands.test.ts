@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { COMMANDS, isCommand, isCommandMessage, pdfName } from "./commands.ts";
+import {
+  COMMANDS,
+  documentFragment,
+  isCommand,
+  isCommandMessage,
+  parseDocumentFragment,
+  pdfName,
+  sitePattern,
+  webUrl,
+} from "./commands.ts";
 
 describe("commands", () => {
   it("knows its own names and nothing else", () => {
@@ -12,6 +21,42 @@ describe("commands", () => {
     expect(pdfName("https://example.com/papers/report.PDF?download=1#page=2")).toBe("report.PDF");
     for (const url of ["https://example.com/", "https://example.com/pdf", "about:reader?url=x.pdf", "not a url", ""])
       expect(pdfName(url), url).toBeNull();
+  });
+
+  it("treats only http(s) addresses as downloadable", () => {
+    expect(webUrl("https://example.com/a.pdf")).toBe("https://example.com/a.pdf");
+    expect(webUrl("http://127.0.0.1:8080/a.pdf")).toBe("http://127.0.0.1:8080/a.pdf");
+    for (const url of [
+      "file:///home/me/a.pdf",
+      "about:reader?url=x",
+      "javascript:alert(1)",
+      "moz-extension://x/a.pdf",
+      "",
+      null,
+      undefined,
+    ])
+      expect(webUrl(url), String(url)).toBeNull();
+  });
+
+  it("asks for the PDF's whole site, without the port", () => {
+    expect(sitePattern("https://example.com/papers/a.pdf?x=1")).toBe("https://example.com/*");
+    expect(sitePattern("http://127.0.0.1:8080/a.pdf")).toBe("http://127.0.0.1/*");
+  });
+
+  it("carries a document request through the page's address", () => {
+    const request = { name: "My report & more.pdf", url: "https://example.com/papers/My%20report.pdf?v=2#page=3" };
+    expect(parseDocumentFragment(documentFragment(request))).toEqual(request);
+    expect(parseDocumentFragment(documentFragment({ name: "local.pdf", url: null }))).toEqual({
+      name: "local.pdf",
+      url: null,
+    });
+    expect(documentFragment({ name: null, url: null })).toBe("");
+    expect(parseDocumentFragment("")).toEqual({ name: null, url: null });
+  });
+
+  it("drops an address that is not http(s) when reading a request", () => {
+    expect(parseDocumentFragment("#name=x.pdf&url=file%3A%2F%2F%2Fetc%2Fpasswd")).toEqual({ name: "x.pdf", url: null });
+    expect(parseDocumentFragment("#url=javascript%3Aalert(1)")).toEqual({ name: null, url: null });
   });
 
   it("accepts only well-formed command messages", () => {

@@ -3,7 +3,8 @@
 A Firefox add-on (Manifest V3) that reads web page text aloud with the
 [tiny-voca](https://github.com/n4ze3m/tiny-voca) text-to-speech model and highlights what is
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
-leaves the machine, and the add-on makes no network requests at runtime.
+leaves the machine. The add-on makes one kind of network request, and only when you ask for it:
+downloading a PDF from the web so that it can read it to you.
 
 ## Using it
 
@@ -11,9 +12,13 @@ leaves the machine, and the add-on makes no network requests at runtime.
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
 - To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
   in Tiny Reader…**, and it opens by itself if you try to read the PDF from the context menu or a shortcut. A Tiny
-  Reader page opens: pick the file, or drop it on
-  the page, and it shows the PDF's text as plain paragraphs and reads them with the same highlighting, control bar,
-  context menu and shortcuts as a web page. The file is read on your computer and never uploaded.
+  Reader page opens and shows the PDF's text as plain paragraphs, which it reads with the same highlighting, control
+  bar, context menu and shortcuts as a web page.
+  - A PDF on the web is downloaded and opened for you. The first time for each site, press **Allow and open** and
+    accept Firefox's permission prompt; after that, PDFs from that site open at once.
+  - A PDF on your computer has to be picked with **Open a PDF…** or dropped on the page: Firefox does not let an
+    add-on open a local file by itself. The page names the file to look for.
+  - Either way the PDF is processed on your computer and never uploaded.
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
 - Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
@@ -239,7 +244,13 @@ The reasoning and measurements behind these choices are in [docs/FINDINGS.md](do
 | `menus`     | Adds **Read with tiny-voca** (on a selection) and **Read from here with tiny-voca** (on the page) to the context menu, and tells the reader which element the menu was opened on.                                 |
 | `storage`   | Remembers your settings (voice, speed, pitch, prefetch depth) in `storage.local`. Nothing else is stored.                                                                                                         |
 
-There are no host permissions and no `web_accessible_resources`. The extension CSP is
+One optional permission is asked for at runtime, never at install:
+
+| Optional permission                              | Why                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Access to one site (`optional_host_permissions`) | Requested when you open a PDF from that site in the Tiny Reader page, so the add-on can download the file. It is used for that download only; the add-on still injects nothing into the site's pages unless you start a reading there. You can withdraw it under the add-on's Permissions in `about:addons`. |
+
+There are no host permissions at install and no `web_accessible_resources`. The extension CSP is
 `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing
 else is allowed. The model, ONNX Runtime and the phonemizer run only in the add-on's own Worker,
 never in a page, so a page's CSP cannot affect them.

@@ -470,9 +470,16 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
   in Firefox 158: `fetch` and `XMLHttpRequest` of a `file://` PDF fail with a network error,
   both without host permissions and with `<all_urls>` granted. So a local PDF always has to be
   chosen or dropped by the user. An `http(s)` PDF can be fetched once the add-on has a host
-  permission for that site (200, full file); without one it fails the same way. Opening web
-  PDFs directly would therefore cost a permission prompt per site and a network request by the
-  add-on, which the project's constraints rule out so far. Not built.
+  permission for that site (200, full file); without one it fails the same way.
+- **Web PDFs are downloaded on request.** The original constraints were no network access at
+  runtime and no host permissions; the user chose to relax both for this one case
+  (2026-11-21). `optional_host_permissions: ["*://*/*"]` is declared, nothing is granted at
+  install, and the document page calls `permissions.request` for the PDF's site only (scheme and
+  host, as match patterns carry no port) from a click on that page. With the permission it
+  fetches the PDF with `credentials: "include"`, so a PDF behind a login the browser already has
+  opens too. This is the add-on's only network request. Verified in Firefox by clicking through
+  the real permission prompt: accepted (PDF opens, and the next PDF from that site opens with no
+  prompt), refused (nothing is downloaded), and a 404 from the site.
 - **Text, not layout.** `getTextContent()` gives positioned runs. Lines are found by baseline,
   paragraphs by vertical gap and font size, a word hyphenated at a line end is rejoined, page
   numbers are dropped, and a sentence that runs over a page break is carried on. Verified on a

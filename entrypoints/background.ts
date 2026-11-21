@@ -1,6 +1,14 @@
 import { type Browser, browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
-import { BLOCKED, isCommand, isCommandMessage, PAGE_STATE, type PageState, pdfName } from "@/content/commands.ts";
+import {
+  BLOCKED,
+  isCommand,
+  isCommandMessage,
+  PAGE_STATE,
+  type PageState,
+  pdfName,
+  webUrl,
+} from "@/content/commands.ts";
 import type { ReaderCommand } from "@/content/controller.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
@@ -115,7 +123,7 @@ export default defineBackground(() => {
       return { kind: "readable" };
     } catch {
       const name = pdfName(tab.url ?? "");
-      return name ? { kind: "pdf", name } : { kind: "blocked" };
+      return name ? { kind: "pdf", name, url: webUrl(tab.url) } : { kind: "blocked" };
     }
   }
 

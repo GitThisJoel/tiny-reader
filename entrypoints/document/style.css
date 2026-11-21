@@ -47,6 +47,13 @@ main {
 #status {
   color: GrayText;
 }
+#allow {
+  background: #ffc83d;
+  color: #1c1b22;
+  border: 1px solid GrayText;
+  border-radius: 8px;
+  font-weight: 600;
+}
 #status[data-kind="error"] {
   color: light-dark(#a4000f, #ff9aa2);
 }

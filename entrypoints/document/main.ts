@@ -1,6 +1,7 @@
 // The add-on's own page for documents Firefox will not let it read in place, PDFs above all.
 // It shows the document's text as plain paragraphs and reads them like any web page.
 import { browser } from "wxt/browser";
+import { parseDocumentFragment, sitePattern } from "@/content/commands.ts";
 import { createController, type ReaderCommand } from "@/content/controller.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { readPdf } from "./pdf.ts";
@@ -25,22 +26,25 @@ function say(message: string, kind: "info" | "error" = "info") {
   status.dataset.kind = kind;
 }
 
-async function open(file: File) {
+/** Why a PDF could not be fetched from its site. The message is for the user. */
+class DownloadError extends Error {}
+
+/** Shows the PDF called `fileName`, whose bytes `bytes` delivers, replacing whatever was open. */
+async function load(fileName: string, bytes: () => Promise<ArrayBuffer>) {
   controller.handle({ type: "stop" });
+  document.getElementById("allow")?.remove();
   article.replaceChildren();
   name.textContent = "";
   document.title = "Tiny Reader";
   startButton.disabled = true;
-  say(`Opening ${file.name}…`);
+  say(`Opening ${fileName}…`);
   try {
-    const paragraphs = await readPdf(await file.arrayBuffer(), (page, pages) =>
-      say(`Reading page ${page} of ${pages}…`),
-    );
+    const paragraphs = await readPdf(await bytes(), (page, pages) => say(`Reading page ${page} of ${pages}…`));
     if (!paragraphs.length) {
       say("This PDF has no text to read. It may be a scan: pages stored as pictures.", "error");
       return;
     }
-    name.textContent = file.name;
+    name.textContent = fileName;
     article.append(
       ...paragraphs.map((text) => {
         const paragraph = document.createElement("p");
@@ -48,18 +52,59 @@ async function open(file: File) {
         return paragraph;
       }),
     );
-    document.title = `${file.name.replace(/\.pdf$/i, "")} · Tiny Reader`;
+    document.title = `${fileName.replace(/\.pdf$/i, "")} · Tiny Reader`;
     startButton.disabled = false;
     say("Press Read from the start, or right-click a paragraph and choose Read from here with tiny-voca.");
   } catch (error) {
-    say(`This file could not be read as a PDF. ${error instanceof Error ? error.message : ""}`.trim(), "error");
+    if (error instanceof DownloadError) say(`${error.message} Choose the file with Open a PDF instead.`, "error");
+    else say(`This file could not be read as a PDF. ${error instanceof Error ? error.message : ""}`.trim(), "error");
   }
 }
 
-// Opened from a PDF tab: the add-on cannot take the file from there, but it can say which one to pick.
-const wanted = new URLSearchParams(location.hash.slice(1)).get("name");
-if (wanted)
-  say(`Choose “${wanted}” with Open a PDF, or drop it on this page. Firefox does not let an add-on open it by itself.`);
+const open = (file: File) => load(file.name, () => file.arrayBuffer());
+
+/**
+ * A PDF on the web: download it and open it, once the user has let the add-on reach that site.
+ * This is the add-on's only network request, and it only fetches: nothing is sent but the
+ * request itself, with the cookies the browser already has for the site, as when viewing the PDF.
+ */
+async function openFromWeb(url: string, fileName: string) {
+  const origins = [sitePattern(url)];
+  const host = new URL(url).hostname;
+  const download = () =>
+    load(fileName, async () => {
+      const response = await fetch(url, { credentials: "include" }).catch(() => null);
+      if (!response) throw new DownloadError(`Tiny Reader could not reach ${host}.`);
+      if (!response.ok) throw new DownloadError(`${host} answered with error ${response.status}.`);
+      return response.arrayBuffer();
+    });
+  if (await browser.permissions.contains({ origins })) return download();
+
+  say(
+    `To open “${fileName}” here, Tiny Reader has to download it from ${host}, and Firefox asks for your permission first. Or choose the file with Open a PDF.`,
+  );
+  const allow = document.createElement("button");
+  allow.type = "button";
+  allow.id = "allow";
+  allow.textContent = "Allow and open";
+  // Firefox shows its permission prompt only in answer to a click on this page.
+  allow.addEventListener("click", async () => {
+    const granted = await browser.permissions.request({ origins });
+    allow.remove();
+    if (granted) await download();
+    else say("Without that permission, choose the file with Open a PDF, or drop it on this page.");
+  });
+  status.after(allow);
+}
+
+// Opened from a PDF tab. A PDF on the web can be downloaded; a local file cannot be taken from
+// the tab, but the page can say which one to pick.
+const request = parseDocumentFragment(location.hash);
+if (request.url) void openFromWeb(request.url, request.name ?? "this PDF");
+else if (request.name)
+  say(
+    `Choose “${request.name}” with Open a PDF, or drop it on this page. Firefox does not let an add-on open a file on your computer by itself.`,
+  );
 
 byId("open").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => {

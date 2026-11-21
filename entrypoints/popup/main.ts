@@ -5,6 +5,8 @@ import {
   BLOCKED,
   type Command,
   type CommandMessage,
+  type DocumentRequest,
+  documentFragment,
   PAGE_STATE,
   type PageState,
   PDF_BLOCKED,
@@ -23,10 +25,9 @@ function warn(message: string) {
   hint.setAttribute("role", "alert");
 }
 
-/** Opens the add-on's document page. `name` tells it which file the user was looking at. */
-async function openDocumentPage(name?: string) {
-  const fragment = name ? `#name=${encodeURIComponent(name)}` : "";
-  await browser.tabs.create({ url: browser.runtime.getURL("/document.html") + fragment });
+/** Opens the add-on's document page, telling it which PDF the user was looking at, if any. */
+async function openDocumentPage(request: DocumentRequest = { name: null, url: null }) {
+  await browser.tabs.create({ url: browser.runtime.getURL("/document.html") + documentFragment(request) });
   window.close();
 }
 
@@ -49,7 +50,7 @@ browser.runtime.sendMessage({ type: PAGE_STATE }).then((state: PageState) => {
   open.type = "button";
   open.id = "open-pdf";
   open.textContent = "Open this PDF in Tiny Reader…";
-  open.addEventListener("click", () => void openDocumentPage(state.name));
+  open.addEventListener("click", () => void openDocumentPage(state));
   hint.after(open);
 });
 

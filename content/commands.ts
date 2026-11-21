@@ -19,8 +19,11 @@ export const PDF_BLOCKED =
 /** What the popup needs to know about the tab it was opened on. */
 export type PageState =
   | { kind: "readable" }
-  /** Firefox's PDF viewer. `name` is the file's name, taken from the address. */
-  | { kind: "pdf"; name: string }
+  /**
+   * Firefox's PDF viewer. `name` is the file's name, taken from the address. `url` is that
+   * address when the PDF is on the web, where the add-on can download it; null for a local file.
+   */
+  | { kind: "pdf"; name: string; url: string | null }
   /** Another page the add-on is not allowed into. */
   | { kind: "blocked" };
 
@@ -35,6 +38,42 @@ export function pdfName(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** `url` if it is an http(s) address, else null. Nothing else can be downloaded by the add-on. */
+export function webUrl(url: string | null | undefined): string | null {
+  try {
+    return url && /^https?:$/.test(new URL(url).protocol) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The host permission that covers `url`: its whole site. Match patterns carry no port. */
+export function sitePattern(url: string): string {
+  const { protocol, hostname } = new URL(url);
+  return `${protocol}//${hostname}/*`;
+}
+
+/** What the document page is asked to open: told to it in the fragment of its address. */
+export interface DocumentRequest {
+  /** The PDF's file name, to show and to ask for. */
+  name: string | null;
+  /** Where to download it from. Null: the user has to choose the file. */
+  url: string | null;
+}
+
+export function documentFragment({ name, url }: DocumentRequest): string {
+  const parameters = new URLSearchParams();
+  if (name) parameters.set("name", name);
+  if (url) parameters.set("url", url);
+  return parameters.size ? `#${parameters}` : "";
+}
+
+/** Reads a fragment back. Anything but an http(s) address is dropped: this text comes from an address bar. */
+export function parseDocumentFragment(hash: string): DocumentRequest {
+  const parameters = new URLSearchParams(hash.replace(/^#/, ""));
+  return { name: parameters.get("name") || null, url: webUrl(parameters.get("url")) };
 }
 
 /** Popup → background. The reply is false when a reading could not be started. */

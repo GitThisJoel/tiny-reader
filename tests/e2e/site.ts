@@ -58,6 +58,10 @@ export async function startSite(): Promise<{
       "content-type": "text/html; charset=utf-8",
     };
     if (request.url?.startsWith("/strict")) headers["content-security-policy"] = STRICT_CSP;
+    if (request.url?.includes("status=404")) {
+      response.writeHead(404).end("not here");
+      return;
+    }
     if (request.url?.endsWith(".pdf")) {
       response.writeHead(200, { "content-type": "application/pdf" }).end(SAMPLE_PDF);
       return;

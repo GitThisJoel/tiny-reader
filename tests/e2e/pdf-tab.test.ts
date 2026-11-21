@@ -1,11 +1,14 @@
 // A PDF open in Firefox's own viewer: it cannot be read there, and the popup leads to the page where it can.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { documentFragment } from "../../content/commands.ts";
 import { ADDON_URL, Firefox } from "./firefox.ts";
 import { startSite } from "./site.ts";
 
 let firefox: Firefox;
 let site: Awaited<ReturnType<typeof startSite>>;
 let viewer: string;
+/** The add-on's document page, once the popup has opened it. */
+let documentPage = "";
 beforeAll(async () => {
   site = await startSite();
   firefox = await Firefox.launch();
@@ -32,6 +35,25 @@ async function popupFor(front: string) {
   }
   throw new Error("the popup did not find out about its tab");
 }
+const paragraphs = (tab: string) =>
+  firefox.evaluate<string[]>(tab, `return [...document.querySelectorAll("#document p")].map((p) => p.textContent);`);
+
+/** Waits for Firefox's own permission prompt, answers it, and returns what it said. */
+const answerPrompt = (answer: "allow" | "refuse") =>
+  firefox.chrome<string>(
+    `for (let tries = 0; tries < 80; tries++) {
+       const prompt = PopupNotifications.panel.firstElementChild;
+       if (PopupNotifications.panel.state === "open" && prompt) {
+         const text = prompt.textContent;
+         (arguments[0] === "allow" ? prompt.button : prompt.secondaryButton).click();
+         return text;
+       }
+       await new Promise((resolve) => setTimeout(resolve, 100));
+     }
+     return "no permission prompt appeared";`,
+    [answer],
+  );
+
 const shown = (popup: string) =>
   firefox.evaluateBehind<{
     page: string;
@@ -85,19 +107,97 @@ describe("a PDF in Firefox's viewer", () => {
 
     const before = await firefox.tabs();
     await firefox.evaluateBehind(popup, `document.getElementById("open-pdf").click();`);
-    let opened: string | undefined;
-    for (let tries = 0; tries < 50 && !opened; tries++) {
+    for (let tries = 0; tries < 50 && !documentPage; tries++) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      opened = (await firefox.tabs()).find((handle) => !before.includes(handle));
+      documentPage = (await firefox.tabs()).find((handle) => !before.includes(handle)) ?? "";
     }
-    if (!opened) throw new Error("the document page did not open");
-    const status = await firefox.waitFor<string>(
-      opened,
-      `return location.pathname === "/document.html" ? document.getElementById("status").textContent.trim() : null;`,
+    if (!documentPage) throw new Error("the document page did not open");
+  }, 60_000);
+
+  it("the document page asks before downloading, and opens the PDF once Firefox's prompt is accepted", async () => {
+    const asking = await firefox.waitFor<{ status: string; allow: string | null }>(
+      documentPage,
+      `const allow = document.getElementById("allow");
+       return location.pathname === "/document.html" && allow
+         ? { status: document.getElementById("status").textContent.trim(), allow: allow.textContent }
+         : null;`,
     );
-    expect(status).toBe(
-      "Choose “My report.pdf” with Open a PDF, or drop it on this page. Firefox does not let an add-on open it by itself.",
+    expect(asking).toEqual({
+      status:
+        "To open “My report.pdf” here, Tiny Reader has to download it from 127.0.0.1, and Firefox asks for your permission first. Or choose the file with Open a PDF.",
+      allow: "Allow and open",
+    });
+    expect(await paragraphs(documentPage)).toEqual([]);
+
+    await firefox.click(documentPage, "#allow");
+    expect(await answerPrompt("allow")).toMatch(/127\.0\.0\.1/);
+    await firefox.waitFor(documentPage, `return document.querySelectorAll("#document p").length > 0;`);
+    expect(await paragraphs(documentPage)).toEqual([
+      "A sample document",
+      "This file exists to be shown in the PDF viewer of the browser.",
+    ]);
+    expect(
+      await firefox.evaluate(
+        documentPage,
+        `return [document.getElementById("name").textContent, !!document.getElementById("allow")];`,
+      ),
+    ).toEqual(["My report.pdf", false]);
+  }, 60_000);
+
+  it("opens another PDF from the same site at once, with no prompt", async () => {
+    const again = await firefox.open(
+      `${ADDON_URL}/document.html${documentFragment({ name: "Other.pdf", url: `${site.url}other/Other.pdf` })}`,
     );
+    await firefox.waitFor(again, `return document.querySelectorAll("#document p").length > 0;`);
+    expect(
+      await firefox.evaluate(
+        again,
+        `return [document.getElementById("name").textContent, !!document.getElementById("allow")];`,
+      ),
+    ).toEqual(["Other.pdf", false]);
+  }, 60_000);
+
+  it("downloads nothing when the prompt is refused, and says how to go on", async () => {
+    // The same server under another name is another site as far as permissions go.
+    const elsewhere = site.url.replace("127.0.0.1", "localhost");
+    const refused = await firefox.open(
+      `${ADDON_URL}/document.html${documentFragment({ name: "Secret.pdf", url: `${elsewhere}Secret.pdf` })}`,
+    );
+    await firefox.waitFor(refused, `return !!document.getElementById("allow");`);
+    await firefox.click(refused, "#allow");
+    expect(await answerPrompt("refuse")).toMatch(/localhost/);
+    expect(
+      await firefox.waitFor<string>(
+        refused,
+        `return document.getElementById("allow") ? null : document.getElementById("status").textContent.trim();`,
+      ),
+    ).toBe("Without that permission, choose the file with Open a PDF, or drop it on this page.");
+    expect(await paragraphs(refused)).toEqual([]);
+  }, 60_000);
+
+  it("says so when the site does not deliver the file", async () => {
+    const missing = await firefox.open(
+      `${ADDON_URL}/document.html${documentFragment({ name: "Gone.pdf", url: `${site.url}missing/Gone.pdf?status=404` })}`,
+    );
+    expect(
+      await firefox.waitFor<string>(
+        missing,
+        `const status = document.getElementById("status"); return status.dataset.kind === "error" ? status.textContent.trim() : null;`,
+      ),
+    ).toBe("127.0.0.1 answered with error 404. Choose the file with Open a PDF instead.");
+  }, 60_000);
+
+  it("for a PDF on the computer, names the file to choose, since it cannot be downloaded", async () => {
+    const local = await firefox.open(`${ADDON_URL}/document.html${documentFragment({ name: "Local.pdf", url: null })}`);
+    expect(
+      await firefox.evaluate(
+        local,
+        `return [document.getElementById("status").textContent.trim(), !!document.getElementById("allow")];`,
+      ),
+    ).toEqual([
+      "Choose “Local.pdf” with Open a PDF, or drop it on this page. Firefox does not let an add-on open a file on your computer by itself.",
+      false,
+    ]);
   }, 60_000);
 });
 
