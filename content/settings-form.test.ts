@@ -59,6 +59,31 @@ describe("mountSettingsForm", () => {
     expect(field("prefetch").value).toBe(String(DEFAULT_SETTINGS.prefetch));
   });
 
+  it("keeps both of two quick changes, even when the first save is slow", async () => {
+    await mountSettingsForm(form);
+    // The first write to storage takes its time, so the second change overlaps it.
+    const write = fakeBrowser.storage.local.set.bind(fakeBrowser.storage.local);
+    let slow = true;
+    const spy = vi.spyOn(fakeBrowser.storage.local, "set").mockImplementation(async (items) => {
+      if (slow) {
+        slow = false;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      return write(items);
+    });
+    for (const [name, value] of [
+      ["speed", "1.3"],
+      ["voice", "1"],
+    ] as const) {
+      field(name).value = value;
+      field(name).dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    await vi.waitFor(async () => expect(await loadSettings()).toMatchObject({ speed: 1.3, voice: 1 }));
+    expect([field("speed").value, field("voice").value]).toEqual(["1.3", "1"]);
+    spy.mockRestore();
+  });
+
   it("resets to the defaults", async () => {
     await saveSettings({ voice: 1, speed: 2 });
     await mountSettingsForm(form);
