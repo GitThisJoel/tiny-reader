@@ -28,13 +28,57 @@ describe("mountSettingsForm", () => {
     await mountSettingsForm(form);
     expect(
       Object.fromEntries(
-        ["voice", "speed", "pitchShift", "pitchRange", "prefetch"].map((name) => [name, field(name).value]),
+        ["model", "voice", "speed", "pitchShift", "pitchRange", "prefetch"].map((name) => [name, field(name).value]),
       ),
-    ).toEqual({ voice: "1", speed: "1.5", pitchShift: "-2", pitchRange: "1", prefetch: "4" });
+    ).toEqual({ model: "tiny-voca", voice: "1", speed: "1.5", pitchShift: "-2", pitchRange: "1", prefetch: "4" });
     expect((form.querySelector('output[for="pitchShift"]') as HTMLOutputElement).value).toBe("-2 st");
     expect((form.querySelector('output[for="speed"]') as HTMLOutputElement).value).toBe("1.50×");
     for (const control of form.querySelectorAll<HTMLInputElement>("select, input"))
       expect(control.labels?.length, control.id).toBe(1);
+  });
+
+  // jsdom has no IndexedDB, as a profile whose storage cannot be read: no model is downloaded.
+  it("offers only the bundled model and its voices when nothing is downloaded", async () => {
+    // A model chosen earlier whose file is gone: the engine falls back to the bundled one, and so does the form.
+    await saveSettings({ model: "fiato", voice: 1 });
+    await mountSettingsForm(form);
+    const texts = (name: string) =>
+      [...(field(name) as unknown as HTMLSelectElement).options].map((option) => option.text);
+    expect(texts("model")).toEqual(["tiny-voca"]);
+    expect(texts("voice")).toEqual(["F2", "M2"]);
+    expect([field("model").value, field("voice").value]).toEqual(["tiny-voca", "1"]);
+    // The popup has no downloads, only the way to them.
+    expect(form.querySelector("#models")).toBeNull();
+    expect(form.querySelector("#more-voices")?.textContent).toBe("Get more voices…");
+  });
+
+  it("lists the models that can be downloaded, with what they are and where they come from", async () => {
+    await mountSettingsForm(form, { downloads: true });
+    expect(form.querySelector("#more-voices")).toBeNull();
+    expect(
+      [...form.querySelectorAll<HTMLElement>("#models .model")].map((row) => [
+        row.dataset.model,
+        row.querySelector("span")?.textContent,
+        row.querySelector("a")?.href,
+        row.querySelector("button")?.getAttribute("aria-label"),
+        row.querySelector("progress")?.hidden,
+      ]),
+    ).toEqual([
+      [
+        "sobbie",
+        "SobbieTTS · English · voices F, M · Apache-2.0 · 21 MB",
+        "https://huggingface.co/PatnaikAshish/SobbieTTS",
+        "Download SobbieTTS",
+        true,
+      ],
+      [
+        "fiato",
+        "fiato · English · voices F1, M1 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/cfahlgren1/fiato",
+        "Download fiato",
+        true,
+      ],
+    ]);
   });
 
   it("saves a change at once", async () => {

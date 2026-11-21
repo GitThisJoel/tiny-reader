@@ -86,7 +86,12 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     // The selection would paint over the highlight, so it is dropped.
     getSelection()?.removeAllRanges();
 
-    const client = new EngineClient(() => browser.runtime.connect({ name: PORT_NAME }));
+    const client = new EngineClient(
+      () => browser.runtime.connect({ name: PORT_NAME }),
+      undefined,
+      // A downloaded model that is gone or broken: the built-in one spoke, and the bar says so.
+      (notice) => bar.notify(notice),
+    );
     const sink = new WebAudioSink();
     // A highlight that jumps from word to word is motion; with reduced motion only the
     // sentence is marked.

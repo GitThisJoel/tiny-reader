@@ -95,8 +95,9 @@ const open = (file: File) => load(file.name, () => file.arrayBuffer());
 
 /**
  * A PDF on the web: download it and open it, once the user has let the add-on reach that site.
- * This is the add-on's only network request, and it only fetches: nothing is sent but the
- * request itself, with the cookies the browser already has for the site, as when viewing the PDF.
+ * One of the add-on's two network requests (the other downloads a voice model, from the settings
+ * page), and it only fetches: nothing is sent but the request itself, with the cookies the
+ * browser already has for the site, as when viewing the PDF.
  */
 async function openFromWeb(url: string, fileName: string) {
   const origins = [sitePattern(url)];

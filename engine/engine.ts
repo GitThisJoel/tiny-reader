@@ -1,5 +1,6 @@
 import type * as Ort from "onnxruntime-web";
 import { alignWords } from "./align.ts";
+import { checkIo, ModelError } from "./models.ts";
 import { loadPhonemizer, type Phonemes, phonemize } from "./phonemizer.ts";
 import { HOP, SAMPLE_RATE, type SynthOptions, type Utterance, type WordTiming } from "./protocol.ts";
 import { finished, normalize, splitLong } from "./text.ts";
@@ -22,20 +23,47 @@ export type { Utterance };
 
 export interface Engine {
   /** Resolves to null when `signal` aborts before the audio is complete. */
-  speak(text: string, options: SynthOptions, signal?: AbortSignal): Promise<Utterance | null>;
+  speak(text: string, options: Omit<SynthOptions, "model">, signal?: AbortSignal): Promise<Utterance | null>;
+  /** Frees the model's memory. The engine cannot be used afterwards. */
+  release(): Promise<void>;
 }
 
 type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
 
-export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; gguf: ArrayBuffer }): Promise<Engine> {
+/**
+ * The text front end called `name`, as the list of models names it: what turns text into a
+ * model's tokens. Throws a ModelError for one this build does not have.
+ */
+export function frontEnd(name: string): typeof loadPhonemizer {
+  // ponytail: one front end, so one comparison. Another language adds its code to the package and a case here.
+  if (name === "dizione") return loadPhonemizer;
+  throw new ModelError(`it needs the text front end "${name}", which this version of Tiny Reader does not have`);
+}
+
+/**
+ * `frontend` is the front end the model needs (engine/models.ts) and `gguf` that front end's data.
+ * Rejects with a ModelError when this build lacks the front end, before the model is loaded, or
+ * when the file's inputs and outputs are not a tiny-voca model's.
+ */
+export async function createEngine(
+  ort: OrtModule,
+  assets: { model: Uint8Array; gguf: ArrayBuffer; frontend: string },
+): Promise<Engine> {
+  const load = frontEnd(assets.frontend);
   const [session, phonemizer] = await Promise.all([
     ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] }),
-    loadPhonemizer(assets.gguf),
+    load(assets.gguf),
   ]);
+  try {
+    checkIo(session);
+  } catch (error) {
+    await session.release();
+    throw error;
+  }
   const int64 = (values: number[]) => new ort.Tensor("int64", BigInt64Array.from(values, BigInt), [1, values.length]);
   const float = (value: number) => new ort.Tensor("float32", Float32Array.of(value), [1]);
 
-  async function synthesize(phonemes: Phonemes, options: SynthOptions) {
+  async function synthesize(phonemes: Phonemes, options: Omit<SynthOptions, "model">) {
     const output = await session.run({
       tokens: int64(phonemes.ids),
       stress: int64(phonemes.stress),
@@ -109,5 +137,6 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
       }
       return { pcm, sampleRate: SAMPLE_RATE, words };
     },
+    release: () => session.release(),
   };
 }

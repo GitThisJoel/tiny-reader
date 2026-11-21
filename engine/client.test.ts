@@ -28,6 +28,27 @@ function setup() {
 afterEach(() => vi.useRealTimers());
 
 describe("EngineClient", () => {
+  it("passes on the notice of a result made with another model than the one asked for", async () => {
+    const notices: string[] = [];
+    const port = new FakePort();
+    const client = new EngineClient(
+      () => port,
+      undefined,
+      (notice) => notices.push(notice),
+    );
+    const pending = client.synthesize("One.", DEFAULT_OPTIONS);
+    port.deliver({
+      type: "result",
+      id: "0",
+      pcm: new Float32Array(1),
+      sampleRate: 24000,
+      words: [],
+      notice: "Fell back.",
+    });
+    expect(await pending).toEqual({ pcm: new Float32Array(1), sampleRate: 24000, words: [] });
+    expect(notices).toEqual(["Fell back."]);
+  });
+
   it("connects on the first request and resolves with the matching result", async () => {
     const { client, ports, reply } = setup();
     expect(ports).toHaveLength(0);

@@ -22,6 +22,14 @@ describe("parseRequest", () => {
     expect(parseRequest({ type: "ping" })).toEqual({ type: "ping" });
   });
 
+  it("accepts a model from the list with one of its voices, and no other", () => {
+    const withOptions = (options: object) =>
+      parseRequest({ ...synthesize, options: { ...DEFAULT_OPTIONS, ...options } });
+    expect(withOptions({ model: "fiato", voice: 1 })).toMatchObject({ options: { model: "fiato", voice: 1 } });
+    for (const options of [{ model: "nope" }, { model: undefined }, { model: 3 }, { model: "fiato", voice: 2 }])
+      expect(withOptions(options)).toBeNull();
+  });
+
   it("drops unknown fields", () => {
     expect(
       parseRequest({

@@ -2,8 +2,10 @@
 // model and ONNX Runtime never enter a web page and page CSPs do not apply.
 import * as ort from "onnxruntime-web/wasm";
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
-import { createEngine, type Engine, NothingToPronounce } from "@/engine/engine.ts";
+import { createEngine, NothingToPronounce } from "@/engine/engine.ts";
 import { JobQueue } from "@/engine/job-queue.ts";
+import { createLoader } from "@/engine/loader.ts";
+import { readModel } from "@/engine/model-store.ts";
 import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
@@ -13,34 +15,26 @@ export default defineUnlistedScript(() => {
     location: Location;
   };
   const queue = new JobQueue();
-  let engine: Promise<Engine> | null = null;
 
-  // Everything is read from inside the add-on package. No network.
+  // The bundled model and the phonemizer data are read from inside the add-on package, a
+  // downloaded model from the add-on's own storage. No network.
   const asset = async (path: string) => {
     const response = await fetch(new URL(path, scope.location.href));
     if (!response.ok) throw new Error(`${path}: ${response.status}`);
     return response.arrayBuffer();
   };
+  // Extension pages are not cross-origin isolated, so there are no wasm threads.
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
-  function load(): Promise<Engine> {
-    if (engine) return engine;
-    scope.postMessage({ type: "status", state: "loading" });
-    // Extension pages are not cross-origin isolated, so there are no wasm threads.
-    ort.env.wasm.numThreads = 1;
-    ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
-    const loading = Promise.all([asset("/assets/model.onnx"), asset("/assets/tiny-voca-js.gguf")]).then(
-      ([model, gguf]) => createEngine(ort, { model: new Uint8Array(model), gguf }),
-    );
-    engine = loading;
-    loading.then(
-      () => scope.postMessage({ type: "status", state: "ready" }),
-      () => {
-        // Let the next request try again instead of failing forever.
-        if (engine === loading) engine = null;
-      },
-    );
-    return loading;
-  }
+  const load = createLoader({
+    bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
+    stored: readModel,
+    // ponytail: the phonemizer is set up again with every model (0.5 s). Share it if switching models gets common.
+    create: async (file, { frontend }) =>
+      createEngine(ort, { model: file, frontend, gguf: await asset("/assets/tiny-voca-js.gguf") }),
+    status: (state) => scope.postMessage({ type: "status", state }),
+  });
 
   scope.onmessage = ({ data }) => {
     const request = parseRequest(data);
@@ -50,7 +44,13 @@ export default defineUnlistedScript(() => {
     if (request.type !== "synthesize") return;
     const { id, text, options } = request;
     queue
-      .run(id, async (signal) => (await load()).speak(text, options, signal))
+      .run(id, async (signal) => {
+        const { engine, model, notice } = await load(options.model);
+        // After a fallback the voice asked for may not exist in the model that speaks.
+        const voice = Math.min(options.voice, model.voices.length - 1);
+        const result = await engine.speak(text, { ...options, voice }, signal);
+        return result && { ...result, notice };
+      })
       .then(
         (result) => {
           // undefined or null: cancelled. Nothing is sent for a cancelled request.

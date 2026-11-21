@@ -1,4 +1,5 @@
-import { type SynthOptions, VOICES } from "@/engine/protocol.ts";
+import { BUNDLED, modelById } from "@/engine/models.ts";
+import type { SynthOptions } from "@/engine/protocol.ts";
 import css from "./bar.css?inline";
 import { iconButton as button, icon } from "./icons.ts";
 import type { ReaderState } from "./reader.ts";
@@ -116,7 +117,7 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
     ),
     select(
       "Voice",
-      VOICES.map((name, index) => [index, name]),
+      (modelById(options.model) ?? BUNDLED).voices.map((name, index) => [index, name]),
       options.voice,
       (voice) => handlers.setOptions({ voice }),
     ),
@@ -177,6 +178,7 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
   if (moved) place(moved);
 
   let showsPlay = false;
+  const notices = new Set<string>();
   return {
     update(state: ReaderState) {
       toolbar.dataset.status = state.status;
@@ -191,9 +193,10 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
         toggle.replaceChildren(icon(wantsPlay ? "play" : "pause"));
       }
     },
-    /** A warning shown above the controls until the bar goes away. */
+    /** A warning shown above the controls until the bar goes away. Each one is shown once. */
     notify(message: string) {
-      notice.textContent = message;
+      notices.add(message);
+      notice.textContent = [...notices].join(" ");
       notice.hidden = false;
     },
     focus() {
