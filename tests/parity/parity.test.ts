@@ -1,5 +1,5 @@
 // Token-id parity with the Python reference (dizione). Fixtures come from
-// scripts/gen-parity-fixtures.py; see the README for how to regenerate them.
+// scripts/gen-parity-fixtures.py; see CONTRIBUTING.md for how to regenerate them.
 import { beforeAll, describe, expect, it } from "vitest";
 import { type Phonemizer, phonemize } from "../../engine/phonemizer.ts";
 import { testPhonemizer } from "../assets.ts";
@@ -7,7 +7,7 @@ import fixtures from "./fixtures.json" with { type: "json" };
 
 /**
  * Inputs where upstream's JS port is intentionally ahead of the pinned Python commit: it no
- * longer puts a sentence-final stop after each initial of a name (docs/FINDINGS.md §3).
+ * longer puts a sentence-final stop after each initial of a name (docs/FINDINGS.md §2).
  * For these the expected ids are the recorded JS output. Remove an entry once Python dizione
  * publishes the fix and the fixtures are regenerated.
  */

@@ -11,7 +11,7 @@ export default defineConfig({
   // Upstream's JS phonemizer, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
   alias: { "tiny-voca": "vendor/tiny-voca/js" },
   // The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
-  zip: { excludeSources: ["public/assets/**", "vendor/**", "docs/screenshots/**"] },
+  zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**"] },
   vite: () => ({
     resolve: {
       // Selects onnxruntime-web's build that loads its wasm from a URL. The default build
@@ -67,7 +67,7 @@ export default defineConfig({
     browser_specific_settings: {
       gecko: {
         id: "tiny-reader@tiny-reader",
-        // CSS Custom Highlight API. See docs/FINDINGS.md §6.
+        // CSS Custom Highlight API. See docs/FINDINGS.md §5.
         strict_min_version: "140.0",
         data_collection_permissions: { required: ["none"] },
       },

@@ -76,7 +76,7 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     let { prefetch, ...options } = await loadSettings().catch(() => DEFAULT_SETTINGS);
     session?.end();
     // ponytail: the whole range is mapped and segmented up front. Measured 0.4 s for
-    // 10,000 paragraphs (docs/FINDINGS.md §14); map block by block if that ever hurts.
+    // 10,000 paragraphs (docs/FINDINGS.md §8); map block by block if that ever hurts.
     const map = textOf(range, fromHere);
     const sentences = segment(map.text);
     if (!sentences.length) {

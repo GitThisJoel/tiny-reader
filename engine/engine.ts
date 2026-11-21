@@ -6,7 +6,7 @@ import { finished, normalize, splitLong } from "./text.ts";
 
 /**
  * Most tokens in one model call. The model accepts 512, but cost grows faster than length and
- * slow speeds stretch the audio past the 32 s it was trained on. See docs/FINDINGS.md §4.
+ * slow speeds stretch the audio past the 32 s it was trained on. See docs/FINDINGS.md §3.
  */
 export const MAX_TOKENS = 200;
 /** The model can peak above full scale; each utterance is scaled down to this. */
