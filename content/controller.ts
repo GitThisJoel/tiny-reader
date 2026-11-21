@@ -10,7 +10,7 @@ import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/content/settings.ts";
 import { WebAudioSink } from "@/content/sink.ts";
-import { mapRange } from "@/content/text-map.ts";
+import { mapRange, type TextMap } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
 import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
@@ -33,8 +33,15 @@ const menus = (
   }
 ).menus;
 
+export interface ControllerOptions {
+  /** The text of a range and the way back to the DOM. Web pages are read from the DOM itself. */
+  textOf?: (range: Range) => TextMap;
+  /** Told the sentence being read each time it changes, and null when there is none. */
+  onSentence?: (range: Range | null) => void;
+}
+
 /** Sets the reader up in this document. `handle` carries out one command; `start` reads a range. */
-export function createController() {
+export function createController({ textOf = mapRange, onSentence }: ControllerOptions = {}) {
   let session: Session | null = null;
 
   /** Shows a message in the bar when there is nothing to start. */
@@ -67,7 +74,7 @@ export function createController() {
     session?.end();
     // ponytail: the whole range is mapped and segmented up front. Measured 0.4 s for
     // 10,000 paragraphs (docs/FINDINGS.md §14); map block by block if that ever hurts.
-    const map = mapRange(range);
+    const map = textOf(range);
     const sentences = segment(map.text);
     if (!sentences.length) {
       report("There is no text to read here.");
@@ -101,7 +108,9 @@ export function createController() {
           // State is reported far more often than the sentence changes.
           if (sentence !== marked) {
             marked = sentence;
-            highlightSentence(sentence ? map.rangeOf(sentence.start, sentence.end) : null);
+            const shown = sentence ? map.rangeOf(sentence.start, sentence.end) : null;
+            highlightSentence(shown);
+            onSentence?.(shown);
           }
           // Follow words only while this utterance is sounding.
           const utterance = state.status === "playing" && !reducedMotion ? state.utterance : undefined;

@@ -1,7 +1,7 @@
 // The text of a DOM range as one string, with a way back from offsets in that string to DOM
 // positions. Reads the DOM and never changes it.
 
-interface Run {
+export interface Run {
   /** Where this run starts in the built text. */
   textStart: number;
   node: Text;
@@ -117,6 +117,11 @@ export function mapRange(range: Range): TextMap {
     text += data;
   }
 
+  return mapOf(text, runs);
+}
+
+/** The map for `text` built from `runs`, which are in text order. */
+export function mapOf(text: string, runs: Run[]): TextMap {
   /** Index of the last run starting at or before `offset`. */
   function runAt(offset: number): number {
     let low = 0;
@@ -158,4 +163,38 @@ export function mapRange(range: Range): TextMap {
       return result;
     },
   };
+}
+
+/**
+ * The part of an already mapped text that lies inside `range`. A range that starts between
+ * nodes, as "read from here" makes, is read from the start of its paragraph in the text.
+ */
+export function mapWithin(text: string, runs: Run[], range: Range): TextMap {
+  let from = -1;
+  let to = -1;
+  // ponytail: every run is tested, for each reading. Runs are in document order, so a binary
+  // search would do if documents get huge.
+  for (const run of runs) {
+    if (!range.intersectsNode(run.node)) continue;
+    const start = run.node === range.startContainer ? Math.max(range.startOffset - run.nodeStart, 0) : 0;
+    const end = run.node === range.endContainer ? Math.min(range.endOffset - run.nodeStart, run.length) : run.length;
+    if (end <= start) continue;
+    if (from < 0) from = run.textStart + start;
+    to = run.textStart + end;
+  }
+  if (from < 0) return mapOf("", []);
+  if (range.startContainer.nodeType !== 3) from = text.lastIndexOf("\n", from) + 1;
+  const part: Run[] = [];
+  for (const run of runs) {
+    const start = Math.max(run.textStart, from);
+    const end = Math.min(run.textStart + run.length, to);
+    if (end > start)
+      part.push({
+        textStart: start - from,
+        node: run.node,
+        nodeStart: run.nodeStart + start - run.textStart,
+        length: end - start,
+      });
+  }
+  return mapOf(text.slice(from, to), part);
 }

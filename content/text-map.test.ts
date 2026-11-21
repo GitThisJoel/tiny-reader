@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 import { segment } from "./segment.ts";
-import { mapRange } from "./text-map.ts";
+import { mapOf, mapRange, mapWithin, type Run } from "./text-map.ts";
 
 function page(html: string) {
   document.body.innerHTML = html;
@@ -177,5 +177,64 @@ describe("mapRange", () => {
   it("gives an empty map for an empty or fully hidden range", () => {
     expect(page("").text).toBe("");
     expect(page("<p hidden>Nothing</p>").rangeOf(0, 5)).toBeNull();
+  });
+});
+
+describe("mapWithin", () => {
+  // Two lines of a text layer: the text read joins them with a space the DOM does not have.
+  const TEXT = "A title\nOne two three four.";
+  function layer() {
+    document.body.innerHTML = "<div><span>A title</span><span>One two</span><span>three four.</span></div>";
+    const [title, first, second] = [...document.querySelectorAll("span")].map((element) => element.firstChild as Text);
+    if (!title || !first || !second) throw new Error("the layer was not built");
+    const runs: Run[] = [
+      { textStart: 0, node: title, nodeStart: 0, length: 7 },
+      { textStart: 8, node: first, nodeStart: 0, length: 7 },
+      { textStart: 16, node: second, nodeStart: 0, length: 11 },
+    ];
+    return { runs, title, first, second };
+  }
+
+  it("maps offsets of a ready-made text to its nodes", () => {
+    const { runs } = layer();
+    const map = mapOf(TEXT, runs);
+    expect(rangeText(map.rangeOf(...span(TEXT, "two three")))).toBe("twothree");
+  });
+
+  it("gives all of the text for a range around everything", () => {
+    const { runs } = layer();
+    const range = document.createRange();
+    range.selectNodeContents(document.body);
+    expect(mapWithin(TEXT, runs, range).text).toBe(TEXT);
+  });
+
+  it("starts at the paragraph of the node a range starts before", () => {
+    const { runs, second } = layer();
+    const range = document.createRange();
+    range.selectNodeContents(document.body);
+    range.setStartBefore(second.parentElement as Element);
+    const map = mapWithin(TEXT, runs, range);
+    expect(map.text).toBe("One two three four.");
+    expect(rangeText(map.rangeOf(...span(map.text, "three")))).toBe("three");
+  });
+
+  it("keeps to a selection inside the text, to the character", () => {
+    const { runs, first, second } = layer();
+    const range = document.createRange();
+    range.setStart(first, 4);
+    range.setEnd(second, 5);
+    const map = mapWithin(TEXT, runs, range);
+    expect(map.text).toBe("two three");
+    expect(rangeText(map.rangeOf(0, map.text.length))).toBe("twothree");
+    expect(rangeText(map.rangeOf(...span(map.text, "three")))).toBe("three");
+  });
+
+  it("gives an empty map when the range holds none of the text", () => {
+    const { runs } = layer();
+    document.body.insertAdjacentHTML("beforeend", "<p>Elsewhere</p>");
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector("p") as Element);
+    expect(mapWithin(TEXT, runs, range).text).toBe("");
+    expect(mapWithin("", [], range).rangeOf(0, 1)).toBeNull();
   });
 });
