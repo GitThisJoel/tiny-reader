@@ -11,7 +11,7 @@ export default defineConfig({
   // Upstream's JS phonemizer, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
   alias: { "tiny-voca": "vendor/tiny-voca/js" },
   // The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
-  zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**"] },
+  zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**", "AGENTS.md"] },
   vite: () => ({
     resolve: {
       // Selects onnxruntime-web's build that loads its wasm from a URL. The default build
