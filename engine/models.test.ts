@@ -31,6 +31,9 @@ describe("the list of models", () => {
       ["tiny-voca-es", "es-ES", "espeak-es"],
       ["tiny-voca-fr", "fr", "espeak-fr"],
       ["apptor-de", "de", "g2p-de"],
+      ["zerre-tts", "tr", "espeak-tr"],
+      ["tiny-swara", "bn", "espeak-bn"],
+      ["tui-voice-ml", "ml", "espeak-ml"],
     ]);
   });
 
@@ -78,6 +81,9 @@ describe("the list of models", () => {
       "European Spanish",
       "French",
       "German",
+      "Turkish",
+      "Bangla",
+      "Malayalam",
     ]);
     expect(readsOnly(BUNDLED)).toBe("tiny-voca only reads English");
     expect(readsOnly(MODELS[4] ?? BUNDLED)).toBe("vocina only reads Italian");

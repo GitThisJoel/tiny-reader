@@ -12,6 +12,9 @@
       "!tests/parity/fixtures.json",
       "!tests/parity/espeak-es.json",
       "!tests/parity/espeak-fr.json",
+      "!tests/parity/espeak-tr.json",
+      "!tests/parity/espeak-bn.json",
+      "!tests/parity/espeak-ml.json",
       "!tests/parity/german.json",
       "!.claude/skills"
     ]

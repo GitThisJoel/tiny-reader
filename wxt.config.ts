@@ -16,6 +16,10 @@ export default defineConfig({
     "tiny-voca": "vendor/tiny-voca/js",
     vocina: "vendor/vocina",
     apptor: "vendor/apptor",
+    "tiny-swara": "vendor/tiny-swara",
+    "tui-voice": "vendor/tui-voice",
+    // The bundled model's own description: its table of tokens.
+    "tiny-voca-config": "vendor/tiny-voca/config.json",
     "tiny-voca-es": "vendor/tiny-voca-es",
     "tiny-voca-fr": "vendor/tiny-voca-fr",
     // eSpeak NG's emscripten glue, built by scripts/build-espeak.sh.

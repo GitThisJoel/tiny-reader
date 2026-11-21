@@ -176,6 +176,9 @@ describe("extra voice models", () => {
         "tiny-voca-es": ["Download", ""],
         "tiny-voca-fr": ["Download", ""],
         "apptor-de": ["Download", ""],
+        "zerre-tts": ["Download", ""],
+        "tiny-swara": ["Download", ""],
+        "tui-voice-ml": ["Download", ""],
         "stand-in": ["Download", ""],
       },
     });

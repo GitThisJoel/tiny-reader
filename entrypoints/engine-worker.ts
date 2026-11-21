@@ -61,7 +61,14 @@ export default defineUnlistedScript(() => {
         const { engine, model, notice } = await load(options.model);
         // After a fallback the voice asked for may not exist in the model that speaks.
         const voice = Math.min(options.voice, model.voices.length - 1);
-        const result = await engine.speak(text, { ...options, voice }, signal).catch((error: unknown) => {
+        // Some models are meant to be run a little off neutral: their makers' own setting.
+        const tuned = {
+          ...options,
+          voice,
+          pitchShift: options.pitchShift + (model.tuning?.pitchShift ?? 0),
+          pitchRange: options.pitchRange * (model.tuning?.pitchRange ?? 1),
+        };
+        const result = await engine.speak(text, tuned, signal).catch((error: unknown) => {
           // Said with the language of the model that tried: text in another one is the usual reason.
           throw error instanceof NothingToPronounce ? new NothingToPronounce(readsOnly(model)) : error;
         });

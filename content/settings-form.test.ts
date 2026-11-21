@@ -114,6 +114,27 @@ describe("mountSettingsForm", () => {
         "Download apptor-tiny-tts",
         true,
       ],
+      [
+        "zerre-tts",
+        "zerre-tts · by erkint · Turkish · voices MK, NK · Apache-2.0 · 21 MB",
+        "https://huggingface.co/erkint/zerre-tts",
+        "Download zerre-tts",
+        true,
+      ],
+      [
+        "tiny-swara",
+        "tiny-swara · by Xeven7 · Bangla · voices BF, BM · Apache-2.0 · 21 MB",
+        "https://huggingface.co/Xeven7/tiny-swara",
+        "Download tiny-swara",
+        true,
+      ],
+      [
+        "tui-voice-ml",
+        "tui-voice-mini-ml · by Cyrax321 · Malayalam · voices F2 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/Cyrax321/tui-voice-mini-ml",
+        "Download tui-voice-mini-ml",
+        true,
+      ],
     ]);
   });
 

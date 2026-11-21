@@ -8,7 +8,10 @@ import { normalize as normalizePortuguese } from "dizione-ptbr/normalize.ts";
 import * as spanish from "tiny-voca-es/frontend.js";
 import * as french from "tiny-voca-fr/frontend-fr.js";
 import { creaG2P } from "vocina/g2p_it.js";
+import { isWord } from "./align.ts";
 import { loadEspeak } from "./espeak.ts";
+import { BENGALI, bengaliMixed, espeakText, TURKISH } from "./espeak-text.ts";
+import { malayalamFrontEnd } from "./malayalam.ts";
 import { ModelError } from "./models.ts";
 import { loadPhonemizer, type Phonemes, phonemize, type WordTokens } from "./phonemizer.ts";
 
@@ -31,8 +34,7 @@ type ReadAsset = (path: string) => Promise<ArrayBuffer>;
 
 const words = new Intl.Segmenter(undefined, { granularity: "word" });
 /** The words of a text a front end has already rewritten ("15" is "quinze" by now), in order. */
-const wordsOf = (text: string) =>
-  [...words.segment(text)].filter((part) => part.isWordLike).map((part) => part.segment);
+const wordsOf = (text: string) => [...words.segment(text)].filter(isWord).map((part) => part.segment);
 
 /**
  * Accented letters as one character each. Text from a PDF often has them as a letter and a
@@ -81,11 +83,18 @@ export function fromSymbols(
 const spacedWords = (text: string) =>
   text
     .split(/\s+/)
-    .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    // Marks count as part of a word: a Bengali word may end in a vowel sign.
+    .map((word) => word.replace(/^[^\p{L}\p{N}\p{M}]+|[^\p{L}\p{N}\p{M}]+$/gu, ""))
     .filter(Boolean);
 
-/** A model's own JavaScript port of tiny-voca's `text.py` for its language: see engine/vendor.d.ts. */
-type EspeakParts = typeof spanish;
+/**
+ * tiny-voca's `text.py` for one language: a model's own JavaScript port of it (see
+ * engine/vendor.d.ts), or this repository's (engine/espeak-text.ts).
+ */
+type EspeakParts = Pick<
+  typeof spanish,
+  "SYMBOLS" | "NothingToPronounce" | "normalizeText" | "chunks" | "parseEspeak" | "tokenize"
+>;
 
 /**
  * A front end that works from eSpeak NG's output, as the model was trained. `parts` is the
@@ -202,6 +211,17 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       return espeakFrontEnd(spanish, await loadEspeak(read, "es"));
     case "espeak-fr":
       return espeakFrontEnd(french, await loadEspeak(read, "fr-fr"));
+    // Turkish: no JavaScript front end came with the model, so tiny-voca's own, ported, with its tables.
+    case "espeak-tr":
+      return espeakFrontEnd(espeakText(TURKISH), await loadEspeak(read, "tr"));
+    // Bengali: the same port, with tiny-swara's tables and its way with English words.
+    case "espeak-bn": {
+      const [bengali, english] = await Promise.all([loadEspeak(read, "bn"), loadEspeak(read, "en-us")]);
+      return espeakFrontEnd(espeakText(BENGALI), bengaliMixed(bengali, english));
+    }
+    // Malayalam: a port of the model's own front end, which is not tiny-voca's.
+    case "espeak-ml":
+      return malayalamFrontEnd(await loadEspeak(read, "ml"), spacedWords);
     default:
       throw new ModelError(`it needs the text front end "${name}", which this version of Tiny Reader does not have`);
   }

@@ -29,12 +29,22 @@ ESPEAK_REPO=https://github.com/espeak-ng/espeak-ng.git
 ESPEAK_TAG=1.52.0
 ESPEAK_COMMIT=4870adfa25b1a32b4361592f1be8a40337c58d6c
 EMSDK_VERSION=4.0.10
-# Dictionaries and voice files to ship. English is there because every voice switches to it
-# for letters and signs its own dictionary lacks (the switch shows as "(en)…(es)").
-LANGS="es fr en"
-# The models' reference front ends, for --fixtures: language, repository, commit.
-REFERENCES="es https://github.com/stdevMac/tiny-voca a4bf2bd979fc40b1bd7e34e13c0164db627d14ec \
-fr https://github.com/DanielSuncost/tiny-voca-fr 4cc26ab23d934e3d33796eb06bf11f23f4c9ab34"
+# Dictionaries to ship, and with each the voice file of that name. English is there because every
+# voice switches to it for letters and signs its own dictionary lacks (the switch shows as
+# "(en)…(es)").
+LANGS="es fr tr bn ml en"
+# Voice files besides those: Bengali reads Latin-script words with the American English voice.
+MORE_VOICES="en-US"
+# The models' reference front ends, for --fixtures, one a line:
+#   language  repository  commit  Python package  its directory  environment for it
+REFERENCES="\
+es https://github.com/stdevMac/tiny-voca a4bf2bd979fc40b1bd7e34e13c0164db627d14ec tiny_voca src/tiny_voca TINY_VOCA_LANGUAGE=es TINY_VOCA_FRONTEND=espeak
+fr https://github.com/DanielSuncost/tiny-voca-fr 4cc26ab23d934e3d33796eb06bf11f23f4c9ab34 tiny_voca src/tiny_voca TINY_VOCA_LANGUAGE=fr TINY_VOCA_FRONTEND=espeak
+tr https://github.com/erkinemreta1/zerre-tts cf3cdfaaa54a9e8ec541081bb5c2e97c3d563db4 zerre src/zerre ZERRE_LANG=tr
+bn https://huggingface.co/Xeven7/tiny-swara 9432a340c46249c8acae4ff4b062d46b9cbd1991 tiny_voca tiny_voca TINY_VOCA_INVENTORY=/work/reference-bn/inventory.json TINY_VOCA_LEXICON=/work/reference-bn/lexicon.json"
+
+MALAYALAM_REPOSITORY=https://github.com/Cyrax321/tui-voice
+MALAYALAM_COMMIT=478761a10399c357e9ccc5380145906167e4d655
 
 # emscripten/emsdk publishes the amd64 image as <version> and the arm64 image as
 # <version>-arm64; both are pinned by digest. emcc output does not depend on which one runs it.
@@ -154,11 +164,11 @@ import json
 import sys
 import types
 
-# Only tiny_voca/text.py is wanted: the package's own __init__ pulls in the model and torch.
-package = types.ModuleType("tiny_voca")
-package.__path__ = [sys.argv[4]]
-sys.modules["tiny_voca"] = package
-T = importlib.import_module("tiny_voca.text")
+# Only the package's text.py is wanted: its own __init__ pulls in the model and torch.
+package = types.ModuleType(sys.argv[4])
+package.__path__ = [sys.argv[5]]
+sys.modules[sys.argv[4]] = package
+T = importlib.import_module(sys.argv[4] + ".text")
 
 out = []
 for sentence in json.load(open(sys.argv[1], encoding="utf-8"))[sys.argv[3]]:
@@ -167,10 +177,44 @@ for sentence in json.load(open(sys.argv[1], encoding="utf-8"))[sys.argv[3]]:
         out.append({"text": sentence, "ids": list(p.ids), "stress": list(p.stress)})
     except Exception as error:
         out.append({"text": sentence, "error": type(error).__name__})
-json.dump({"espeak": T.espeak_version(), "voice": T.ESPEAK_VOICE, "symbols": list(T.SYMBOLS), "sentences": out},
+voice = getattr(T, "ESPEAK_VOICE", None) or T.language().espeak_voice
+json.dump({"espeak": T.espeak_version(), "voice": voice, "symbols": list(T.SYMBOLS), "sentences": out},
           open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False, indent=0)
 EOF
-[ -n "${FIXTURES}" ] && cp "${ROOT}/tests/parity/espeak-sentences.json" "${WORK}/sentences.json"
+if [ -n "${FIXTURES}" ]; then
+  cp "${ROOT}/tests/parity/espeak-sentences.json" "${WORK}/sentences.json"
+  printf '%s\n' "${REFERENCES}" > "${WORK}/references.txt"
+  # What the Malayalam front end builds on: the English model's token table and its own plan
+  # for it, both fetched by `pnpm fetch-assets`.
+  cp "${ROOT}/vendor/tiny-voca/config.json" "${WORK}/upstream.json"
+  cp "${ROOT}/vendor/tui-voice/vocab_plan.json" "${WORK}/vocab_plan.json"
+fi
+
+cat > "${WORK}/reference-ml.py" <<'EOF'
+"""Runs tui-voice's own phonemize and encode over the Malayalam sentences: in.json -> out.json."""
+import importlib
+import json
+import subprocess
+import sys
+import types
+
+package = types.ModuleType("tui_voice")
+package.__path__ = [sys.argv[3]]
+sys.modules["tui_voice"] = package
+P = importlib.import_module("tui_voice.phonemes")
+
+# The English model's symbols in the order of their slots, as its training took them.
+vocab = json.load(open(sys.argv[4], encoding="utf-8"))["vocab"]
+upstream = sorted(vocab, key=vocab.get)
+plan = json.load(open(sys.argv[5], encoding="utf-8"))
+out = []
+for sentence in json.load(open(sys.argv[1], encoding="utf-8"))["ml"]:
+    ids = P.encode(P.phonemize(sentence), plan, upstream)
+    out.append({"text": sentence, "ids": ids, "stress": [0] * len(ids)})
+version = subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True, check=True).stdout.strip()
+json.dump({"espeak": version, "voice": "ml", "symbols": plan["new_symbols"], "sentences": out},
+          open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False, indent=0)
+EOF
 
 # -------------------------------------------------------- in-container build
 UID_GID="$(id -u):$(id -g)"
@@ -207,15 +251,23 @@ if [ -n "${FIXTURES}" ]; then
   # The reference front ends call "espeak-ng" from PATH.
   printf '#!/bin/sh\nESPEAK_DATA_PATH=/work/native exec /work/native/src/espeak-ng "\$@"\n' > /usr/local/bin/espeak-ng
   chmod +x /usr/local/bin/espeak-ng
-  set -- ${REFERENCES}
-  while [ \$# -ge 3 ]; do
-    language="\$1"; repository="\$2"; commit="\$3"; shift 3
+  # Only source files are wanted from the references, not what they keep in large-file storage.
+  export GIT_LFS_SKIP_SMUDGE=1
+  while read -r language repository commit package directory environment; do
     git init -q "/work/reference-\${language}"
-    git -C "/work/reference-\${language}" fetch -q --depth 1 "\${repository}" "\${commit}"
-    git -C "/work/reference-\${language}" checkout -q FETCH_HEAD
-    TINY_VOCA_LANGUAGE="\${language}" TINY_VOCA_FRONTEND=espeak python3 /build/reference.py \\
-      /build/sentences.json "/work/out/espeak-\${language}.json" "\${language}" "/work/reference-\${language}/src/tiny_voca"
-  done
+    # By commit where the server allows it (GitHub), else from the branch (Hugging Face).
+    git -C "/work/reference-\${language}" fetch -q --depth 1 "\${repository}" "\${commit}" 2>/dev/null \\
+      || git -C "/work/reference-\${language}" fetch -q "\${repository}"
+    git -C "/work/reference-\${language}" checkout -q "\${commit}"
+    env \${environment} python3 /build/reference.py /build/sentences.json "/work/out/espeak-\${language}.json" \\
+      "\${language}" "\${package}" "/work/reference-\${language}/\${directory}"
+  done < /build/references.txt
+  # Malayalam: the model has a front end of its own design, so a driver of its own.
+  git init -q /work/reference-ml
+  git -C /work/reference-ml fetch -q --depth 1 "${MALAYALAM_REPOSITORY}" "${MALAYALAM_COMMIT}"
+  git -C /work/reference-ml checkout -q FETCH_HEAD
+  python3 /build/reference-ml.py /build/sentences.json /work/out/espeak-ml.json /work/reference-ml/tui_voice \\
+    /build/upstream.json /build/vocab_plan.json
   chown -R "${UID_GID}" /work/out
   exit 0
 fi
@@ -246,7 +298,8 @@ nice -n 10 emcc -O2 -I src/include /build/tr_espeak.c src/.libs/libespeak-ng.a \
 # Pack the data of LANGS: one gzip stream of
 #   "TVPK" | u32le header length | JSON [[path, size], ...] | file bytes
 cd /work/native/espeak-ng-data
-LANG_FILES="\$(for lang in ${LANGS}; do echo "\${lang}_dict"; find lang -type f -name "\${lang}"; done)"
+LANG_FILES="\$(for lang in ${LANGS}; do echo "\${lang}_dict"; find lang -type f -name "\${lang}"; done
+  for voice in ${MORE_VOICES}; do find lang -type f -name "\${voice}"; done)"
 LANG_FILES="\${LANG_FILES}" python3 - <<'PY'
 import gzip, json, os, struct
 files = ["phontab", "phonindex", "phondata", "intonations"] + os.environ["LANG_FILES"].split()
@@ -282,7 +335,7 @@ echo "wrote:"
 if ( cd "${WORK}/out" && sha256sum --check --quiet - ) <<'EOF'
 e06facb2130784d127327320f8bd8006d559bbfc90491aaf10df9422bf0ad555  espeak-ng-core.mjs
 b46dc88f143784d6a52f1c9e6cebe4ce787fb0a042220902cb6fba18d918d2ef  espeak-ng-core.wasm
-b71dc1076d8c64e80092823b059c93f0748c3f166bce3ca9fda623da76e09a42  espeak-ng-data.pack
+349bf48e0fcbe2ec28dfd101d9aa27010e9f56acf2c1b86ad2b3b52a49a59c01  espeak-ng-data.pack
 EOF
 then echo "identical to the recorded build"
 else echo "NOTE: this build differs from the recorded one (see the hashes in this script)" >&2

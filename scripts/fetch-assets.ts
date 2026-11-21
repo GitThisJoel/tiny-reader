@@ -71,7 +71,7 @@ export const ASSETS: Asset[] = [
     "public/assets/licenses/homograph-data.LICENSE.txt",
     "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
   ),
-  // Build- and test-time only.
+  // Build- and test-time, and bundled for its token table, which the Malayalam front end builds on.
   hf("config.json", "vendor/tiny-voca/config.json", "27bcbf322fc428581f0e959be1c141dd7751c61f4fed5eded326e779b215f69c"),
   // Upstream's JS port of the dizione phonemizer, plus the GGUF reader in tiny-voca.js.
   js("tiny-voca.js", "a5d3df367d6af3e97efa837869c2f15d9605e92938f8d7e3a85b6eb4bdb32e8f"),
@@ -218,6 +218,39 @@ export const ASSETS: Asset[] = [
     "vendor/apptor/model.json",
     "50835666366dafb41e8d865deba76405e76523623df85cf24329e5e7fb9401c8",
   ), // tests only
+  // Bengali: the tables of tiny-swara's front end (Apache-2.0). The code that uses them is this
+  // repository's port of tiny-voca's text.py (engine/espeak-text.ts).
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "inventory.json",
+    "vendor/tiny-swara/inventory.json",
+    "ac19dcd4fbd16daa9d6a446ebc99ee560c554072cf4d6f124479da12beb2f34e",
+  ),
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "lexicon.json",
+    "vendor/tiny-swara/lexicon.json",
+    "68f02681f0515d645a4443ca2e79953428e9084f28df3fae7e945c2668e86e1b",
+  ),
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "config.json",
+    "vendor/tiny-swara/model.json",
+    "874e6125e316306b8d6cd45ad2829bbdb1f2f0db16159b0f93f3881353bd1835",
+  ),
+  // Malayalam: the model's table of which token slot each sound takes (Apache-2.0).
+  from(
+    "https://huggingface.co/Cyrax321/tui-voice-mini-ml/resolve/9c2fee75373d81bbd62fbe2d683b1bad3c4415ea",
+    "vocab_plan.json",
+    "vendor/tui-voice/vocab_plan.json",
+    "9d196209759785e7b6f904091601bbd1442ae8985163bbb266c4bd7379e3e302",
+  ),
+  from(
+    "https://huggingface.co/Cyrax321/tui-voice-mini-ml/resolve/9c2fee75373d81bbd62fbe2d683b1bad3c4415ea",
+    "config.json",
+    "vendor/tui-voice/model.json",
+    "d7f53c54b50b810cfe539e77b4ee5ef9b5e638888943f6f99259c68b359e8ab9",
+  ),
   // Each model's own description, to test that its symbol table is its front end's.
   from(
     "https://huggingface.co/semfence/tiny-voca-ptbr/resolve/f231cbe318c9f972e27fd8dad5d8ebcfb40a672f",
@@ -236,6 +269,12 @@ export const ASSETS: Asset[] = [
     "onnx/model.json",
     "vendor/tiny-voca-fr/model.json",
     "b36144a5aeefc07a1ed94d40d20f9bf8514d962236ffd3dee39f0be8a6d9c459",
+  ),
+  from(
+    "https://huggingface.co/erkint/zerre-tts/resolve/55753a04ae624998cba86f7c17625616e318124e",
+    "onnx/model.json",
+    "vendor/zerre-tts/model.json",
+    "5a9a96dd4f58cd79e3a0d5f3663885e31465689a05f03ede4ce7c8710b1caa78",
   ),
   from(
     "https://github.com/OfficinePixel/vocina/releases/download/v1.0",

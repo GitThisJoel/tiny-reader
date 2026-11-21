@@ -53,6 +53,9 @@ describe.each([
   // eSpeak NG does not say which words it read: a piece is named from the text when the counts agree.
   ["espeak-es", "Hola, ¿cómo estás? Cuesta 15 euros.", ["Hola", "cómo", "estás", "Cuesta", "15", "euros"]],
   ["espeak-fr", "Bonjour, comment allez-vous ? Cela coûte 15 euros.", ["Bonjour", "comment", "allez-vous", "Cela"]],
+  ["espeak-tr", "Merhaba, bugün nasılsın? Ankara'da hava güzel.", ["Merhaba", "bugün", "nasılsın", "Ankarada"]],
+  ["espeak-bn", "আমি ভাত খাই। আপনার order টি আসবে।", ["আমি", "ভাত", "খাই", "আপনার", "order", "টি", "আসবে"]],
+  ["espeak-ml", "ഹലോ, സുഖമാണോ? എവിടെയാണ് ഇപ്പോൾ?", ["ഹലോ", "സുഖമാണോ", "എവിടെയാണ്", "ഇപ്പോൾ"]],
 ])("the %s front end", (name, sentence, firstWords) => {
   let frontEnd: SyncFrontEnd;
   beforeAll(async () => {
@@ -64,7 +67,8 @@ describe.each([
     if (!spoken) throw new Error("nothing");
     expect([spoken.ids[0], spoken.ids.at(-1)]).toEqual([1, 2]);
     expect(spoken.stress).toHaveLength(spoken.ids.length);
-    expect(spoken.stress.some((value) => value > 0)).toBe(true);
+    // The Malayalam model was trained without stress.
+    expect(spoken.stress.some((value) => value > 0)).toBe(name !== "espeak-ml");
     // Numbers are spoken as words, and each word owns a stretch of tokens, in order.
     expect(spoken.words.slice(0, firstWords.length).map((word) => word.text)).toEqual(firstWords);
     let previous = 1;

@@ -280,6 +280,8 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
   form.addEventListener("submit", (event) => event.preventDefault());
   reset.addEventListener("click", () => void save(DEFAULT_SETTINGS));
   offerModels();
+  // Never a moment with sliders at arbitrary places: the defaults, until the stored settings are read.
+  show(DEFAULT_SETTINGS);
   // The settings are shown at once. Which models are downloaded takes a moment longer to find
   // out; storage that cannot be read offers the bundled model only.
   const models = storedModels()

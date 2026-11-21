@@ -37,6 +37,11 @@ export interface Model extends PinnedFile {
    */
   helper?: PinnedFile;
   /**
+   * What the model's makers set where Tiny Reader's settings are neutral: added to the pitch,
+   * and multiplied into the pitch range.
+   */
+  tuning?: { pitchShift: number; pitchRange: number };
+  /**
    * Sites the download is redirected to that send no CORS headers, as match patterns. Firefox
    * has to be allowed to reach them too. Hugging Face needs none.
    */
@@ -162,6 +167,49 @@ export const MODELS: readonly Model[] = [
       size: 12_364_141,
       sha256: "d981694e7a03030b2169be46b2094775dde4ec5a3e9406c92a3fc8f1ed8bbec3",
     },
+  },
+  {
+    id: "zerre-tts",
+    name: "zerre-tts",
+    author: "erkint",
+    language: "tr",
+    frontend: "espeak-tr",
+    voices: ["MK", "NK"],
+    licence: "Apache-2.0",
+    ...huggingFace("erkint/zerre-tts", "55753a04ae624998cba86f7c17625616e318124e"),
+    size: 21_381_286,
+    sha256: "f4474434eb5c60e1f985afdf4251ddbc783384041aa09604257895783067cfca",
+  },
+  {
+    id: "tiny-swara",
+    name: "tiny-swara",
+    author: "Xeven7",
+    language: "bn",
+    frontend: "espeak-bn",
+    voices: ["BF", "BM"],
+    licence: "Apache-2.0",
+    ...huggingFace("Xeven7/tiny-swara", "9432a340c46249c8acae4ff4b062d46b9cbd1991", "onnx/tiny-swara.onnx"),
+    size: 21_387_142,
+    sha256: "cef829cff4b6cb38554e32d8f96b9b51f96a4c0e9cb2e406b53ac79d5923d630",
+  },
+  {
+    id: "tui-voice-ml",
+    name: "tui-voice-mini-ml",
+    author: "Cyrax321",
+    language: "ml",
+    frontend: "espeak-ml",
+    // The model has a second voice slot, but its makers name data for this one only.
+    voices: ["F2"],
+    licence: "Apache-2.0",
+    ...huggingFace(
+      "Cyrax321/tui-voice-mini-ml",
+      "9c2fee75373d81bbd62fbe2d683b1bad3c4415ea",
+      "onnx/tui-voice-mini-ml.onnx",
+    ),
+    size: 21_386_372,
+    sha256: "3fddc5a894eb1dd501921c6342cbbf350d56bbd08a55bf9e2a5a7ac614f355b5",
+    // Their own defaults, "to keep the voice female".
+    tuning: { pitchShift: 0.15, pitchRange: 0.85 },
   },
   ...(standIn ? [JSON.parse(standIn) as Model] : []),
 ];

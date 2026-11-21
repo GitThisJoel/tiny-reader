@@ -139,3 +139,23 @@ declare module "apptor/apptor-tts.js" {
     tables: Tables,
   ): (pieces: ([true, string] | [false, Units[]])[]) => { symbols: string[]; ids: number[]; stress: number[] };
 }
+
+// tiny-swara's tables for Bengali: its phone inventory, and Bengali spellings of English words.
+declare module "tiny-swara/inventory.json" {
+  const inventory: { voice: string; consonants: string[]; vowels: string[]; fallback: Record<string, string[]> };
+  export default inventory;
+}
+declare module "tiny-swara/lexicon.json" {
+  const lexicon: Record<string, string>;
+  export default lexicon;
+}
+
+// The Malayalam model's table of which slot each sound takes, and the English model's own table.
+declare module "tui-voice/vocab_plan.json" {
+  const plan: { new_symbols: string[]; mapping: Record<string, number> };
+  export default plan;
+}
+declare module "tiny-voca-config" {
+  const config: { vocab: Record<string, number> };
+  export default config;
+}

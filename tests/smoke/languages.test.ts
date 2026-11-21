@@ -25,6 +25,13 @@ describe.each([
   ],
   ["apptor-de", "Hallo, der Zug fährt um 14:35 Uhr ab.", ["Hallo", "der", "Zug", "fährt", "um", "14:35", "Uhr", "ab"]],
   [
+    "zerre-tts",
+    "Merhaba, bugün nasılsın? Tren saat onda kalkıyor.",
+    ["Merhaba", "bugün", "nasılsın", "Tren", "saat", "onda", "kalkıyor"],
+  ],
+  ["tiny-swara", "আমি ভাত খাই। আপনার order টি আসবে।", ["আমি", "ভাত", "খাই", "আপনার", "order", "টি", "আসবে"]],
+  ["tui-voice-ml", "ഹലോ, സുഖമാണോ? എവിടെയാണ് ഇപ്പോൾ?", ["ഹലോ", "സുഖമാണോ", "എവിടെയാണ്", "ഇപ്പോൾ"]],
+  [
     "tiny-voca-fr",
     "Bonjour, comment allez-vous ? Cela coûte 15 euros.",
     ["Bonjour", "comment", "allez-vous", "Cela", "coûte", "15", "euros"],
