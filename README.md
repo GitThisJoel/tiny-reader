@@ -6,10 +6,19 @@ being spoken. Inference runs locally in the browser through ONNX Runtime Web. No
 leaves the machine. The add-on makes one kind of network request, and only when you ask for it:
 downloading a PDF from the web so that it can read it to you.
 
+<p align="center">
+  <img src="docs/screenshots/web-page.png" width="800" alt="A web page being read: the sentence is highlighted in yellow, the word being spoken in a darker colour, and a small control bar sits at the bottom of the page.">
+</p>
+
 ## Using it
 
 - Click the Tiny Reader button in the toolbar and press **Read aloud**: it reads the selection, or the page's main
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
+
+  <p align="center">
+    <img src="docs/screenshots/popup.png" width="300" alt="The toolbar popup: a Read aloud button, buttons for previous, pause, next and stop, and the settings for voice, speed, pitch and expressiveness.">
+  </p>
+
 - To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
   in Tiny Reader…**, and it opens by itself if you try to read the PDF from the context menu or a shortcut. A Tiny
   Reader page opens and shows the PDF's pages as they are. It reads them with the sentence and word highlighted on
@@ -19,6 +28,11 @@ downloading a PDF from the web so that it can read it to you.
   - A PDF on your computer has to be picked with **Open a PDF…** or dropped on the page: Firefox does not let an
     add-on open a local file by itself. The page names the file to look for.
   - Either way the PDF is processed on your computer and never uploaded.
+
+  <p align="center">
+    <img src="docs/screenshots/pdf.png" width="800" alt="A PDF open in Tiny Reader's own page: the paper is shown as it looks, with the sentence and word being read highlighted on the page.">
+  </p>
+
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
 - Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
@@ -32,57 +46,20 @@ downloading a PDF from the web so that it can read it to you.
 - Settings (add-on's Preferences): voice, speed, pitch, expressiveness (pitch range) and how many
   sentences are prepared ahead. Speed and voice chosen in the bar are remembered too.
 
-## Requirements
+## Trying it
 
-- Node.js 22.18 or newer
-- [pnpm](https://pnpm.io/installation) 12 (the exact version is pinned in `package.json`)
-- Firefox 140 or newer, desktop
+Tiny Reader is not on addons.mozilla.org yet. Until it is, build it and load it as a temporary add-on. You need
+Node.js 22.18 or newer, [pnpm](https://pnpm.io/installation) 12 and Firefox 140 or newer on desktop.
 
-## Setup
-
-```bash
-pnpm install
-pnpm fetch-assets
-```
-
-`pnpm fetch-assets` downloads the model, the phonemizer data and upstream's JavaScript
-phonemizer (about 30 MB) into `public/assets/` and `vendor/`. Every file is pinned to a commit
-and checked against a SHA-256 in [scripts/fetch-assets.ts](scripts/fetch-assets.ts). These files
-are never committed. Running it again only re-verifies what is on disk.
-
-## Development
-
-```bash
-pnpm dev
-```
-
-Builds in watch mode and starts Firefox with the add-on installed in a temporary profile. It
-opens the engine test page (`playground.html`), where you can type a sentence and hear it.
-
-If Firefox is installed as a snap, `web-ext` cannot reach it. Create `web-ext.config.ts`
-(gitignored) pointing at the real binary:
-
-```ts
-import { defineWebExtConfig } from "wxt";
-
-export default defineWebExtConfig({
-  binaries: { firefox: "/snap/firefox/current/usr/lib/firefox/firefox" },
-});
-```
-
-## Installing a development build in your own Firefox
-
-`pnpm dev` runs the add-on in a throwaway profile. To use it in your normal Firefox, load a build as a temporary
-add-on:
-
-1. Build it:
+1. Install the dependencies, download the model (about 30 MB) and build:
 
    ```bash
+   pnpm install
+   pnpm fetch-assets
    pnpm build
    ```
 
-   Without pnpm installed, `npx -y pnpm@12.21.0 build` does the same. That prefix works for every `pnpm` command in
-   this README.
+   Without pnpm installed, write `npx -y pnpm@12.21.0` in place of `pnpm`.
 
 2. In Firefox, open `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on…** and choose `.output/firefox-mv3/manifest.json` inside this repository. `.output`
@@ -91,159 +68,8 @@ add-on:
 4. The Tiny Reader button appears in the toolbar or in the extensions (puzzle piece) menu, from where it can be
    pinned.
 
-After changing the code, run the build again and click **Reload** on the add-on's card on that page.
-
-A temporary add-on is removed when Firefox closes; load it again after a restart. Installing it permanently needs a
-build signed by Mozilla, see [Before publishing](#before-publishing).
-
-## Scripts
-
-| Command             | What it does                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm dev`          | Watch build and launch Firefox with the add-on                                            |
-| `pnpm build`        | Production build into `.output/firefox-mv3/`                                              |
-| `pnpm zip`          | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO |
-| `pnpm lint`         | Biome lint and format check                                                               |
-| `pnpm format`       | Biome, applying fixes                                                                     |
-| `pnpm typecheck`    | `tsc --noEmit` in strict mode                                                             |
-| `pnpm test`         | Vitest unit tests                                                                         |
-| `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
-| `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
-
-`pnpm lint:ext` reports no errors and four accepted warnings:
-
-- `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: the add-on is desktop only.
-- `UNSAFE_VAR_ASSIGNMENT` in the document page's script and in `pdf.worker.min-*.mjs`: both are pdf.js, bundled
-  unmodified from the `pdfjs-dist` npm package.
-- `UNSAFE_VAR_ASSIGNMENT` in `engine-worker.js`: ONNX Runtime loads its own wasm loader with a
-  dynamic `import()`. The URL is always `ort/ort-wasm-simd-threaded.mjs` inside the add-on
-  package, an unmodified file from the `onnxruntime-web` npm package.
-
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs everything above except
-`test:e2e` and uploads the zip as an artifact. The end-to-end tests are left out of CI because
-they have only been run locally; set `FIREFOX` to the binary if it is not found.
-
-## Pre-commit hook
-
-[lefthook](https://lefthook.dev) installs a Git pre-commit hook when dependencies are installed (`pnpm install`).
-It is configured in [lefthook.yml](lefthook.yml) and runs Biome (lint and formatting) on the staged files; a
-finding stops the commit. Fix with `pnpm format`, stage again and commit. `git commit --no-verify` skips it once,
-and `pnpm exec lefthook install` reinstalls the hook if it is ever missing.
-
-## Commit messages
-
-Commits use semantic commit messages: `type(scope): subject`, with the scope optional and the subject in the
-imperative, lower case, on one line.
-
-| Type                | For                                                  |
-| ------------------- | ---------------------------------------------------- |
-| `feat`              | A new capability of the add-on                       |
-| `fix`               | A bug fix                                            |
-| `test`              | Tests only                                           |
-| `docs`              | Documentation only                                   |
-| `ci`                | The GitHub Actions workflow and Dependabot config    |
-| `build`             | Build tooling, asset fetching and dependency bumps   |
-| `chore`             | Repository upkeep that fits none of the above        |
-| `perf`              | A change that only makes something faster or lighter |
-| `refactor`, `style` | Code changes with no change in behaviour; formatting |
-
-Scopes in use: `engine`, `content`, `highlight`, `options`, `e2e`, `parity`, `assets`, `scripts`, `deps`, `dependabot`.
-Examples: `feat(engine): align spoken words to source text`, `test(e2e): add reading tests on strict-CSP pages`,
-`docs: document the pre-commit hook`.
-
-## Phonemizer parity
-
-Text is turned into phoneme ids by upstream's JavaScript port of the
-[dizione](https://github.com/n4ze3m/dizione) phonemizer. `pnpm test:parity` checks that it gives
-exactly the ids and stress values of the Python reference for every sentence in
-[tests/parity/fixtures.json](tests/parity/fixtures.json).
-
-To regenerate the fixtures (needs `git`, Python 3.10+ and `numpy`):
-
-```bash
-python3 scripts/gen-parity-fixtures.py
-```
-
-The script checks out dizione at the commit pinned inside it, downloads the phonemizer data at
-the pinned Hugging Face revision (SHA-256 verified) into `~/.cache/tiny-reader-parity`, and
-phonemizes dizione's own tricky-sentence list plus [tests/parity/extra.txt](tests/parity/extra.txt).
-Add sentences to `extra.txt`, not to the JSON.
-
-Two inputs are known to differ on purpose (initials such as "H. C. Sirr": the JavaScript port has
-a fix that Python dizione has not published yet). They are listed in `KNOWN_DIVERGENT` in
-[tests/parity/parity.test.ts](tests/parity/parity.test.ts) with the recorded JavaScript output,
-and a test fails once that list is no longer needed.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph page["Reader: content script injected into a web page, or built into the PDF page"]
-    direction TB
-    pdf["PDF page only: pdf.js<br/>pages on canvas, text layer over them"]
-    bar["Control bar<br/>closed shadow root"]
-    text["Text map and Intl.Segmenter<br/>selection to sentences"]
-    pdf --> text
-    reader["Reader queue<br/>prefetch, pause, skip, cancel"]
-    audio["Web Audio<br/>gapless playback"]
-    marks["CSS Custom Highlight API<br/>sentence and word"]
-    bar --> reader
-    text --> reader
-    reader --> audio
-    reader --> marks
-  end
-
-  subgraph background["Background event page"]
-    router["Router<br/>menus, shortcuts, per-page request ids"]
-  end
-
-  popup["Toolbar popup<br/>commands, settings"]
-
-  subgraph worker["Engine Worker"]
-    direction TB
-    phonemizer["Phonemizer<br/>dizione"]
-    model["tiny-voca<br/>ONNX Runtime Web, wasm"]
-    align["Word alignment"]
-    phonemizer --> model --> align
-  end
-
-  reader <-->|"runtime.Port<br/>sentence in, PCM and word timings out"| router
-  router <-->|"postMessage"| worker
-  popup -->|"command"| router
-  router -->|"command"| bar
-```
-
-- **Reader** ([content/controller.ts](content/controller.ts), [content/](content/)): reads the selection from the DOM
-  as one string, splits it into sentences, keeps two sentences synthesized ahead of the one playing, and schedules
-  each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a change of voice or speed
-  abort work that is no longer needed. It runs in web pages as a content script
-  ([entrypoints/reader.content.ts](entrypoints/reader.content.ts)), injected on demand, and is built into the
-  document page.
-- **Highlighting** ([content/text-map.ts](content/text-map.ts), [content/highlight.ts](content/highlight.ts)): offsets
-  in that string map back to DOM ranges, which are registered with the CSS Custom Highlight API. Nothing is wrapped or
-  inserted. The word highlight follows the audio clock; with `prefers-reduced-motion: reduce` only the sentence is
-  marked.
-- **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
-  add-on adds to a page.
-- **Document page** ([entrypoints/document/](entrypoints/document/), [content/pdf-text.ts](content/pdf-text.ts)): a
-  page of the add-on's own that shows a PDF you open with a bundled copy of pdf.js: each page drawn on a canvas, with
-  pdf.js's invisible text layer over it. Paragraphs are rebuilt from the positioned text runs, with a map from every
-  word back to its place in the text layer, so the same controller as the content script
-  ([content/controller.ts](content/controller.ts)) reads them and the highlight lands on the page.
-- **Toolbar popup** ([entrypoints/popup/](entrypoints/popup/)): the panel behind the toolbar button. Its buttons send
-  a command to the background, which passes it to the reader in the active tab; its settings form is the one the
-  options page uses ([content/settings-form.ts](content/settings-form.ts)).
-- **Background event page** ([entrypoints/background.ts](entrypoints/background.ts)): context menu, shortcuts and
-  message routing. It owns the Worker, because a content script cannot start one, and prefixes request ids per page so
-  pages cannot see or cancel each other's requests. It also tells the popup whether the active tab can be read, and
-  opens the popup when a reading could not start.
-- **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts), [engine/](engine/)): one request is
-  one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
-  reading stops.
-- **Protocol** ([engine/protocol.ts](engine/protocol.ts)): typed messages with request ids. Cancelling drops queued
-  work and discards the result of work in progress.
-
-The reasoning and measurements behind these choices are in [docs/FINDINGS.md](docs/FINDINGS.md).
+After changing the code, run the build again and click **Reload** on the add-on's card on that page. A temporary
+add-on is removed when Firefox closes; load it again after a restart.
 
 ## Permissions
 
@@ -292,25 +118,16 @@ does not extend to such frames.
 - With `prefers-reduced-motion: reduce`, only the sentence is highlighted, not each word.
 - "Read from here" starts at the beginning of the paragraph, not at the word under the pointer.
 
-## int8 model experiment
+## More
 
-```bash
-python3 scripts/quantize-experiment.py
-```
+- [CONTRIBUTING.md](CONTRIBUTING.md): developing, the commands, tests and conventions.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the parts fit together, with a diagram.
+- [docs/FINDINGS.md](docs/FINDINGS.md): what was measured and tested, and the decisions that rest on it.
 
-Needs `onnxruntime`, `onnx` and `numpy`. It writes two dynamically quantized copies of the model
-and WAV files for listening into `.output/int8-experiment/`, and prints size, speed and how far
-the output drifts from the float32 model. The add-on ships the float32 model; the comparison and
-the reasons are in [docs/FINDINGS.md](docs/FINDINGS.md) §14.
+## Licence
 
-## Before publishing
-
-The engine test page (`playground.html`) is part of every build, reachable only by its
-`moz-extension://` address. Remove [entrypoints/playground/](entrypoints/playground/) if you do not
-want to ship it; `tests/e2e/playground.test.ts` goes with it.
-
-The add-on ID in [wxt.config.ts](wxt.config.ts) (`tiny-reader@tiny-reader.invalid`) is a
-placeholder. Change it before submitting to addons.mozilla.org.
+Apache License 2.0: see [LICENSE](LICENSE). You may use, change and pass on Tiny Reader, also commercially, as long as
+you keep the licence and the [NOTICE](NOTICE) file, which credits this project.
 
 ## Third-party components
 
@@ -320,4 +137,5 @@ placeholder. Change it before submitting to addons.mozilla.org.
   [entrypoints/document/style.css](entrypoints/document/style.css) are taken from its `pdf_viewer.css`.
 - ONNX Runtime Web: MIT, © Microsoft
 
-The licence texts are bundled in the add-on under `assets/licenses/`.
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the versions and sources. The licence texts are bundled in the
+add-on under `licenses/` and `assets/licenses/`.

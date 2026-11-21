@@ -1,6 +1,6 @@
 // Matches the words the phonemizer speaks to the words in the source text.
 // The phonemizer rewrites text before speaking it ("$42.50" becomes "forty two dollars and
-// fifty cents") and keeps no positions, so the link is rebuilt here. See docs/FINDINGS.md §5.
+// fifty cents") and keeps no positions, so the link is rebuilt here. See docs/FINDINGS.md §4.
 
 /** A spoken word with its time span in seconds. */
 export interface TimedWord {
