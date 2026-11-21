@@ -82,24 +82,18 @@ export function mountSettingsForm(form: HTMLFormElement) {
     prefetch: prefetch.valueAsNumber,
   });
 
-  // Saves run one at a time, in the order the changes were made: two overlapping saves could
-  // otherwise store the older one last. Only the newest result is shown back, so a slow save
-  // never undoes what was changed since.
-  let queue: Promise<void> = Promise.resolve();
+  // Only the newest save's result is shown back, so a slow save never undoes what was changed since.
   let newest = 0;
-  function save(settings: Settings) {
+  async function save(settings: Settings) {
     const mine = ++newest;
-    queue = queue
-      .then(async () => {
-        const stored = await saveSettings(settings);
-        if (mine !== newest) return;
-        show(stored);
-        saved.textContent = "Saved. Used from the next reading.";
-      })
-      .catch(() => {
-        saved.textContent = "The settings could not be saved.";
-      });
-    return queue;
+    try {
+      const stored = await saveSettings(settings);
+      if (mine !== newest) return;
+      show(stored);
+      saved.textContent = "Saved. Used from the next reading.";
+    } catch {
+      saved.textContent = "The settings could not be saved.";
+    }
   }
 
   form.addEventListener("input", describe);
