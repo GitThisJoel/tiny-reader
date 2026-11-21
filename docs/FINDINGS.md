@@ -5,7 +5,8 @@ tested with code unless marked **(unverified)**. It explains choices that look o
 the background page, why PDFs get a page of their own, why Firefox 140.
 
 Checked 2026-11-19 to 2026-11-21 with Node 22.22.1, Firefox 158.0.1 (Linux x86-64, headless), onnxruntime-web 1.31.1
-and pdf.js 6.5.438. Nothing in the automated runs was listened to, the downloadable voices of §13 included.
+and pdf.js 6.5.438. Nothing in the automated runs was listened to, the downloadable voices of §13 and the other
+languages of §14 included.
 
 Pinned sources:
 
@@ -300,13 +301,13 @@ Other models of the tiny-voca family can be downloaded from a list kept in the a
 - **`phonemizer.fingerprint` in a model's `config.json` cannot be trusted**: one model claimed the original's
   fingerprint with a different token table. Models are admitted by comparing the table itself.
 - **Each list entry names the text front end it needs** (`frontend`), and the list in this repository is the
-  authority for it, for the reason above. There is one front end today, `dizione`, the bundled English phonemizer,
-  and all three entries name it. The engine picks the front end by that name and refuses a model whose front end it
-  does not have, before loading the file; the bundled model then reads, with the notice described below.
+  authority for it, for the reason above. The engine sets up the front end by that name and refuses a model whose
+  front end it does not have, before loading the file; the bundled model then reads, with the notice described
+  below. The front ends there are, and the languages they brought, are in §14.
 - What that leaves open for another language: a front end's **code** must ship in the add-on (no remote code), so a
   new language is a new release with its front end and list entries that name it. A front end's **data**, such as a
-  pronunciation dictionary, is data like model weights and could be downloaded the same way. Neither is built: no
-  interface for front ends, no downloadable front-end data.
+  pronunciation dictionary, is data like model weights and could be downloaded the same way. That is not built:
+  the lexicons of §14 are in the package.
 - The sizes and SHA-256 values are the ones Hugging Face publishes for the files
   (`https://huggingface.co/api/models/<repo>?blobs=true`); a download of SobbieTTS from Firefox hashed to the same.
 
@@ -372,3 +373,75 @@ submitted yet)**. The request is `https`, started by a click, and described in t
 list entry, given in `VITE_E2E_MODEL`: a 687-byte ONNX file with the right inputs and outputs, written out by hand
 ([tests/stand-in-model.ts](../tests/stand-in-model.ts)) and served by the local test site. The normal build has no
 trace of it.
+
+## 14. Other languages
+
+**Survey.** The 32 non-English models linked from the tiny-voca README (2026-11-21) were looked at: page, files,
+licence, and where there is an ONNX file, its interface.
+
+- **The models fit.** 19 ONNX files were run through the engine's input and output check and one synthesis: 17 have
+  exactly the interface of §1, at 24 kHz, with `sum(durations) * 256 === samples`. The exceptions are an Austrian
+  German model with an extra `accent` input and a Sanskrit one with `weight` in place of `stress`.
+- **The front ends mostly do not.** A front end's code has to ship in the add-on, as dependency-free JavaScript with
+  no `eval`. Most projects use the eSpeak NG program (GPL-3.0, natively or as wasm), Python under Pyodide, or a
+  large helper model. Some have no licence, weights under a non-commercial licence, no ONNX file, or no published
+  front end.
+- Two had what is needed and were added. A third, German (`apptor/apptor-tiny-tts`), has a JavaScript front end
+  plus a 12 MB letter-to-sound ONNX model: a second session in the Worker, not built.
+
+| Language             | Model                                   | Front end                                           | Its data in the package                                  |
+| -------------------- | --------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| Brazilian Portuguese | `semfence/tiny-voca-ptbr`, CC BY 4.0    | `SemFence/dizione-ptbr-js` at `8fbb77e`, Apache-2.0 | lexicon 0.9 MB (CC BY 4.0, from the MFA dictionary)      |
+| Italian              | `OfficinePixel/vocina` v1.0, Apache-2.0 | vocina's `g2p_it.js` at `8dd17b3`, Apache-2.0       | 32 kB of rules, Wiktionary lexicon 0.5 MB (CC BY-SA 4.0) |
+
+**What was checked for the two**
+
+- **Against each project's own reference.** Italian: all of vocina's test vectors without optional readings give
+  the Python reference's ids and stress, and the released model's symbol table gives the same ids. Portuguese: 333
+  of the 341 sample sentences and edge cases agree, four of them texts with nothing to say. Seven that differ
+  contain loanwords or spelled-out acronyms, whose pronunciation the port's last commit changed after the sample
+  was recorded; one has accents stored as separate marks (below).
+- **Through the engine**, with the real models under Node and in Firefox after a download through the settings
+  page: finite audio (6.2 s for "Oi, tudo bem? Paguei R$ 15,50 às 10h30.", 3.1 s for "L'amico arriva alle 14:35,
+  poi parte."), every source word timed, "R$ 15,50" and "14:35" as one span over their expansion.
+- **Accents as separate marks.** Text from a PDF often stores "ã" as "a" and a combining mark. The Portuguese
+  reference then reads "mãe" as "mai". The engine composes the text (NFC) before these two front ends, and the word
+  alignment compares composed words.
+
+**How a front end fits in**
+
+- A front end is a function from text to token ids, stress and the token range of each spoken word
+  (`loadFrontEnd` in [engine/frontends.ts](../engine/frontends.ts)). The Worker sets one up the first time a model
+  names it and keeps it.
+- **Word timing without help from the front end.** Neither new front end says which tokens belong to which word.
+  Both put a pause token or a mark between words, so each run of phones is one spoken word. The words' texts are
+  the words of the front end's own rewritten text ("15,50" already "quinze reais e cinquenta centavos"). When the
+  two counts differ the words are dropped, and only the sentence is highlighted; over 95 % of the reference
+  sentences get their words.
+- The TypeScript front end is reached through an alias given to Vite alone, with hand-written types: `tsc` would
+  otherwise check its sources against this repository's stricter settings.
+- The reader follows the model's language: the bar's warning compares the detected language with the model's, and
+  "only reads English" became "only reads" the model's language. Sentence splitting still uses the English
+  abbreviation list for every language.
+- Size: the package grew from 46.2 MB to 47.8 MB, almost all of it the two lexicons; the Worker script from 148 kB to
+  175 kB.
+
+**The Italian model is on GitHub Releases**, which sends no CORS headers on either hop. The download therefore
+needs host access to `github.com` and to `release-assets.githubusercontent.com`, where it redirects; both are
+requested in the one prompt and given back after the download, like `huggingface.co` (§13). If GitHub moves its
+release files to another host the download will fail until the list is updated. A release tag can be moved, so the
+SHA-256 is what pins the file.
+
+**eSpeak NG (not built).** Spanish, French and several more would follow from shipping eSpeak NG as wasm, which
+their browser demos already do. What was found by reading those projects, without building anything:
+
+- eSpeak NG and its data are GPL-3.0-or-later, so the whole add-on would have to be relicensed.
+- No npm package wraps a tagged release verifiably. The route that fits Mozilla's source rules is a documented build
+  from the 1.52.0 tag in a pinned emscripten container, as `stdevMac/tiny-voca`'s `scripts/build_espeak_wasm.sh`
+  does: about 65 kB of glue, 0.36 MB of wasm and under 1 MB of data per handful of languages **(unverified: the
+  build was not run)**.
+- **The eSpeak NG version matters.** The Spanish model was trained with 1.52.0; the Italian and Brazilian
+  Portuguese eSpeak models with 1.51, and their makers measured 0.5 to 1.2 % of texts differing under 1.52. The
+  French model's version is not stated.
+- Each language still needs its own glue from eSpeak's output to the model's tokens (40 to 80 lines of tables, up
+  to 300 of number and title handling) and a comparison against a native eSpeak NG of the right version.

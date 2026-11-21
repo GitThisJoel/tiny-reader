@@ -104,15 +104,26 @@ Examples: `feat(engine): align spoken words to source text`, `test(e2e): add rea
 The models the add-on can use are listed in [engine/models.ts](engine/models.ts); nothing else can be downloaded.
 To add one:
 
-1. Check that it qualifies: the token table in its `config.json` is the bundled model's (extra tokens the phonemizer
-   never emits are fine), and the ONNX file has the inputs and outputs in [docs/FINDINGS.md](docs/FINDINGS.md) §1 at
-   24 kHz. Do not go by `phonemizer.fingerprint`. Its entry names the text front end it needs (`frontend`); the
-   only one is `dizione`, the bundled English phonemizer. A model for another language needs its front end's code
-   added to the add-on first (`frontEnd` in [engine/engine.ts](engine/engine.ts)): code cannot be downloaded.
+1. Check that it qualifies: the ONNX file has the inputs and outputs in [docs/FINDINGS.md](docs/FINDINGS.md) §1 at
+   24 kHz, and its token table is the one a front end in [engine/frontends.ts](engine/frontends.ts) produces (for an
+   English model: the bundled model's table; extra tokens the phonemizer never emits are fine). Do not go by a
+   fingerprint in the model's own files. The entry names that front end (`frontend`).
 2. Take the commit, size and SHA-256 from `https://huggingface.co/api/models/<repo>?blobs=true` (`sha`, and the
-   file's `size` and `lfs.sha256`). Pin the commit, never a branch.
-3. Run it through `createEngine` (as [tests/smoke/engine.test.ts](tests/smoke/engine.test.ts) does), listen to it,
-   and check its licence allows passing it on.
+   file's `size` and `lfs.sha256`). Pin the commit, never a branch. A model hosted elsewhere needs an address that
+   is as fixed as can be (a release tag), and in `alsoAllow` the sites it redirects to without CORS headers.
+3. Add it to [tests/smoke/languages.test.ts](tests/smoke/languages.test.ts), listen to it, and check its licence
+   allows passing it on.
+
+A new language needs its text front end first. Its code has to ship in the add-on, so it is fetched at a pinned
+commit by [scripts/fetch-assets.ts](scripts/fetch-assets.ts) like the English one, typed in
+[engine/vendor.d.ts](engine/vendor.d.ts) and given a case in `loadFrontEnd`. It must be plain JavaScript or
+TypeScript with no dependencies and no `eval`, under a licence the add-on can carry; add its credit to
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and a comparison with its own reference outputs to
+[tests/parity/frontends.test.ts](tests/parity/frontends.test.ts). [docs/FINDINGS.md](docs/FINDINGS.md) §14 lists
+which community models were looked at and why most cannot be added yet.
+
+`pnpm test:smoke` speaks a sentence with every downloadable model that has a front end of its own. It downloads
+each one once (about 21 MB) into `.cache/models/`, verified like in the add-on.
 
 `pnpm test:e2e` makes a second build in `.output/firefox-mv3-e2e` for
 [tests/e2e/models.test.ts](tests/e2e/models.test.ts): the production build with a stand-in model added to the list

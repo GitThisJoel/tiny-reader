@@ -4,24 +4,34 @@ Tiny Reader is licensed under the Apache License 2.0 ([LICENSE](LICENSE), [NOTIC
 contains the components below, each under its own licence. Inside the add-on these three files are in `licenses/`, and
 the licence texts that come with the model are in `assets/licenses/`.
 
-| Component                                                    | Version                         | Licence                                 | In the add-on as                                                  | Source                                   |
-| ------------------------------------------------------------ | ------------------------------- | --------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------- |
-| tiny-voca model                                              | Hugging Face revision `1e73262` | Apache-2.0, © Muhammed Nazeem           | `assets/model.onnx`                                               | https://huggingface.co/n4ze3m/tiny-voca  |
-| tiny-voca JavaScript phonemizer (dizione)                    | GitHub commit `0eea2be`         | Apache-2.0, © Muhammed Nazeem           | bundled into `engine-worker.js`                                   | https://github.com/n4ze3m/tiny-voca      |
-| Phonemizer data, derived from the CMU Pronouncing Dictionary | Hugging Face revision `1e73262` | BSD-style, © Carnegie Mellon University | `assets/tiny-voca-js.gguf`                                        | https://huggingface.co/n4ze3m/tiny-voca  |
-| Homograph data                                               | Hugging Face revision `1e73262` | Apache-2.0                              | `assets/tiny-voca-js.gguf`                                        | https://huggingface.co/n4ze3m/tiny-voca  |
-| ONNX Runtime Web                                             | 1.31.1                          | MIT, © Microsoft Corporation            | `ort/`, and bundled into `engine-worker.js`                       | https://github.com/microsoft/onnxruntime |
-| pdf.js (`pdfjs-dist`)                                        | 6.5.438                         | Apache-2.0, © Mozilla Foundation        | bundled into the document page, and `assets/pdf.worker.min-*.mjs` | https://github.com/mozilla/pdf.js        |
-| WXT runtime helpers                                          | 0.21.5                          | MIT, © 2023 Aaron                       | a few lines in each script                                        | https://github.com/wxt-dev/wxt           |
+| Component                                                                                 | Version                         | Licence                                                                                     | In the add-on as                                                         | Source                                      |
+| ----------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------- |
+| tiny-voca model                                                                           | Hugging Face revision `1e73262` | Apache-2.0, © Muhammed Nazeem                                                               | `assets/model.onnx`                                                      | https://huggingface.co/n4ze3m/tiny-voca     |
+| tiny-voca JavaScript phonemizer (dizione)                                                 | GitHub commit `0eea2be`         | Apache-2.0, © Muhammed Nazeem                                                               | bundled into `engine-worker.js`                                          | https://github.com/n4ze3m/tiny-voca         |
+| Phonemizer data, derived from the CMU Pronouncing Dictionary                              | Hugging Face revision `1e73262` | BSD-style, © Carnegie Mellon University                                                     | `assets/tiny-voca-js.gguf`                                               | https://huggingface.co/n4ze3m/tiny-voca     |
+| Homograph data                                                                            | Hugging Face revision `1e73262` | Apache-2.0                                                                                  | `assets/tiny-voca-js.gguf`                                               | https://huggingface.co/n4ze3m/tiny-voca     |
+| dizione-ptbr in TypeScript (Brazilian Portuguese front end)                               | GitHub commit `8fbb77e`         | Apache-2.0, © 2026 SemFence (Gustavo Toledo)                                                | bundled into `engine-worker.js`                                          | https://github.com/SemFence/dizione-ptbr-js |
+| Brazilian Portuguese lexicon, derived from the Portuguese (Brazil) MFA dictionary v2.0.0a | GitHub commit `8fbb77e`         | CC BY 4.0, Michael McAuliffe and Morgan Sonderegger; changes by SemFence (Gustavo Toledo)   | `assets/dizione-ptbr/lexicon.tsv`, `assets/dizione-ptbr/open_table.json` | https://github.com/SemFence/dizione-ptbr-js |
+| vocina `g2p_it` (Italian front end) and its data                                          | GitHub commit `8dd17b3`         | Apache-2.0, OfficinePixel                                                                   | bundled into `engine-worker.js`, `assets/g2p-it/dati.json`               | https://github.com/OfficinePixel/vocina     |
+| Italian pronunciation lexicon from the English Wiktionary                                 | GitHub commit `8dd17b3`         | CC BY-SA 4.0, Wiktionary contributors, extracted with kaikki.org (wiktextract) and WikiPron | `assets/g2p-it/lessico_wikizionario.json`                                | https://github.com/OfficinePixel/vocina     |
+| ONNX Runtime Web                                                                          | 1.31.1                          | MIT, © Microsoft Corporation                                                                | `ort/`, and bundled into `engine-worker.js`                              | https://github.com/microsoft/onnxruntime    |
+| pdf.js (`pdfjs-dist`)                                                                     | 6.5.438                         | Apache-2.0, © Mozilla Foundation                                                            | bundled into the document page, and `assets/pdf.worker.min-*.mjs`        | https://github.com/mozilla/pdf.js           |
+| WXT runtime helpers                                                                       | 0.21.5                          | MIT, © 2023 Aaron                                                                           | a few lines in each script                                               | https://github.com/wxt-dev/wxt              |
 
 All of these are used unmodified. The text-layer rules in `entrypoints/document/style.css` are taken from pdf.js's
 `pdf_viewer.css`.
 
 ## Licence texts
 
-- **Apache License 2.0** (tiny-voca, homograph data, pdf.js): the same text as [LICENSE](LICENSE). The copies that come
+- **Apache License 2.0** (tiny-voca, homograph data, dizione-ptbr, vocina, pdf.js): the same text as [LICENSE](LICENSE). The copies that come
   with the model are in `assets/licenses/tiny-voca.LICENSE.txt` and `assets/licenses/homograph-data.LICENSE.txt`.
 - **CMU Pronouncing Dictionary**: `assets/licenses/cmudict.LICENSE.txt`.
+- **dizione-ptbr**: its notice is `assets/licenses/dizione-ptbr.NOTICE.txt`. The lexicon's licence and the changes
+  made to the MFA dictionary are in `assets/licenses/dizione-ptbr-lexicon.LICENSE.md`; the text of CC BY 4.0 is at
+  https://creativecommons.org/licenses/by/4.0/legalcode.
+- **vocina**: its notice, which lists what it changed in tiny-voca and credits the Wiktionary lexicon, is
+  `assets/licenses/vocina.NOTICE.txt`. The lexicon stays under CC BY-SA 4.0, whose text is at
+  https://creativecommons.org/licenses/by-sa/4.0/legalcode; the rest of the add-on is not under that licence.
 - **ONNX Runtime**: the MIT License below. Its WebAssembly binary contains further libraries, listed in
   `ThirdPartyNotices.txt` in its repository.
 - **WXT**: the MIT License below, with "Copyright (c) 2023 Aaron" in place of Microsoft's line.

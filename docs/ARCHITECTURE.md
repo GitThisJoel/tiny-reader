@@ -27,7 +27,7 @@ flowchart LR
 
   subgraph worker["Engine Worker"]
     direction TB
-    phonemizer["Phonemizer<br/>dizione"]
+    phonemizer["Text front end<br/>one per language"]
     model["tiny-voca, or a downloaded model<br/>ONNX Runtime Web, wasm"]
     align["Word alignment"]
     phonemizer --> model --> align
@@ -66,6 +66,9 @@ flowchart LR
 - **Engine Worker** ([entrypoints/engine-worker.ts](../entrypoints/engine-worker.ts), [engine/](../engine/)): one request is
   one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
+- **Front ends** ([engine/frontends.ts](../engine/frontends.ts)): text to phoneme tokens, one per language: English
+  (dizione), Brazilian Portuguese (dizione-ptbr) and Italian (vocina's `g2p_it`). Their code is in the package; each
+  model names the one it needs, and a front end is set up the first time a model asks for it.
 - **Models** ([engine/models.ts](../engine/models.ts), [engine/model-store.ts](../engine/model-store.ts),
   [engine/loader.ts](../engine/loader.ts)): the list of models the add-on can use. The first ships in the package;
   the others are downloaded from the settings page, verified against the list and kept in IndexedDB, where the
