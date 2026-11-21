@@ -461,7 +461,7 @@ add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es
   numbers and dates, 79 % of the Spanish spoken words are matched to a word.
 - **Other scripts are not skipped.** eSpeak NG names the letters of text it cannot read, as it did when the models
   were trained, so these two front ends never report "nothing to pronounce" for Japanese or Cyrillic text.
-- Size: the package is 48.7 MB, the Worker script 232 kB.
+- Size after Spanish and French: the package 48.7 MB, the Worker script 232 kB.
 
 **German** (`apptor/apptor-tiny-tts`) needs no eSpeak NG: its makers trained a letter-to-sound model on eSpeak
 NG's readings and wrote the front end in JavaScript.
@@ -483,9 +483,38 @@ NG's readings and wrote the front end in JavaScript.
   say that without it the voice is "noticeably buzzy". Tiny Reader plays the model's own output.
 - The Austrian model of the same makers has one more input (`accent`) and is not in the list.
 
-**What is left of the survey.** With eSpeak NG in the package, a model trained on its output needs its dictionary
-in the build, its front-end code and a reference. Candidates, none of them done: Turkish (`erkint/zerre-tts`),
-Bengali (`Xeven7/tiny-swara`) and Malayalam (`Cyrax321/tui-voice-mini-ml`) have only Python front ends (200 to 500
-lines each to port, eSpeak NG versions not pinned); a second Italian and a second Brazilian Portuguese model were
-trained on eSpeak NG 1.51, not the version built. Russian, Polish, Japanese, Arabic, Hebrew, Korean, Urdu, Greek,
-Hindi, Swahili, Kurdish and Sanskrit stay out for the reasons at the top of this section.
+**Turkish, Bengali and Malayalam** came with no JavaScript front end, only Python. Their front ends are ported
+here, which the first six languages did not need.
+
+- **Turkish** (`erkint/zerre-tts`) and **Bengali** (`Xeven7/tiny-swara`) use tiny-voca's own `text.py` with other
+  tables. [engine/espeak-text.ts](../engine/espeak-text.ts) is one port of it, with a profile per language. Bengali
+  adds a word list: an English word it knows is read from its Bengali spelling, any other by eSpeak NG's American
+  English voice, so that front end runs two voices.
+- **Malayalam** (`Cyrax321/tui-voice-mini-ml`) has a front end of its makers' own. The model keeps the English
+  model's 76 token slots and gives those Malayalam has no use for to Malayalam sounds;
+  [engine/malayalam.ts](../engine/malayalam.ts) ports that mapping. It uses no stress, and its makers run it with
+  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`). The model has
+  two voice slots; its makers name data for one, and only that one is offered.
+- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 22
+  Malayalam sentences (the makers' own example prompts), from the same fixture run as Spanish and French.
+- **The published fingerprint checks the tables.** A model's `frontend_fingerprint` is a hash of its symbols and
+  fallback table. The Turkish profile reproduces the model's. The Bengali one reproduces what tiny-swara's own
+  `text.py` computes from its published tables, but **the model's description carries another fingerprint**: its
+  fallback table for foreign sounds changed after the release. The symbols agree.
+- **eSpeak NG versions.** zerre-tts's tables mention 1.52; tiny-swara says "1.5x"; tui-voice says nothing. None is
+  pinned, so the caution about French applies to all three **(unverified)**.
+- **Firefox's word segmenter says `isWordLike: false` for a word that ends in a combining mark**, which is most
+  Bengali and Malayalam words (Node says true). Word timing lost those words in Firefox only. A segment now counts
+  as a word when it has a letter or a digit.
+- The Malayalam project is inconsistent in places: its API example calls functions its code does not have. What is
+  ported is the path its training script and `speak.py` take. Its makers call the model experimental. Its GitHub
+  repository states Apache-2.0 in the README but has no licence file.
+- The Bengali voice came out quiet in the checks (peak 0.2 to 0.3 where the others reach 0.8).
+- In Firefox: all three downloaded through the settings page and spoke, every word of the test sentences timed.
+- eSpeak NG's data pack is now 569 kB (Spanish, French, Turkish, Bengali, Malayalam, English); the package is
+  48.9 MB, the Worker script 266 kB.
+
+**What is left of the survey.** A second Italian and a second Brazilian Portuguese model were trained on eSpeak NG
+1.51, not the version built, and their languages are covered. Russian, Polish, Japanese, Arabic, Hebrew, Korean,
+Urdu, Greek, Hindi, Swahili, Kurdish and Sanskrit stay out for the reasons at the top of this section: licences of
+the models themselves, missing ONNX files, missing front ends, or input the reader cannot supply.

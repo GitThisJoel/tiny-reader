@@ -133,8 +133,10 @@ TypeScript with no dependencies and no `eval`, under a licence the add-on can ca
 which community models were looked at and why most cannot be added yet.
 
 A language whose model was trained on eSpeak NG's output needs three things: its dictionary in `LANGS` in
-[scripts/build-espeak.sh](scripts/build-espeak.sh), the model's own JavaScript port of tiny-voca's `text.py`
-(fetched and given to `espeakFrontEnd`), and a reference: add its Python front end to `REFERENCES` in that script
+[scripts/build-espeak.sh](scripts/build-espeak.sh), tiny-voca's `text.py` for that language, and a reference. For
+`text.py`, take the model's own JavaScript port where there is one (fetched and given to `espeakFrontEnd`);
+otherwise write a profile for this repository's port, [engine/espeak-text.ts](engine/espeak-text.ts), from the
+project's tables, and test that it reproduces the fingerprint the model publishes. For the reference: add its Python front end to `REFERENCES` in that script
 and sentences to [tests/parity/espeak-sentences.json](tests/parity/espeak-sentences.json), then run
 `pnpm build-espeak --fixtures`. That runs the Python front end with a native eSpeak NG from the same source and
 writes `tests/parity/espeak-<language>.json`, which `pnpm test:parity` compares the JavaScript side with. Check

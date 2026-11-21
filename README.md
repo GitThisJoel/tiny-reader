@@ -2,7 +2,7 @@
 
 A Firefox add-on (Manifest V3) that reads web page text aloud with the
 [tiny-voca](https://github.com/n4ze3m/tiny-voca) text-to-speech model, in English and with downloaded models in
-Brazilian Portuguese, Italian, Spanish, French and German, and highlights what is
+eight more languages, and highlights what is
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
 leaves the machine. The add-on makes two kinds of network request, each only when you ask for it:
 downloading a PDF from the web so that it can read it to you, and downloading another voice from
@@ -50,15 +50,18 @@ Hugging Face.
 - More voices and languages: the English tiny-voca model with its two voices is built in. Under **More voices** in the
   settings (**Get more voices…** in the popup leads there) you can download others made from it, about 21 MB each:
 
-  | Model                                                             | Language             | By                        | Licence    |
-  | ----------------------------------------------------------------- | -------------------- | ------------------------- | ---------- |
-  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)       | English              | PatnaikAshish             | Apache-2.0 |
-  | [fiato](https://huggingface.co/cfahlgren1/fiato)                  | English              | cfahlgren1                | Apache-2.0 |
-  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)  | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
-  | [vocina](https://github.com/OfficinePixel/vocina)                 | Italian              | OfficinePixel             | Apache-2.0 |
-  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)   | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
-  | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr) | French               | DanielSuncost             | Apache-2.0 |
-  | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)  | German               | apptor                    | Apache-2.0 |
+  | Model                                                                  | Language             | By                        | Licence    |
+  | ---------------------------------------------------------------------- | -------------------- | ------------------------- | ---------- |
+  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)            | English              | PatnaikAshish             | Apache-2.0 |
+  | [fiato](https://huggingface.co/cfahlgren1/fiato)                       | English              | cfahlgren1                | Apache-2.0 |
+  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)       | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
+  | [vocina](https://github.com/OfficinePixel/vocina)                      | Italian              | OfficinePixel             | Apache-2.0 |
+  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)        | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
+  | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr)      | French               | DanielSuncost             | Apache-2.0 |
+  | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)       | German               | apptor                    | Apache-2.0 |
+  | [zerre-tts](https://huggingface.co/erkint/zerre-tts)                   | Turkish              | erkint                    | Apache-2.0 |
+  | [tiny-swara](https://huggingface.co/Xeven7/tiny-swara)                 | Bengali              | Xeven7                    | Apache-2.0 |
+  | [tui-voice-mini-ml](https://huggingface.co/Cyrax321/tui-voice-mini-ml) | Malayalam            | Cyrax321                  | Apache-2.0 |
 
   Press **Download** and accept Firefox's permission prompt; the file comes from the model's own page, is checked
   against a fingerprint Tiny Reader carries, and is kept on your computer until you press **Delete**. Then choose it
@@ -130,16 +133,19 @@ does not extend to such frames.
 
 ## Limits
 
-- English, Brazilian Portuguese, Italian, Spanish, French and German, each with a model of its own; all but English
-  have to be downloaded. Text that Firefox's local language detector identifies as another language than the model's gets
-  a warning in the bar and is read anyway, with the wrong sounds. Text in a script the model cannot read is skipped
-  by the English, Portuguese and Italian models; the Spanish and French ones name its letters instead. Nobody has
-  listened to the downloadable models in full: they were checked by numbers and against their makers' reference
-  outputs.
+- Nine languages, each with a model of its own: English, Brazilian Portuguese, Italian, Spanish, French, German,
+  Turkish, Bengali and Malayalam. All but English have to be downloaded. Text that Firefox's local language
+  detector identifies as another language than the model's gets a warning in the bar and is read anyway, with the
+  wrong sounds. Text in a script the model cannot read is skipped by the English, Portuguese, Italian and German
+  models; the others, which use eSpeak NG, name its letters instead.
+- Nobody has listened to the downloadable models in full. They were checked by numbers and against their makers'
+  reference outputs. For Turkish, Bengali and Malayalam the code that prepares the text is Tiny Reader's own port
+  of each project's Python code, which is not in JavaScript; it gives the same output on every test sentence. The
+  Malayalam model is called experimental by its makers and has one voice.
 - The German download is 34 MB: the voice and a second model that works out how words are pronounced. Its makers
   recommend a further 17 MB sound filter, which Tiny Reader does not use; without it they call the voice clear but
   noticeably buzzy.
-- In Spanish and French, a number, date or amount is highlighted together with the words around it, up to the next
+- In Spanish, French, Turkish, Bengali and Malayalam, a number, date or amount is highlighted together with the words around it, up to the next
   comma or full stop, not word by word.
 - Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
   addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. The toolbar button then shows a "!"
@@ -184,9 +190,12 @@ with its source. The licence follows from eSpeak NG, which is part of the add-on
   lexicon: CC BY 4.0, derived from the Portuguese (Brazil) MFA dictionary by Michael McAuliffe and Morgan Sonderegger
 - Italian front end (vocina's `g2p_it`): Apache-2.0, OfficinePixel. Its Wiktionary lexicon: CC BY-SA 4.0, Wiktionary
   contributors
-- eSpeak NG 1.52.0, as WebAssembly, for Spanish and French: GPL-3.0-or-later, © the eSpeak NG authors
+- eSpeak NG 1.52.0, as WebAssembly, for Spanish, French, Turkish, Bengali and Malayalam: GPL-3.0-or-later, © the
+  eSpeak NG authors
 - Spanish and French front ends (from tiny-voca-es and tiny-voca-fr): Apache-2.0, stdevMac and DanielSuncost
 - German front end (from apptor-tiny-tts): Apache-2.0, apptor
+- Turkish, Bengali and Malayalam: tables and rules from zerre-tts (erkinemreta1), tiny-swara (Xeven7) and tui-voice
+  (Cyrax321), all Apache-2.0, in Tiny Reader's port of their front ends
 
 The models that can be downloaded are not part of the add-on; they are fetched from their makers' pages when you
 ask for them, under the licences in the table above. tiny-voca-ptbr is CC BY 4.0: credit SemFence (Gustavo Toledo).
