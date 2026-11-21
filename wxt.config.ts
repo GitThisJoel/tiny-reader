@@ -8,6 +8,9 @@ export default defineConfig({
   browser: "firefox",
   manifestVersion: 3,
   imports: false,
+  // The end-to-end tests make a build of their own with a stand-in voice model in the list
+  // (tests/e2e/models.test.ts, engine/models.ts). It goes beside the real build, not over it.
+  outDirTemplate: process.env.VITE_E2E_MODEL ? "firefox-mv3-e2e" : undefined,
   // Upstream's JS phonemizer, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
   alias: { "tiny-voca": "vendor/tiny-voca/js" },
   // The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
@@ -39,8 +42,9 @@ export default defineConfig({
     action: { default_title: "Tiny Reader", default_icon: "icon.svg" },
     // Each permission is justified in the README.
     permissions: ["activeTab", "scripting", "menus", "storage"],
-    // Never granted at install. Asked for one site at a time, when the user opens a PDF from that
-    // site in the add-on's document page, so that the add-on can download it.
+    // Never granted at install. Asked for one site at a time: when the user opens a PDF from that
+    // site in the add-on's document page, so that the add-on can download it, and for
+    // huggingface.co while a voice model is downloaded from the settings page.
     optional_host_permissions: ["*://*/*"],
     // Defaults only; every key can be changed in Firefox's "Manage Extension Shortcuts".
     commands: {

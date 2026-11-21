@@ -1,6 +1,8 @@
-// A local web site for the end-to-end tests: a plain page and one with a strict CSP.
-import { createServer, type Server } from "node:http";
+// A local web site for the end-to-end tests: a plain page, one with a strict CSP, PDFs, and a
+// stand-in voice model to download.
+import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { standInModel } from "../stand-in-model.ts";
 import { buildPdf } from "./pdf.ts";
 
 const PAGE = `<!doctype html>
@@ -48,12 +50,29 @@ ${Array.from(
 </article>
 </html>`;
 
+/** Served at /stand-in.onnx, as Hugging Face serves a model: to any origin. */
+export const STAND_IN = standInModel();
+
 export async function startSite(): Promise<{
   url: string;
   strictUrl: string;
+  /** The headers of every request for the stand-in model. */
+  modelRequests: IncomingHttpHeaders[];
+  /** While true, the stand-in model is served with one byte changed. */
+  tamper: boolean;
   close(): void;
 }> {
+  const modelRequests: IncomingHttpHeaders[] = [];
   const server: Server = createServer((request, response) => {
+    if (request.url === "/stand-in.onnx") {
+      modelRequests.push(request.headers);
+      const file = Uint8Array.from(STAND_IN);
+      if (site.tamper) file[file.length - 1] = (file.at(-1) ?? 0) ^ 1;
+      response
+        .writeHead(200, { "content-type": "application/octet-stream", "access-control-allow-origin": "*" })
+        .end(file);
+      return;
+    }
     const headers: Record<string, string> = {
       "content-type": "text/html; charset=utf-8",
     };
@@ -78,9 +97,12 @@ export async function startSite(): Promise<{
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
-  return {
+  const site = {
     url: `http://127.0.0.1:${port}/`,
     strictUrl: `http://127.0.0.1:${port}/strict`,
+    modelRequests,
+    tamper: false,
     close: () => server.close(),
   };
+  return site;
 }

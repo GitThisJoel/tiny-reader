@@ -36,17 +36,19 @@ export class Firefox {
   private pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
   private current = "";
 
-  /** Starts Firefox with the built add-on. `extraPrefs` are set on top of the test profile's own. */
-  static async launch(extraPrefs: Record<string, unknown> = {}): Promise<Firefox> {
+  /**
+   * Starts Firefox with the built add-on. `extraPrefs` are set on top of the test profile's own.
+   * `build` is the build's folder in `.output`.
+   */
+  static async launch(extraPrefs: Record<string, unknown> = {}, build = "firefox-mv3"): Promise<Firefox> {
     const firefox = new Firefox();
-    await firefox.start(extraPrefs);
+    await firefox.start(extraPrefs, join(ROOT, ".output", build));
     return firefox;
   }
 
-  private async start(extraPrefs: Record<string, unknown>) {
+  private async start(extraPrefs: Record<string, unknown>, build: string) {
     const binary = BINARIES.find((path) => path && existsSync(path));
     if (!binary) throw new Error("Firefox not found. Set FIREFOX to the binary.");
-    const build = join(ROOT, ".output/firefox-mv3");
     if (!existsSync(join(build, "manifest.json"))) throw new Error("No build found. Run `pnpm build` first.");
     this.profile = await mkdtemp(join(tmpdir(), "tiny-reader-e2e-"));
     const prefs: Record<string, unknown> = {
@@ -176,6 +178,23 @@ export class Firefox {
     } finally {
       await this.send("Marionette:SetContext", { value: "content" });
     }
+  }
+
+  /** Waits for Firefox's own permission prompt, answers it, and returns what it said. */
+  answerPrompt(answer: "allow" | "refuse"): Promise<string> {
+    return this.chrome<string>(
+      `for (let tries = 0; tries < 80; tries++) {
+         const prompt = PopupNotifications.panel.firstElementChild;
+         if (PopupNotifications.panel.state === "open" && prompt) {
+           const text = prompt.textContent;
+           (arguments[0] === "allow" ? prompt.button : prompt.secondaryButton).click();
+           return text;
+         }
+         await new Promise((resolve) => setTimeout(resolve, 100));
+       }
+       return "no permission prompt appeared";`,
+      [answer],
+    );
   }
 
   /** Marionette's id for the first element matching `selector`. */

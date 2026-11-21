@@ -43,21 +43,7 @@ const lines = (tab: string) =>
   );
 const OPENED = `return !document.getElementById("start").disabled;`;
 
-/** Waits for Firefox's own permission prompt, answers it, and returns what it said. */
-const answerPrompt = (answer: "allow" | "refuse") =>
-  firefox.chrome<string>(
-    `for (let tries = 0; tries < 80; tries++) {
-       const prompt = PopupNotifications.panel.firstElementChild;
-       if (PopupNotifications.panel.state === "open" && prompt) {
-         const text = prompt.textContent;
-         (arguments[0] === "allow" ? prompt.button : prompt.secondaryButton).click();
-         return text;
-       }
-       await new Promise((resolve) => setTimeout(resolve, 100));
-     }
-     return "no permission prompt appeared";`,
-    [answer],
-  );
+const answerPrompt = (answer: "allow" | "refuse") => firefox.answerPrompt(answer);
 
 const shown = (popup: string) =>
   firefox.evaluateBehind<{
