@@ -41,18 +41,23 @@ document.getElementById("read")?.addEventListener("click", async () => {
 });
 
 // Where the page cannot be read in place, say so at once and offer the way that works.
-browser.runtime.sendMessage({ type: PAGE_STATE }).then((state: PageState) => {
-  document.body.dataset.page = state.kind;
-  if (state.kind === "readable") return;
-  warn(state.kind === "pdf" ? PDF_BLOCKED : BLOCKED);
-  if (state.kind !== "pdf") return;
-  const open = document.createElement("button");
-  open.type = "button";
-  open.id = "open-pdf";
-  open.textContent = "Open this PDF in Tiny Reader…";
-  open.addEventListener("click", () => void openDocumentPage(state));
-  hint.after(open);
-});
+// With no answer the controls stay as they are, and Read aloud says why if it fails.
+const pageState: Promise<PageState> = browser.runtime.sendMessage({ type: PAGE_STATE });
+void pageState
+  .catch(() => null)
+  .then((state) => {
+    if (!state) return;
+    document.body.dataset.page = state.kind;
+    if (state.kind === "readable") return;
+    warn(state.kind === "pdf" ? PDF_BLOCKED : BLOCKED);
+    if (state.kind !== "pdf") return;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.id = "open-pdf";
+    open.textContent = "Open this PDF in Tiny Reader…";
+    open.addEventListener("click", () => void openDocumentPage(state));
+    hint.after(open);
+  });
 
 document.getElementById("controls")?.append(
   iconButton("previous", "Previous sentence", () => void send("previous")),
