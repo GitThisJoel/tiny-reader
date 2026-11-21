@@ -5,7 +5,7 @@ tested with code unless marked **(unverified)**. It explains choices that look o
 the background page, why PDFs get a page of their own, why Firefox 140.
 
 Checked 2026-11-19 to 2026-11-21 with Node 22.22.1, Firefox 158.0.1 (Linux x86-64, headless), onnxruntime-web 1.31.1
-and pdf.js 6.5.438. Nothing in the automated runs was listened to.
+and pdf.js 6.5.438. Nothing in the automated runs was listened to, the downloadable voices of §13 included.
 
 Pinned sources:
 
@@ -275,3 +275,100 @@ size becomes a goal, upstream's block-scaled Q8 weights are the better route and
   shortcut's `<key>` element, which fails unless that exact shortcut is registered.
 - `web-ext lint`: no errors, four accepted warnings. One is that `strict_min_version` 140 predates Firefox for
   Android 142 (the add-on is desktop only); three are inside ONNX Runtime and pdf.js.
+
+## 13. Extra voices
+
+Other models of the tiny-voca family can be downloaded from a list kept in the add-on
+([engine/models.ts](../engine/models.ts)). The bundled model stays in every release.
+
+**Which models**
+
+- A model can be listed only if it works with the engine and the bundled English phonemizer unchanged: the same
+  token table, the inputs and outputs of §1, 24 kHz. Text-to-phoneme code for another language would have to ship
+  inside the add-on; it cannot be downloaded, because that would be remote code.
+- A check on 2026-11-21 of the 34 community models linked from the tiny-voca README found two that qualify, both
+  Apache-2.0 and both a 21 MB float32 ONNX file. Through `createEngine` under Node each gave finite audio and 14 word
+  timings for a test sentence.
+
+  | Model                     | Voices | Hugging Face revision                      | `onnx/model.onnx`                     |
+  | ------------------------- | ------ | ------------------------------------------ | ------------------------------------- |
+  | `PatnaikAshish/SobbieTTS` | F, M   | `6b6132c6d34b5fc163d8f5553580678a60532ac3` | 21,386,372 bytes, SHA-256 `eafb38b7…` |
+  | `cfahlgren1/fiato`        | F1, M1 | `967de50b6a9ab673ef7de9f8f276fa93a8c0db81` | 21,388,682 bytes, SHA-256 `179df2e1…` |
+
+- SobbieTTS has the original's token table. fiato has the same 76 tokens at the same ids plus three more (sigh,
+  exhale, gasp) that the phonemizer never emits, so those sounds are not used.
+- **`phonemizer.fingerprint` in a model's `config.json` cannot be trusted**: one model claimed the original's
+  fingerprint with a different token table. Models are admitted by comparing the table itself.
+- **Each list entry names the text front end it needs** (`frontend`), and the list in this repository is the
+  authority for it, for the reason above. There is one front end today, `dizione`, the bundled English phonemizer,
+  and all three entries name it. The engine picks the front end by that name and refuses a model whose front end it
+  does not have, before loading the file; the bundled model then reads, with the notice described below.
+- What that leaves open for another language: a front end's **code** must ship in the add-on (no remote code), so a
+  new language is a new release with its front end and list entries that name it. A front end's **data**, such as a
+  pronunciation dictionary, is data like model weights and could be downloaded the same way. Neither is built: no
+  interface for front ends, no downloadable front-end data.
+- The sizes and SHA-256 values are the ones Hugging Face publishes for the files
+  (`https://huggingface.co/api/models/<repo>?blobs=true`); a download of SobbieTTS from Firefox hashed to the same.
+
+**Is a download allowed?** Mozilla's Add-on Policies (last updated 2026-10-20) and the revision announced for
+2026-12-01 say the same in "Development Practices": "Add-ons must be self-contained and not load remote code for
+execution", and "Add-ons must use encryption when transporting data remotely." About other files: "If external
+resources are used in combination with add-on code, the functionality of the code must not be obscured." Nothing
+forbids fetching data. Model weights are data: ONNX Runtime, which is in the package, reads them, and no script or
+wasm is fetched. The policy does not define "remote code", so a reviewer has the last word **(unverified: not
+submitted yet)**. The request is `https`, started by a click, and described in the README.
+
+**The request**
+
+- `https://huggingface.co/<repo>/resolve/<revision>/onnx/model.onnx` answers `302` to a signed address on
+  `us.aws.cdn.hf.co`. Both answers carry CORS headers, so **the download works from an add-on page with no host
+  permission at all** (21 MB in 1.5 s on the test connection).
+- **The permission is asked for anyway, because of one header.** Measured with a local server: without host access
+  Firefox sends `Origin: moz-extension://<uuid>` on the first request, and that uuid is made up per installation,
+  so it would tell one user's downloads apart. With host access to the first host there is no `Origin` header; the
+  redirected request carries `Origin: null` either way. `credentials: "omit"` keeps cookies out. An end-to-end test
+  checks that the request has no `Cookie`, `Authorization`, `Origin` or `Referer`.
+- The access is requested in the click on Download and removed when that download ends, unless it was held before
+  (granted earlier for a PDF on that site). Firefox's prompt reads "Access your data for sites in huggingface.co
+  domains". Verified by clicking through the real prompt: accepted and refused in the settings page opened in a
+  tab, and accepted where it is embedded in `about:addons`, with a real download from Hugging Face.
+- **Not in the toolbar popup.** A popup closes when it loses focus, which a permission prompt causes, and a
+  download would die with it. The popup offers the downloaded models and a link to the settings.
+
+**Verifying and storing**
+
+- A download is kept in memory, never more than the size the list pins, and stored only if its length and SHA-256
+  match. Tested end to end with a file that has one byte changed: nothing is stored.
+- **Storage: IndexedDB.** Tried with a throwaway add-on, writing 21 MB in a page and reading it elsewhere:
+
+  | Storage                                 | Add-on page | Background page | Worker started by it |
+  | --------------------------------------- | ----------- | --------------- | -------------------- |
+  | IndexedDB, as a `Blob`                  | works       | works           | works, read in 36 ms |
+  | IndexedDB, as an `ArrayBuffer`          | works       | works           | works                |
+  | OPFS (`navigator.storage.getDirectory`) | works       | works           | works                |
+
+  Both would do. IndexedDB was taken: the same few lines in the page and in the Worker, and a `Blob` is kept as a
+  file by Firefox. `storage.local` is not meant for 21 MB values.
+- `navigator.storage.persisted()` is false, so Firefox may evict the models when the disk is short. `unlimitedStorage`
+  would prevent that and was not added: it is one more permission, and a model that is gone is handled.
+
+**Using a model**
+
+- The model's id travels with every request (`SynthOptions.model`). The Worker has no `browser.storage`, and this
+  way a change of model needs no other message.
+- Before a model is used, its inputs and outputs are compared with §1, by name and type
+  (`InferenceSession.inputMetadata`). A stand-in model with one input renamed is refused.
+- **Fallback.** A model that is not in storage, cannot be loaded, or needs a front end the build lacks is replaced by
+  the bundled one, and every
+  result made that way carries a notice that the control bar shows. A missing file is looked for again with each
+  sentence (cheap), so a model downloaded again is used at once; a file that failed to load is not tried again
+  until the Worker restarts. The settings form offers only models that are in storage, and deleting the chosen
+  model chooses the bundled one.
+- One model is in memory at a time; switching releases the session first. In Firefox, the test sentence came out as
+  2.57 s of audio with SobbieTTS and 2.94 s with fiato, 9 word timings each.
+
+**Testing.** No test file can pass for a listed model, since each is pinned to a hash. The end-to-end test
+([tests/e2e/models.test.ts](../tests/e2e/models.test.ts)) therefore makes a second production build with one more
+list entry, given in `VITE_E2E_MODEL`: a 687-byte ONNX file with the right inputs and outputs, written out by hand
+([tests/stand-in-model.ts](../tests/stand-in-model.ts)) and served by the local test site. The normal build has no
+trace of it.

@@ -99,6 +99,25 @@ Scopes in use: `engine`, `content`, `highlight`, `options`, `e2e`, `parity`, `as
 Examples: `feat(engine): align spoken words to source text`, `test(e2e): add reading tests on strict-CSP pages`,
 `docs: document the pre-commit hook`.
 
+## Voice models
+
+The models the add-on can use are listed in [engine/models.ts](engine/models.ts); nothing else can be downloaded.
+To add one:
+
+1. Check that it qualifies: the token table in its `config.json` is the bundled model's (extra tokens the phonemizer
+   never emits are fine), and the ONNX file has the inputs and outputs in [docs/FINDINGS.md](docs/FINDINGS.md) §1 at
+   24 kHz. Do not go by `phonemizer.fingerprint`. Its entry names the text front end it needs (`frontend`); the
+   only one is `dizione`, the bundled English phonemizer. A model for another language needs its front end's code
+   added to the add-on first (`frontEnd` in [engine/engine.ts](engine/engine.ts)): code cannot be downloaded.
+2. Take the commit, size and SHA-256 from `https://huggingface.co/api/models/<repo>?blobs=true` (`sha`, and the
+   file's `size` and `lfs.sha256`). Pin the commit, never a branch.
+3. Run it through `createEngine` (as [tests/smoke/engine.test.ts](tests/smoke/engine.test.ts) does), listen to it,
+   and check its licence allows passing it on.
+
+`pnpm test:e2e` makes a second build in `.output/firefox-mv3-e2e` for
+[tests/e2e/models.test.ts](tests/e2e/models.test.ts): the production build with a stand-in model added to the list
+through the `VITE_E2E_MODEL` variable. Nothing else sets that variable.
+
 ## Phonemizer parity
 
 Text is turned into phoneme ids by upstream's JavaScript port of the

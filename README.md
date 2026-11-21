@@ -3,8 +3,9 @@
 A Firefox add-on (Manifest V3) that reads web page text aloud with the
 [tiny-voca](https://github.com/n4ze3m/tiny-voca) text-to-speech model and highlights what is
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
-leaves the machine. The add-on makes one kind of network request, and only when you ask for it:
-downloading a PDF from the web so that it can read it to you.
+leaves the machine. The add-on makes two kinds of network request, each only when you ask for it:
+downloading a PDF from the web so that it can read it to you, and downloading another voice from
+Hugging Face.
 
 <p align="center">
   <img src="docs/screenshots/web-page.png" width="800" alt="A web page being read: the sentence is highlighted in yellow, the word being spoken in a darker colour, and a small control bar sits at the bottom of the page.">
@@ -16,7 +17,7 @@ downloading a PDF from the web so that it can read it to you.
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
 
   <p align="center">
-    <img src="docs/screenshots/popup.png" width="300" alt="The toolbar popup: a Read aloud button, buttons for previous, pause, next and stop, and the settings for voice, speed, pitch and expressiveness.">
+    <img src="docs/screenshots/popup.png" width="300" alt="The toolbar popup: a Read aloud button, buttons for previous, pause, next and stop, and the settings for model, voice, speed, pitch and expressiveness.">
   </p>
 
 - To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
@@ -43,8 +44,16 @@ downloading a PDF from the web so that it can read it to you.
 - <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> pauses and resumes, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>
   stops. Next and previous sentence have commands without default keys. All keys can be changed in
   Firefox under Add-ons and themes → gear menu → Manage Extension Shortcuts.
-- Settings (add-on's Preferences): voice, speed, pitch, expressiveness (pitch range) and how many
+- Settings (add-on's Preferences): model, voice, speed, pitch, expressiveness (pitch range) and how many
   sentences are prepared ahead. Speed and voice chosen in the bar are remembered too.
+- More voices: the tiny-voca model with its two voices is built in. Under **More voices** in the settings (**Get more
+  voices…** in the popup leads there) you can download other English models made from it,
+  [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS) and [fiato](https://huggingface.co/cfahlgren1/fiato),
+  about 21 MB each, both under the Apache-2.0 licence. Press **Download** and accept Firefox's permission prompt; the
+  file comes from huggingface.co, is checked against a fingerprint Tiny Reader carries, and is kept on your computer
+  until you press **Delete**. Then choose it under **Model**. Only the models in this list can be downloaded: the
+  list is part of the add-on ([engine/models.ts](engine/models.ts)). If a downloaded model is ever missing or
+  unusable, the built-in one reads instead and the control bar says so.
 
 ## Trying it
 
@@ -82,9 +91,20 @@ add-on is removed when Firefox closes; load it again after a restart.
 
 One optional permission is asked for at runtime, never at install:
 
-| Optional permission                              | Why                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Access to one site (`optional_host_permissions`) | Requested when you open a PDF from that site in the Tiny Reader page, so the add-on can download the file. It is used for that download only; the add-on still injects nothing into the site's pages unless you start a reading there. You can withdraw it under the add-on's Permissions in `about:addons`. |
+| Optional permission                              | Why                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Access to one site (`optional_host_permissions`) | Requested when you open a PDF from that site in the Tiny Reader page, so the add-on can download the file. It is used for that download only; the add-on still injects nothing into the site's pages unless you start a reading there. You can withdraw it under the add-on's Permissions in `about:addons`.                                                                                                     |
+| Access to `huggingface.co` (the same key)        | Requested each time you press **Download** on a voice model, and given back as soon as that download ends (unless you had already granted it for a PDF there). The download would work without it, but then Firefox adds an `Origin` header with the add-on's internal address, which is different for every installation and so could tell yours apart. With the permission the request carries no such header. |
+
+Network requests, all of them started by you:
+
+- A PDF you open from the web, fetched from its own site with the cookies Firefox has for it, as when you view it.
+- A voice model you download: one `GET` for a file at a pinned revision on `huggingface.co`, which redirects to
+  Hugging Face's file servers. No cookies, no data and no header that could tell your installation apart are sent;
+  Hugging Face sees what any download shows it, your IP address and browser version. The file is model weights, data that ONNX Runtime
+  reads; it is never run as code, and it is stored only if its size and SHA-256 are the ones in the add-on's list.
+
+Nothing is requested in the background, and nothing is updated by itself.
 
 There are no host permissions at install and no `web_accessible_resources`. The extension CSP is
 `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing
@@ -96,7 +116,8 @@ does not extend to such frames.
 
 ## Limits
 
-- English only. Text in another script is skipped; if nothing can be read the bar says so. Text
+- English only, with the built-in model and with the ones that can be downloaded. Text in another script is
+  skipped; if nothing can be read the bar says so. Text
   that Firefox's local language detector identifies as another language gets a warning in the bar
   and is read anyway, with English sounds.
 - Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
@@ -136,6 +157,10 @@ you keep the licence and the [NOTICE](NOTICE) file, which credits this project.
 - pdf.js (`pdfjs-dist`): Apache-2.0, © Mozilla Foundation. The text-layer rules in
   [entrypoints/document/style.css](entrypoints/document/style.css) are taken from its `pdf_viewer.css`.
 - ONNX Runtime Web: MIT, © Microsoft
+
+The voices that can be downloaded are not part of the add-on: SobbieTTS (by `PatnaikAshish`) and fiato (by
+`cfahlgren1`), both made from tiny-voca and released under Apache-2.0, are fetched from their authors' pages on
+Hugging Face when you ask for them.
 
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) has the versions and sources. The licence texts are bundled in the
 add-on under `licenses/` and `assets/licenses/`.
