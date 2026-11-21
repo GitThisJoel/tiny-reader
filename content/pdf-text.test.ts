@@ -7,7 +7,7 @@ const paragraphsOf = (pages: TextItem[][]) => {
 };
 
 /** A line of text at height `y`, as one run that ends its line. */
-const line = (str: string, y: number, height = 12): TextItem => ({ str, x: 72, y, height, hasEOL: true });
+const line = (str: string, y: number, height = 12): TextItem => ({ str, y, height, hasEOL: true });
 
 describe("paragraphsOf", () => {
   it("joins the lines of a paragraph and splits at a wide gap", () => {
@@ -42,27 +42,27 @@ describe("paragraphsOf", () => {
 
   it("builds a line from several runs and collapses its spaces", () => {
     const runs: TextItem[] = [
-      { str: "Hello", x: 72, y: 700, height: 12, hasEOL: false },
-      { str: " ", x: 100, y: 700, height: 0, hasEOL: false },
-      { str: "big ", x: 104, y: 700, height: 12, hasEOL: false },
-      { str: " world.", x: 130, y: 700, height: 12, hasEOL: true },
+      { str: "Hello", y: 700, height: 12, hasEOL: false },
+      { str: " ", y: 700, height: 0, hasEOL: false },
+      { str: "big ", y: 700, height: 12, hasEOL: false },
+      { str: " world.", y: 700, height: 12, hasEOL: true },
     ];
     expect(paragraphsOf([runs])).toEqual(["Hello big world."]);
   });
 
   it("starts a new line at a new baseline even without an end-of-line mark", () => {
     const runs: TextItem[] = [
-      { str: "First line", x: 72, y: 700, height: 12, hasEOL: false },
-      { str: "second line.", x: 72, y: 686, height: 12, hasEOL: false },
+      { str: "First line", y: 700, height: 12, hasEOL: false },
+      { str: "second line.", y: 686, height: 12, hasEOL: false },
     ];
     expect(paragraphsOf([runs])).toEqual(["First line second line."]);
   });
 
   it("keeps a superscript on its line", () => {
     const runs: TextItem[] = [
-      { str: "E = mc", x: 72, y: 700, height: 12, hasEOL: false },
-      { str: "2", x: 110, y: 704, height: 8, hasEOL: false },
-      { str: " is famous.", x: 116, y: 700, height: 12, hasEOL: true },
+      { str: "E = mc", y: 700, height: 12, hasEOL: false },
+      { str: "2", y: 704, height: 8, hasEOL: false },
+      { str: " is famous.", y: 700, height: 12, hasEOL: true },
     ];
     expect(paragraphsOf([runs])).toEqual(["E = mc2 is famous."]);
   });
@@ -85,7 +85,7 @@ describe("paragraphsOf", () => {
 
   it("gives nothing for a document without text", () => {
     expect(paragraphsOf([])).toEqual([]);
-    expect(paragraphsOf([[], [{ str: "  ", x: 0, y: 0, height: 0, hasEOL: true }]])).toEqual([]);
+    expect(paragraphsOf([[], [{ str: "  ", y: 0, height: 0, hasEOL: true }]])).toEqual([]);
   });
 });
 
@@ -94,8 +94,8 @@ describe("pdfText", () => {
     const pages: TextItem[][] = [
       [line("and then it con-", 700), line("tinues  on.", 686), line("1", 40, 10)],
       [
-        { str: "It ", x: 72, y: 700, height: 12, hasEOL: false },
-        { str: "ends.", x: 90, y: 700, height: 12, hasEOL: true },
+        { str: "It ", y: 700, height: 12, hasEOL: false },
+        { str: "ends.", y: 700, height: 12, hasEOL: true },
       ],
     ];
     const { text, runs } = pdfText(pages);
@@ -126,5 +126,20 @@ describe("pdfText", () => {
       [1, 0],
       [1, 1],
     ]);
+  });
+});
+
+describe("pdfText on a long paragraph", () => {
+  it("joins thousands of lines without slowing down with each one", () => {
+    // A word list: no line ends a sentence, so the whole of it is one paragraph across its pages.
+    const page = Array.from({ length: 45 }, (_, index) =>
+      line("alpha beta gamma delta epsilon zeta eta theta", 740 - index * 14),
+    );
+    const began = performance.now();
+    const { text, runs } = pdfText(Array(200).fill(page));
+    // 1.5 s when every line re-read the paragraph so far; some 50 ms now.
+    expect(performance.now() - began).toBeLessThan(750);
+    expect(text.includes("\n")).toBe(false);
+    expect(runs).toHaveLength(200 * 45 * 8);
   });
 });

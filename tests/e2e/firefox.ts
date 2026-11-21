@@ -176,13 +176,19 @@ export class Firefox {
     }
   }
 
-  /** A real click on the first element matching `selector`. */
-  async click(tab: string, selector: string) {
+  /** Marionette's id for the first element matching `selector`. */
+  private async elementId(tab: string, selector: string): Promise<string> {
     const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
       selector,
     ]);
     const id = Object.values(element ?? {})[0];
     if (!id) throw new Error(`no element matches ${selector}`);
+    return id;
+  }
+
+  /** A real click on the first element matching `selector`. */
+  async click(tab: string, selector: string) {
+    const id = await this.elementId(tab, selector);
     await this.send("WebDriver:ElementClick", { id });
   }
 
@@ -213,11 +219,7 @@ export class Firefox {
 
   /** Chooses a file in an <input type="file">, as the file picker would. */
   async upload(tab: string, selector: string, path: string) {
-    const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
-      selector,
-    ]);
-    const id = Object.values(element ?? {})[0];
-    if (!id) throw new Error(`no element matches ${selector}`);
+    const id = await this.elementId(tab, selector);
     await this.send("WebDriver:ElementSendKeys", { id, text: path });
   }
 
@@ -319,14 +321,7 @@ export class Firefox {
   /** A PNG of the element matching `selector`, or of the window's view without one, as bytes. */
   async screenshot(tab: string, selector?: string): Promise<Buffer> {
     await this.focus(tab);
-    let id: string | undefined;
-    if (selector) {
-      const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
-        selector,
-      ]);
-      id = Object.values(element ?? {})[0];
-      if (!id) throw new Error(`no element matches ${selector}`);
-    }
+    const id = selector ? await this.elementId(tab, selector) : undefined;
     const { value } = await this.send<{ value: string }>("WebDriver:TakeScreenshot", { id, full: false });
     return Buffer.from(value, "base64");
   }

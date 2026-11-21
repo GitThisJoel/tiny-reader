@@ -6,7 +6,13 @@ import { join } from "node:path";
 /** [text, y from the bottom of the page, font size] */
 export type PdfLine = [text: string, y: number, size?: number];
 
-export function buildPdf(pages: PdfLine[][]): string {
+/** How a page differs from an upright US Letter sheet: its width in points, and a turn in degrees. */
+export interface PdfSheet {
+  width?: number;
+  rotate?: number;
+}
+
+export function buildPdf(pages: PdfLine[][], sheets: PdfSheet[] = []): string {
   const literal = (text: string) => text.replace(/[\\()]/g, "\\$&");
   const objects: string[] = [];
   const add = (body: string) => objects.push(body);
@@ -18,8 +24,9 @@ export function buildPdf(pages: PdfLine[][]): string {
     const stream = lines
       .map(([text, y, size = 12]) => `BT /F1 ${size} Tf 1 0 0 1 72 ${y} Tm (${literal(text)}) Tj ET`)
       .join("\n");
+    const { width = 612, rotate = 0 } = sheets[index] ?? {};
     add(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${5 + index * 2} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} 792] /Rotate ${rotate} /Contents ${5 + index * 2} 0 R /Resources << /Font << /F1 3 0 R >> >> >>`,
     );
     add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
   }
@@ -37,7 +44,7 @@ export function buildPdf(pages: PdfLine[][]): string {
 }
 
 /** Writes `content` to a temporary file with this name and returns its path. */
-export async function temporaryFile(name: string, content: string | Uint8Array): Promise<string> {
+export async function temporaryFile(name: string, content: string): Promise<string> {
   const path = join(await mkdtemp(join(tmpdir(), "tiny-reader-pdf-")), name);
   await writeFile(path, content);
   return path;

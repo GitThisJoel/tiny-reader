@@ -34,9 +34,12 @@ const menus = (
 ).menus;
 
 export interface ControllerOptions {
-  /** The text of a range and the way back to the DOM. Web pages are read from the DOM itself. */
-  textOf?: (range: Range) => TextMap;
-  /** Told the sentence being read each time it changes, and null when there is none. */
+  /**
+   * The text of a range and the way back to the DOM. Web pages are read from the DOM itself.
+   * `fromHere`: the range was made by "read from here" and starts before the element clicked.
+   */
+  textOf?: (range: Range, fromHere: boolean) => TextMap;
+  /** Told the sentence being read each time it changes, and null when there is none any more. */
   onSentence?: (range: Range | null) => void;
 }
 
@@ -67,14 +70,14 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     session = current;
   }
 
-  async function start(range: Range) {
+  async function start(range: Range, fromHere = false) {
     // The only await comes first, so two quick starts cannot interleave below.
     // Unreadable storage must not stop a reading: the defaults will do.
     let { prefetch, ...options } = await loadSettings().catch(() => DEFAULT_SETTINGS);
     session?.end();
     // ponytail: the whole range is mapped and segmented up front. Measured 0.4 s for
     // 10,000 paragraphs (docs/FINDINGS.md §14); map block by block if that ever hurts.
-    const map = textOf(range);
+    const map = textOf(range, fromHere);
     const sentences = segment(map.text);
     if (!sentences.length) {
       report("There is no text to read here.");
@@ -96,6 +99,13 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     );
     let followed: unknown = null;
     let marked: (typeof sentences)[number] | undefined;
+    /** Shows which sentence is being read, or that none is. */
+    function mark(sentence: (typeof sentences)[number] | undefined) {
+      marked = sentence;
+      const shown = sentence ? map.rangeOf(sentence.start, sentence.end) : null;
+      highlightSentence(shown);
+      onSentence?.(shown);
+    }
     const reader = new Reader(
       {
         synthesize: (sentence, synthOptions, signal) => client.synthesize(sentence, synthOptions, signal),
@@ -106,12 +116,7 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
           const reading = state.status !== "done" && state.status !== "error";
           const sentence = reading ? sentences[state.index] : undefined;
           // State is reported far more often than the sentence changes.
-          if (sentence !== marked) {
-            marked = sentence;
-            const shown = sentence ? map.rangeOf(sentence.start, sentence.end) : null;
-            highlightSentence(shown);
-            onSentence?.(shown);
-          }
+          if (sentence !== marked) mark(sentence);
           // Follow words only while this utterance is sounding.
           const utterance = state.status === "playing" && !reducedMotion ? state.utterance : undefined;
           if (utterance !== followed) {
@@ -148,7 +153,7 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
       ended = true;
       reader.stop();
       tracker.stop();
-      highlightSentence(null);
+      mark(undefined);
       highlightWord(null);
       sink.close();
       client.close();
@@ -183,7 +188,7 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
       }
       case "read-from-here": {
         const target = menus?.getTargetElement(message.target);
-        if (target) void start(rangeFrom(target));
+        if (target) void start(rangeFrom(target), true);
         break;
       }
       case "toggle":

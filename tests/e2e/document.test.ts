@@ -62,6 +62,30 @@ const sentenceIs = (text: string) =>
   );
 /** Whether each page has been drawn: a page that is not near the window holds no picture. */
 const DRAWN = `[...document.querySelectorAll(".page canvas")].map((canvas) => canvas.width > 0)`;
+/**
+ * Where the ink is on the first page's canvas and where its first line of text lies, both in
+ * window coordinates. Null until the page is drawn.
+ */
+const INK_AND_TEXT = `
+  const canvas = document.querySelector(".page canvas");
+  if (!canvas.width) return null;
+  const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+  let [left, top, right, bottom] = [Infinity, Infinity, -1, -1];
+  for (let y = 0; y < canvas.height; y++)
+    for (let x = 0; x < canvas.width; x++) {
+      const at = (y * canvas.width + x) * 4;
+      if (pixels[at + 3] === 0 || pixels[at] > 127) continue;
+      left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+    }
+  if (right < 0) return null;
+  const sheet = canvas.getBoundingClientRect();
+  const perPixel = sheet.width / canvas.width;
+  const text = document.querySelector(".textLayer span").getBoundingClientRect();
+  return {
+    ink: { x: sheet.left + ((left + right) / 2) * perPixel, y: sheet.top + ((top + bottom) / 2) * perPixel, width: (right - left) * perPixel, height: (bottom - top) * perPixel },
+    text: { x: text.left + text.width / 2, y: text.top + text.height / 2, width: text.width, height: text.height },
+  };`;
+type Box = { x: number; y: number; width: number; height: number };
 const content = () =>
   firefox.evaluate<{
     heading: string | null;
@@ -116,20 +140,13 @@ describe("document page", () => {
       "The end.",
       "2",
     ]);
-    // The first page is drawn: there is ink on its canvas, and its first line of text lies on it.
-    const drawn = await firefox.waitFor<{ ink: boolean; onPage: boolean }>(
-      page,
-      `const canvas = document.querySelector(".page canvas");
-       if (!canvas.width) return null;
-       const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
-       let ink = false;
-       for (let at = 0; at < pixels.length && !ink; at += 4) ink = pixels[at + 3] > 0 && pixels[at] < 128;
-       if (!ink) return null;
-       const sheet = canvas.getBoundingClientRect();
-       const line = document.querySelector(".textLayer span").getBoundingClientRect();
-       return { ink, onPage: line.top > sheet.top && line.bottom < sheet.bottom && line.left > sheet.left && line.right < sheet.right && line.width > 100 };`,
-    );
-    expect(drawn).toEqual({ ink: true, onPage: true });
+  }, 60_000);
+
+  it("draws the first page, with its text lying where the ink is", async () => {
+    // Only the heading reaches as far up as it does; the other lines stretch the ink box down and right.
+    const { ink, text } = await firefox.waitFor<{ ink: Box; text: Box }>(page, INK_AND_TEXT);
+    expect(Math.abs(ink.y - ink.height / 2 - (text.y - text.height / 2))).toBeLessThan(12);
+    expect(Math.abs(ink.x - ink.width / 2 - (text.x - text.width / 2))).toBeLessThan(6);
   }, 60_000);
 
   it("reads it from the start, highlighting sentence and word on the page", async () => {
@@ -210,7 +227,10 @@ describe("document page", () => {
   }, 60_000);
 
   it("draws only the pages near the window, and lets go of those left behind", async () => {
-    const lines: PdfLine[] = [["A page of a longer document.", 720]];
+    const lines: PdfLine[] = [
+      ["A page of a longer document.", 720],
+      ["   ", 700],
+    ];
     await firefox.upload(page, "#file", await temporaryFile("long.pdf", buildPdf(Array(8).fill(lines))));
     await opened();
     await noBar();
@@ -224,6 +244,11 @@ describe("document page", () => {
       false,
       false,
     ]);
+    // A page that was let go is drawn again when it comes back.
+    await firefox.evaluate(page, `scrollTo(0, 0);`);
+    await firefox.waitFor(page, INK_AND_TEXT);
+    // Blank text between words is no page number: nothing here is kept out of the highlight.
+    expect(await firefox.evaluate(page, `return document.querySelectorAll("[data-unread]").length;`)).toBe(0);
   }, 60_000);
 
   it("stops following once the reader has scrolled elsewhere", async () => {
@@ -243,7 +268,62 @@ describe("document page", () => {
     expect(await firefox.evaluate(page, `return scrollY;`)).toBe(end);
   }, 60_000);
 
+  it("follows a new reading after one was stopped out of view", async () => {
+    // The reading above is on page 3 and the window at the end of the document.
+    await barButton("Stop reading");
+    await noBar();
+    await firefox.click(page, "#start");
+    await barWhen(`bar.status === "playing" && bar.text === "Sentence 1 of 8"`);
+    await firefox.waitFor(page, `return scrollY < 200;`);
+  }, 60_000);
+
+  it("turns the text with a page that is stored turned", async () => {
+    const turned = buildPdf([[["A line on a page turned a quarter.", 720, 24]]], [{ rotate: 90 }]);
+    await firefox.upload(page, "#file", await temporaryFile("turned.pdf", turned));
+    await opened();
+    await noBar();
+    const { ink, text } = await firefox.waitFor<{ ink: Box; text: Box }>(page, INK_AND_TEXT);
+    // The line runs down the page, and the text lies on the ink.
+    expect(ink.height).toBeGreaterThan(ink.width * 5);
+    expect(text.height).toBeGreaterThan(text.width * 5);
+    expect([Math.abs(ink.x - text.x), Math.abs(ink.y - text.y)].every((off) => off < 12)).toBe(true);
+    expect(Math.abs(ink.height - text.height)).toBeLessThan(ink.height * 0.1);
+  }, 60_000);
+
+  it("fits the widest page to the window when pages differ in size", async () => {
+    const lines: PdfLine[] = [["A page.", 720]];
+    await firefox.upload(
+      page,
+      "#file",
+      await temporaryFile("mixed.pdf", buildPdf([lines, lines], [{}, { width: 1836 }])),
+    );
+    await opened();
+    const widths = await firefox.evaluate<{ pages: number[]; room: number; overflow: boolean }>(
+      page,
+      `return {
+        pages: [...document.querySelectorAll(".page")].map((page) => page.getBoundingClientRect().width),
+        room: document.getElementById("document").clientWidth,
+        overflow: document.documentElement.scrollWidth > innerWidth,
+      };`,
+    );
+    expect(widths.overflow).toBe(false);
+    expect(widths.pages[1]).toBeLessThanOrEqual(widths.room + 0.5);
+    expect(widths.pages[1]).toBeCloseTo((widths.pages[0] ?? 0) * 3, 0);
+  }, 60_000);
+
+  it("gives way to a file opened while it is still loading", async () => {
+    const lines: PdfLine[] = Array.from({ length: 30 }, (_, index) => ["A line of a long book.", 740 - index * 20]);
+    await firefox.upload(page, "#file", await temporaryFile("book.pdf", buildPdf(Array(300).fill(lines))));
+    await firefox.upload(page, "#file", report);
+    await firefox.waitFor(page, `return document.getElementById("name").textContent === "A short report.pdf";`);
+    // The book is gone for good: no page of it turns up later.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(await content()).toMatchObject({ heading: "A short report.pdf", pages: ["Page 1", "Page 2"], start: true });
+  }, 60_000);
+
   it("stops the reading when another file is opened, and says so when a file is not a PDF", async () => {
+    await firefox.click(page, "#start");
+    await barWhen(`bar.status === "playing"`);
     await firefox.upload(page, "#file", await temporaryFile("notes.pdf", "this is not a pdf"));
     await opened();
     await noBar();

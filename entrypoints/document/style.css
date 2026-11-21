@@ -76,12 +76,12 @@ body[data-dropping] {
   width: 100%;
   height: 100%;
 }
-/* The text layer's layout, from pdf.js's pdf_viewer.css (Apache-2.0). The text is in place but
-   transparent: it is there to be selected, read by a screen reader, and highlighted. */
+/* The text layer's layout, from pdf.js's pdf_viewer.css (Apache-2.0), less what is not used here.
+   The text is in place but transparent: it is there to be selected, read by a screen reader,
+   and highlighted. pdf.js sets --min-font-size, --font-height, --scale-x and --rotate itself. */
 .textLayer {
   --scale-round-x: 1px;
   --scale-round-y: 1px;
-  --min-font-size: 1;
   --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
   color-scheme: only light;
@@ -95,6 +95,16 @@ body[data-dropping] {
   forced-color-adjust: none;
   transform-origin: 0 0;
 }
+/* A page stored turned: pdf.js lays the text out unturned and says how far to turn the layer. */
+.textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
 .textLayer :is(span, br) {
   color: transparent;
   position: absolute;
@@ -102,22 +112,19 @@ body[data-dropping] {
   cursor: text;
   transform-origin: 0% 0%;
 }
-.textLayer > :not(.markedContent),
-.textLayer .markedContent span:not(.markedContent) {
+.textLayer > * {
   --font-height: 0;
   --scale-x: 1;
   --rotate: 0deg;
   font-size: calc(var(--text-scale-factor) * var(--font-height));
   transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
 }
-.textLayer .markedContent {
-  display: contents;
-}
 .textLayer ::selection {
   background: color-mix(in srgb, AccentColor, transparent 50%);
   color: transparent;
 }
-/* The sentence being read and the word being spoken. See-through, so the page shows beneath. */
+/* The sentence being read and the word being spoken, under the names content/highlight.ts gives
+   them. See-through, so the page shows beneath. */
 ::highlight(tiny-reader-sentence) {
   background-color: rgb(255 208 0 / 0.4);
   color: transparent;
@@ -126,6 +133,8 @@ body[data-dropping] {
   background-color: rgb(255 106 0 / 0.5);
   color: transparent;
 }
-.textLayer [data-unread]::highlight(tiny-reader-sentence) {
+/* Text that is not read, such as a page number in the middle of a sentence. */
+.textLayer [data-unread]::highlight(tiny-reader-sentence),
+.textLayer [data-unread]::highlight(tiny-reader-word) {
   background-color: transparent;
 }

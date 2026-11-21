@@ -208,14 +208,17 @@ describe("mapWithin", () => {
     expect(mapWithin(TEXT, runs, range).text).toBe(TEXT);
   });
 
-  it("starts at the paragraph of the node a range starts before", () => {
+  it("starts at the range, or at the start of its paragraph when asked to", () => {
     const { runs, second } = layer();
     const range = document.createRange();
     range.selectNodeContents(document.body);
+    // As a selection begun between two lines: the range starts at an element, not in text.
     range.setStartBefore(second.parentElement as Element);
-    const map = mapWithin(TEXT, runs, range);
+    expect(mapWithin(TEXT, runs, range).text).toBe("three four.");
+    const map = mapWithin(TEXT, runs, range, true);
     expect(map.text).toBe("One two three four.");
     expect(rangeText(map.rangeOf(...span(map.text, "three")))).toBe("three");
+    expect(rangeText(map.rangeOf(0, map.text.length))).toBe("One twothree four.");
   });
 
   it("keeps to a selection inside the text, to the character", () => {

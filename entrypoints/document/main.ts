@@ -15,8 +15,8 @@ const fileInput = byId<HTMLInputElement>("file");
 
 /** The PDF on show, once all of it has been read in. */
 let shown: ShownPdf | null = null;
-/** Counts the files opened, so one that is overtaken while loading can step aside. */
-let opened = 0;
+/** Aborted when another file is opened, so a file still loading gives way. */
+let loading = new AbortController();
 
 /** Whether the sentence starts in view: its first line clear of the header and of the control bar's usual place. */
 function startsInView(range: Range): boolean {
@@ -37,9 +37,11 @@ function follow(range: Range | null) {
 // The same commands a web page gets: toolbar popup, shortcuts and the context menu work here too.
 // What is read is the PDF's text as rebuilt from its pages, not the text layer's scattered pieces.
 const controller = createController({
-  textOf: (range) => mapWithin(shown?.text ?? "", shown?.runs ?? [], range),
+  // "Read from here" starts at the paragraph of the line clicked, as it does on a web page.
+  textOf: (range, fromHere) => mapWithin(shown?.text ?? "", shown?.runs ?? [], range, fromHere),
   onSentence: follow,
 });
+// What the popup tells the background arrives here too; the controller acts on reader commands only.
 browser.runtime.onMessage.addListener((message: ReaderCommand) => controller.handle(message));
 
 function say(message: string, kind: "info" | "error" = "info") {
@@ -51,13 +53,14 @@ function say(message: string, kind: "info" | "error" = "info") {
 class DownloadError extends Error {}
 
 /** Shows the PDF called `fileName`, whose bytes `bytes` delivers, replacing whatever was open. */
-async function load(fileName: string, bytes: () => Promise<ArrayBuffer>) {
-  const mine = ++opened;
+async function load(fileName: string, bytes: (signal: AbortSignal) => Promise<ArrayBuffer>) {
+  loading.abort();
+  loading = new AbortController();
+  const { signal } = loading;
   controller.handle({ type: "stop" });
   document.getElementById("allow")?.remove();
   shown?.close();
   shown = null;
-  sentence = null;
   const pages = document.createElement("div");
   article.replaceChildren(pages);
   name.textContent = "";
@@ -65,10 +68,10 @@ async function load(fileName: string, bytes: () => Promise<ArrayBuffer>) {
   startButton.disabled = true;
   say(`Opening ${fileName}…`);
   try {
-    const pdf = await showPdf(await bytes(), pages, (page, total) => {
-      if (mine === opened) say(`Reading page ${page} of ${total}…`);
-    });
-    if (mine !== opened) {
+    const data = await bytes(signal);
+    const pdf = await showPdf(data, pages, (page, total) => say(`Reading page ${page} of ${total}…`), signal);
+    // Overtaken while its last page was being read.
+    if (signal.aborted) {
       pdf.close();
       return;
     }
@@ -82,7 +85,7 @@ async function load(fileName: string, bytes: () => Promise<ArrayBuffer>) {
     startButton.disabled = false;
     say("Press Read from the start, or right-click a line and choose Read from here with tiny-voca.");
   } catch (error) {
-    if (mine !== opened) return;
+    if (signal.aborted) return;
     if (error instanceof DownloadError) say(`${error.message} Choose the file with Open a PDF instead.`, "error");
     else say(`This file could not be read as a PDF. ${error instanceof Error ? error.message : ""}`.trim(), "error");
   }
@@ -99,8 +102,8 @@ async function openFromWeb(url: string, fileName: string) {
   const origins = [sitePattern(url)];
   const host = new URL(url).hostname;
   const download = () =>
-    load(fileName, async () => {
-      const response = await fetch(url, { credentials: "include" }).catch(() => null);
+    load(fileName, async (signal) => {
+      const response = await fetch(url, { credentials: "include", signal }).catch(() => null);
       if (!response) throw new DownloadError(`Tiny Reader could not reach ${host}.`);
       if (!response.ok) throw new DownloadError(`${host} answered with error ${response.status}.`);
       return response.arrayBuffer();

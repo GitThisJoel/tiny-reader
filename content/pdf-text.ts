@@ -4,7 +4,6 @@
 /** One run of text as pdf.js reports it, in page units with y growing upwards. */
 export interface TextItem {
   str: string;
-  x: number;
   y: number;
   /** Font size of the run. Zero for some whitespace runs. */
   height: number;
@@ -41,12 +40,11 @@ interface Piece {
 
 interface Line {
   pieces: Piece[];
+  /** The pieces joined. Set when the page's lines are complete. */
   text: string;
   y: number;
   height: number;
   page: number;
-  /** White space was seen since the last word. */
-  gap: boolean;
 }
 
 const SPACE: Piece = { text: " ", page: -1, item: -1, start: 0 };
@@ -57,36 +55,33 @@ const STARTS_LOWER = /^\p{Ll}/u;
 function linesOf(items: TextItem[], page: number): Line[] {
   const lines: Line[] = [];
   let current: Line | null = null;
-  const close = () => {
-    if (current) lines.push(current);
-    current = null;
-  };
+  /** White space was seen since the last word of the line. */
+  let gap = false;
   for (const [index, item] of items.entries()) {
     // A new baseline starts a new line. Half a line of slack keeps superscripts on theirs.
     if (current && item.str.trim() && Math.abs(item.y - current.y) > Math.max(current.height, item.height) * 0.5)
-      close();
+      current = null;
     if (!current) {
       if (!item.str.trim()) continue;
-      current = { pieces: [], text: "", y: item.y, height: item.height, page, gap: false };
+      current = { pieces: [], text: "", y: item.y, height: item.height, page };
+      lines.push(current);
+      gap = false;
     }
-    const line: Line = current;
     // Words keep their place in the run; any white space between them becomes one space.
     let end = 0;
     for (const word of item.str.matchAll(/\S+/g)) {
-      if (word.index > end) line.gap = true;
-      if (line.gap && line.pieces.length) line.pieces.push(SPACE);
-      line.gap = false;
-      line.pieces.push({ text: word[0], page, item: index, start: word.index });
+      if (word.index > end) gap = true;
+      if (gap && current.pieces.length) current.pieces.push(SPACE);
+      gap = false;
+      current.pieces.push({ text: word[0], page, item: index, start: word.index });
       end = word.index + word[0].length;
     }
-    if (end < item.str.length) line.gap = true;
-    line.height = Math.max(line.height, item.height);
-    if (item.hasEOL) close();
+    if (end < item.str.length) gap = true;
+    current.height = Math.max(current.height, item.height);
+    if (item.hasEOL) current = null;
   }
-  close();
-  return lines
-    .map((line) => ({ ...line, text: line.pieces.map((piece) => piece.text).join("") }))
-    .filter((line) => line.text && !PAGE_NUMBER.test(line.text));
+  for (const line of lines) line.text = line.pieces.map((piece) => piece.text).join("");
+  return lines.filter((line) => !PAGE_NUMBER.test(line.text));
 }
 
 /**
@@ -102,11 +97,12 @@ function linesOf(items: TextItem[], page: number): Line[] {
  * hyphen. Use page geometry (column detection, repeated header lines) if that matters.
  */
 export function pdfText(pages: TextItem[][]): PdfText {
-  const paragraphs: { text: string; pieces: Piece[] }[] = [];
+  const paragraphs: Piece[][] = [];
   let previous: Line | null = null;
   for (const line of pages.flatMap(linesOf)) {
     const paragraph = paragraphs.at(-1);
-    const last = paragraph?.text ?? "";
+    // How the text so far ends. The previous line is enough to tell: what is looked for has no space in it.
+    const last = previous?.text ?? "";
     const tallest = Math.max(previous?.height ?? 0, line.height) || 12;
     const runsOn = !ENDS_SENTENCE.test(last) && STARTS_LOWER.test(line.text);
     const sameBlock =
@@ -116,16 +112,12 @@ export function pdfText(pages: TextItem[][]): PdfText {
           previous.y - line.y > 0 &&
           previous.y - line.y <= tallest * 1.6
         : runsOn);
-    const hyphen = paragraph?.pieces.at(-1);
-    if (!paragraph || !sameBlock) paragraphs.push({ text: line.text, pieces: [...line.pieces] });
+    const hyphen = paragraph?.at(-1);
+    if (!paragraph || !sameBlock) paragraphs.push([...line.pieces]);
     else if (hyphen && /\p{L}-$/u.test(last) && STARTS_LOWER.test(line.text)) {
-      paragraph.pieces[paragraph.pieces.length - 1] = { ...hyphen, text: hyphen.text.slice(0, -1) };
-      paragraph.pieces.push(...line.pieces);
-      paragraph.text = last.slice(0, -1) + line.text;
-    } else {
-      paragraph.pieces.push(SPACE, ...line.pieces);
-      paragraph.text = `${last} ${line.text}`;
-    }
+      paragraph[paragraph.length - 1] = { ...hyphen, text: hyphen.text.slice(0, -1) };
+      paragraph.push(...line.pieces);
+    } else paragraph.push(SPACE, ...line.pieces);
     previous = line;
   }
 
@@ -133,7 +125,7 @@ export function pdfText(pages: TextItem[][]): PdfText {
   const runs: PdfRun[] = [];
   for (const [index, paragraph] of paragraphs.entries()) {
     if (index) text += "\n";
-    for (const { text: piece, page, item, start } of paragraph.pieces) {
+    for (const { text: piece, page, item, start } of paragraph) {
       if (item >= 0 && piece) runs.push({ textStart: text.length, page, item, start, length: piece.length });
       text += piece;
     }
