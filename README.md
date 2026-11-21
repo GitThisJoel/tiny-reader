@@ -65,6 +65,32 @@ export default defineWebExtConfig({
 });
 ```
 
+## Installing a development build in your own Firefox
+
+`pnpm dev` runs the add-on in a throwaway profile. To use it in your normal Firefox, load a build as a temporary
+add-on:
+
+1. Build it:
+
+   ```bash
+   pnpm build
+   ```
+
+   Without pnpm installed, `npx -y pnpm@12.21.0 build` does the same. That prefix works for every `pnpm` command in
+   this README.
+
+2. In Firefox, open `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on…** and choose `.output/firefox-mv3/manifest.json` inside this repository. `.output`
+   is a hidden folder, so the file picker does not show it: press <kbd>Ctrl</kbd>+<kbd>L</kbd> there and paste the
+   full path.
+4. The Tiny Reader button appears in the toolbar or in the extensions (puzzle piece) menu, from where it can be
+   pinned.
+
+After changing the code, run the build again and click **Reload** on the add-on's card on that page.
+
+A temporary add-on is removed when Firefox closes; load it again after a restart. Installing it permanently needs a
+build signed by Mozilla, see [Before publishing](#before-publishing).
+
 ## Scripts
 
 | Command             | What it does                                                                              |
