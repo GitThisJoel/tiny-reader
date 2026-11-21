@@ -201,6 +201,38 @@ describe("a PDF in Firefox's viewer", () => {
   }, 60_000);
 });
 
+describe("a PDF whose address does not end in .pdf", () => {
+  it("is recognised by its tab title, and opens the same way", async () => {
+    const unnamed = await firefox.open(`${site.url}pdf/1706.03762`);
+    await firefox.waitFor(unnamed, `return document.querySelectorAll(".textLayer span").length > 0;`);
+    expect(await firefox.evaluate(unnamed, "return document.title;")).toBe("paper-v7.pdf");
+    // The context menu click is what lets the add-on see the tab, as a click on the toolbar button would.
+    await firefox.evaluate(unnamed, `getSelection().selectAllChildren(document.querySelector(".textLayer"));`);
+    await firefox.contextMenu(unnamed, ".textLayer span", "Read with tiny-voca");
+    await firefox.chrome(
+      `for (let tries = 0; tries < 50; tries++) {
+         const open = [...document.querySelectorAll("panel")].filter((panel) => panel.state === "open");
+         if (open.length) { for (const panel of open) panel.hidePopup(); return; }
+         await new Promise((resolve) => setTimeout(resolve, 100));
+       }`,
+    );
+
+    const popup = await popupFor(unnamed);
+    expect(await shown(popup)).toMatchObject({ page: "pdf", visible: { read: false, openPdf: true } });
+    const before = await firefox.tabs();
+    await firefox.evaluateBehind(popup, `document.getElementById("open-pdf").click();`);
+    let opened = "";
+    for (let tries = 0; tries < 50 && !opened; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      opened = (await firefox.tabs()).find((handle) => !before.includes(handle)) ?? "";
+    }
+    // Permission for this site was given in the tests above, so it opens with no prompt.
+    await firefox.waitFor(opened, `return document.querySelectorAll("#document p").length > 0;`);
+    expect(await firefox.evaluate(opened, `return document.getElementById("name").textContent;`)).toBe("paper-v7.pdf");
+    expect(await paragraphs(opened)).toHaveLength(2);
+  }, 60_000);
+});
+
 describe("a page that can be read", () => {
   it("the popup shows its reading controls and no warning", async () => {
     const page = await firefox.open(site.url);

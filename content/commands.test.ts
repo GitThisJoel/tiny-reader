@@ -23,6 +23,18 @@ describe("commands", () => {
       expect(pdfName(url), url).toBeNull();
   });
 
+  it("falls back to the tab title the PDF viewer sets, for addresses without the ending", () => {
+    expect(pdfName("https://arxiv.org/pdf/1706.03762", "1706.03762v7.pdf")).toBe("1706.03762v7.pdf");
+    expect(pdfName("https://arxiv.org/pdf/1706.03762", "Attention Is All You Need - 1706.03762v7.pdf")).toBe(
+      "1706.03762v7.pdf",
+    );
+    expect(pdfName("https://example.com/download?id=7", "  document.pdf ")).toBe("document.pdf");
+    // The address wins when it has a name of its own.
+    expect(pdfName("https://example.com/a/report.pdf", "Annual report - other.pdf")).toBe("report.pdf");
+    for (const title of ["", "Attention Is All You Need", "How to read a .pdf file", "pdf"])
+      expect(pdfName("https://arxiv.org/abs/1706.03762", title), title).toBeNull();
+  });
+
   it("treats only http(s) addresses as downloadable", () => {
     expect(webUrl("https://example.com/a.pdf")).toBe("https://example.com/a.pdf");
     expect(webUrl("http://127.0.0.1:8080/a.pdf")).toBe("http://127.0.0.1:8080/a.pdf");

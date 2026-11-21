@@ -495,3 +495,14 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
   panel opens after a failed context-menu read). The popup finds out whether its tab can be read
   by running a script that does nothing; if that fails and the address ends in `.pdf`, it offers
   the document page and passes the file name along, since the user has to pick the file again.
+- **Recognising a PDF tab.** The add-on cannot look into the viewer, and the tabs API has no
+  content type. An address ending in `.pdf` is one sign; many PDFs lack it
+  (`arxiv.org/pdf/1706.03762`). The viewer titles its tab with the file name
+  ("1706.03762v7.pdf", or "Title - file.pdf"), so a blocked tab whose title ends in `.pdf`
+  counts as a PDF too.
+- **A real paper.** `https://arxiv.org/pdf/1706.03762` (15 pages) went through the whole flow in
+  headless Firefox: recognised, permission prompt for arxiv.org accepted, downloaded and parsed
+  in 1.1 s, 369 paragraphs, reading started. Running prose came out as proper paragraphs. More
+  than half of the "paragraphs" were under 20 characters: section headings, but mostly pieces
+  of formulas and table cells, which are read as they come. Footnotes and the arXiv margin
+  stamp are read in page order. Filtering those is not built.

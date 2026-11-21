@@ -122,7 +122,7 @@ export default defineBackground(() => {
       await browser.scripting.executeScript({ target: { tabId: tab.id }, func: () => true });
       return { kind: "readable" };
     } catch {
-      const name = pdfName(tab.url ?? "");
+      const name = pdfName(tab.url ?? "", tab.title);
       return name ? { kind: "pdf", name, url: webUrl(tab.url) } : { kind: "blocked" };
     }
   }

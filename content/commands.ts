@@ -30,14 +30,24 @@ export type PageState =
 /** Popup → background: "what is the active tab?" The reply is a PageState. */
 export const PAGE_STATE = "page-state";
 
-/** The file name of a PDF address, such as "report.pdf", or null when the address does not end in one. */
-export function pdfName(url: string): string | null {
+/**
+ * The file name of the PDF a tab is showing in Firefox's viewer, or null when it does not look like one.
+ *
+ * The address tells when it ends in ".pdf". Many do not ("arxiv.org/pdf/1706.03762"), and the
+ * add-on cannot look inside the viewer, but the viewer titles its tab with the file's name,
+ * as "1706.03762v7.pdf" or "Attention Is All You Need - 1706.03762v7.pdf".
+ */
+export function pdfName(url: string, title = ""): string | null {
   try {
     const last = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
-    return /\.pdf$/i.test(last) ? last : null;
+    if (/\.pdf$/i.test(last)) return last;
   } catch {
-    return null;
+    // Not an address: the title may still tell.
   }
+  const named = title.trim();
+  if (!/\.pdf$/i.test(named)) return null;
+  const file = named.split(" - ").pop() ?? named;
+  return /\.pdf$/i.test(file) ? file : named;
 }
 
 /** `url` if it is an http(s) address, else null. Nothing else can be downloaded by the add-on. */

@@ -62,6 +62,13 @@ export async function startSite(): Promise<{
       response.writeHead(404).end("not here");
       return;
     }
+    // Like arxiv.org/pdf/1706.03762: a PDF whose address does not say so. The name comes in a header.
+    if (request.url?.startsWith("/pdf/")) {
+      response
+        .writeHead(200, { "content-type": "application/pdf", "content-disposition": 'inline; filename="paper-v7.pdf"' })
+        .end(SAMPLE_PDF);
+      return;
+    }
     if (request.url?.endsWith(".pdf")) {
       response.writeHead(200, { "content-type": "application/pdf" }).end(SAMPLE_PDF);
       return;

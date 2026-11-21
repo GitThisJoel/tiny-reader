@@ -267,7 +267,8 @@ does not extend to such frames.
   addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. For PDFs, use **Read a PDF…**.
 - PDFs are read as text only: no figures or layout. Paragraphs are rebuilt from the positions of the text, which works
   for single-column prose. Columns, tables, footnotes and running headers may come out in the wrong order, and a
-  scanned PDF (pages stored as pictures) has no text to read. The toolbar button then shows a "!" badge with the reason, and the popup says so.
+  scanned PDF (pages stored as pictures) has no text to read. In a scientific paper the running text reads well, but
+  formulas and table cells come out as short fragments that are read aloud as they are. The toolbar button then shows a "!" badge with the reason, and the popup says so.
   Leave Reader View and read the original page instead.
 - Text selected inside a frame from another site cannot be read (see Permissions).
 - A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
