@@ -1,7 +1,7 @@
 // The text of a DOM range as one string, with a way back from offsets in that string to DOM
 // positions. Reads the DOM and never changes it.
 
-interface Run {
+export interface Run {
   /** Where this run starts in the built text. */
   textStart: number;
   node: Text;
@@ -117,6 +117,11 @@ export function mapRange(range: Range): TextMap {
     text += data;
   }
 
+  return mapOf(text, runs);
+}
+
+/** The map for `text` built from `runs`, which are in text order and in document order. */
+export function mapOf(text: string, runs: Run[]): TextMap {
   /** Index of the last run starting at or before `offset`. */
   function runAt(offset: number): number {
     let low = 0;
@@ -158,4 +163,35 @@ export function mapRange(range: Range): TextMap {
       return result;
     },
   };
+}
+
+/**
+ * The part of an already mapped text that lies inside `range`, to the character.
+ * With `fromParagraph` it starts at the beginning of the paragraph the range starts in.
+ */
+export function mapWithin(text: string, runs: Run[], range: Range, fromParagraph = false): TextMap {
+  let from = -1;
+  let to = -1;
+  // ponytail: every run is tested, for each reading (0.16 s to start in a 500-page PDF). Runs
+  // are in document order, so a binary search would do if documents get huge.
+  let node: Text | null = null;
+  let inside = false;
+  for (const run of runs) {
+    // The words of a line share a node: it is tested once.
+    if (run.node !== node) {
+      node = run.node;
+      inside = range.intersectsNode(node);
+    }
+    if (!inside) continue;
+    const start = run.node === range.startContainer ? Math.max(range.startOffset - run.nodeStart, 0) : 0;
+    const end = run.node === range.endContainer ? Math.min(range.endOffset - run.nodeStart, run.length) : run.length;
+    if (end <= start) continue;
+    if (from < 0) from = run.textStart + start;
+    to = run.textStart + end;
+  }
+  if (from < 0) return mapOf("", []);
+  if (fromParagraph) from = text.lastIndexOf("\n", from) + 1;
+  const whole = mapOf(text, runs);
+  const first = from;
+  return { text: text.slice(first, to), rangeOf: (start, end) => whole.rangeOf(first + start, first + end) };
 }

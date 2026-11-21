@@ -37,8 +37,19 @@ export async function loadSettings(): Promise<Settings> {
   return parseSettings(stored[KEY]);
 }
 
-export async function saveSettings(change: Partial<Settings>): Promise<Settings> {
-  const settings = parseSettings({ ...(await loadSettings()), ...change });
-  await browser.storage.local.set({ [KEY]: settings });
-  return settings;
+let saving: Promise<unknown> = Promise.resolve();
+
+/**
+ * Stores `change` on top of what is stored and resolves to the result. Saves run one at a
+ * time, in the order they were asked for: each reads before it writes, so two at once would
+ * lose one of the changes.
+ */
+export function saveSettings(change: Partial<Settings>): Promise<Settings> {
+  const save = saving.then(async () => {
+    const settings = parseSettings({ ...(await loadSettings()), ...change });
+    await browser.storage.local.set({ [KEY]: settings });
+    return settings;
+  });
+  saving = save.catch(() => {});
+  return save;
 }

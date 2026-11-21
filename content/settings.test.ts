@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { parseRequest } from "@/engine/protocol.ts";
 import { DEFAULT_SETTINGS, loadSettings, parseSettings, SEMITONE, saveSettings } from "./settings.ts";
@@ -70,6 +70,25 @@ describe("stored settings", () => {
       speed: 1.5,
       voice: 1,
     });
+  });
+
+  it("keeps both of two changes saved at once, as two quick changes in the control bar are", async () => {
+    // The first write takes its time. Unordered, the second save would read the old settings meanwhile.
+    const write = fakeBrowser.storage.local.set.bind(fakeBrowser.storage.local);
+    const spy = vi.spyOn(fakeBrowser.storage.local, "set").mockImplementationOnce(async (items) => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return write(items);
+    });
+    await Promise.all([saveSettings({ speed: 1.5 }), saveSettings({ voice: 1 })]);
+    expect(await loadSettings()).toMatchObject({ speed: 1.5, voice: 1 });
+    spy.mockRestore();
+  });
+
+  it("goes on saving after a save that failed", async () => {
+    const spy = vi.spyOn(fakeBrowser.storage.local, "set").mockRejectedValueOnce(new Error("storage is full"));
+    await expect(saveSettings({ speed: 1.5 })).rejects.toThrow("storage is full");
+    expect(await saveSettings({ voice: 1 })).toMatchObject({ speed: DEFAULT_SETTINGS.speed, voice: 1 });
+    spy.mockRestore();
   });
 
   it("never stores an invalid value", async () => {

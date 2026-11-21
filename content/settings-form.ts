@@ -82,9 +82,18 @@ export function mountSettingsForm(form: HTMLFormElement) {
     prefetch: prefetch.valueAsNumber,
   });
 
+  // Only the newest save's result is shown back, so a slow save never undoes what was changed since.
+  let newest = 0;
   async function save(settings: Settings) {
-    show(await saveSettings(settings));
-    saved.textContent = "Saved. Used from the next reading.";
+    const mine = ++newest;
+    try {
+      const stored = await saveSettings(settings);
+      if (mine !== newest) return;
+      show(stored);
+      saved.textContent = "Saved. Used from the next reading.";
+    } catch {
+      saved.textContent = "The settings could not be saved.";
+    }
   }
 
   form.addEventListener("input", describe);

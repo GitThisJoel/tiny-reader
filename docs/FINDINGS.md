@@ -441,6 +441,10 @@ Tested in headless Firefox 158 on `about:reader?url=…`:
   add-on cannot leave Reader View and carry on reading in one step without a host permission
   for the article's site.
 
+**PDFs are the same.** A PDF opened in Firefox's built-in viewer, from `http://` or from
+`file://`, has a selectable text layer and shows the context menu entries, but injection fails
+with the same "Missing host permission for the tab", again also with `<all_urls>` granted.
+
 What the add-on does: a reading that cannot start marks the toolbar button for that tab with a
 "!" badge and the reason as its tooltip, and the popup shows the reason instead of closing.
 
@@ -452,3 +456,107 @@ Two ways to actually read such text, neither built:
 2. Ask for access to the article's site (`optional_host_permissions`, a prompt per site), leave
    Reader View and read the original page. Reads whole pages; costs a permission prompt and
    takes the user out of Reader View.
+
+## 16. Reading PDFs
+
+Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a page of its own
+(`document.html`), where the user opens or drops the file.
+
+- **No permission and no network.** The file comes from a file picker or a drop, is parsed by
+  pdf.js (`pdfjs-dist` 6.5.438, bundled, 1.7 MB) in a Worker of the page, and never leaves it.
+  pdf.js is told not to fetch anything: `useWorkerFetch: false`, `useWasm: false`
+  (and, until pages were drawn, §17, `disableFontFace: true`).
+- **The PDF open in another tab cannot be picked up automatically.** Tested from an add-on page
+  in Firefox 158: `fetch` and `XMLHttpRequest` of a `file://` PDF fail with a network error,
+  both without host permissions and with `<all_urls>` granted. So a local PDF always has to be
+  chosen or dropped by the user. An `http(s)` PDF can be fetched once the add-on has a host
+  permission for that site (200, full file); without one it fails the same way.
+- **Web PDFs are downloaded on request.** The original constraints were no network access at
+  runtime and no host permissions; the user chose to relax both for this one case
+  (2026-11-21). `optional_host_permissions: ["*://*/*"]` is declared, nothing is granted at
+  install, and the document page calls `permissions.request` for the PDF's site only (scheme and
+  host, as match patterns carry no port) from a click on that page. With the permission it
+  fetches the PDF with `credentials: "include"`, so a PDF behind a login the browser already has
+  opens too. This is the add-on's only network request. Verified in Firefox by clicking through
+  the real permission prompt: accepted (PDF opens, and the next PDF from that site opens with no
+  prompt), refused (nothing is downloaded), and a 404 from the site.
+- **Text, not layout.** `getTextContent()` gives positioned runs. Lines are found by baseline,
+  paragraphs by vertical gap and font size, a word hyphenated at a line end is rejoined, page
+  numbers are dropped, and a sentence that runs over a page break is carried on. Verified on a
+  generated two-page PDF in real Firefox; not yet tried on a range of real-world PDFs.
+- **Everything else is shared.** The page uses the same controller as the content script, and
+  `tabs.sendMessage` reaches an add-on page shown in a tab, so the popup, the shortcuts and both
+  context menu entries (including `menus.getTargetElement`) work there unchanged. The background
+  only has to skip injection for that page.
+- `web-ext lint` gains two `UNSAFE_VAR_ASSIGNMENT` warnings, both inside pdf.js.
+- **Telling the user.** Nothing can be shown inside the PDF viewer, and the add-on only learns
+  what a tab holds once the user invokes it there, so there is no warning while merely viewing a
+  PDF. When a reading cannot start, `action.openPopup()` opens the toolbar popup (verified: the
+  panel opens after a failed context-menu read). The popup finds out whether its tab can be read
+  by running a script that does nothing; if that fails and the address ends in `.pdf`, it offers
+  the document page and passes the file name along, since the user has to pick the file again.
+- **Recognising a PDF tab.** The add-on cannot look into the viewer, and the tabs API has no
+  content type. An address ending in `.pdf` is one sign; many PDFs lack it
+  (`arxiv.org/pdf/1706.03762`). The viewer titles its tab with the file name
+  ("1706.03762v7.pdf", or "Title - file.pdf"), so a blocked tab whose title ends in `.pdf`
+  counts as a PDF too.
+- **A real paper.** `https://arxiv.org/pdf/1706.03762` (15 pages) went through the whole flow in
+  headless Firefox: recognised, permission prompt for arxiv.org accepted, downloaded and parsed
+  in 1.1 s, 369 paragraphs, reading started. Running prose came out as proper paragraphs. More
+  than half of the "paragraphs" were under 20 characters: section headings, but mostly pieces
+  of formulas and table cells, which are read as they come. Footnotes and the arXiv margin
+  stamp are read in page order. Filtering those is not built.
+
+## 17. Highlighting on the PDF's pages
+
+The document page first showed the extracted text as paragraphs. It now shows the pages
+themselves and paints the highlight on them (2026-11-21). Firefox's own viewer stays out of
+reach (§15), so "in the PDF" means in the add-on's page.
+
+- **Drawing works under the add-on's CSP.** `page.render()` onto a canvas plus pdf.js's
+  `TextLayer` run with `script-src 'self' 'wasm-unsafe-eval'` and no further data files.
+  Embedded fonts are loaded through the FontFace API from the PDF's own bytes
+  (`disableFontFace` is no longer set; with the arXiv paper open, `document.fonts` held its
+  fonts as `loaded`); nothing is fetched. A font the PDF does not embed
+  (Helvetica in the generated test PDF) is drawn with a system font, since pdf.js's
+  `standard_fonts` (820 kB) are not bundled. Nor are its wasm image decoders (1.4 MB) or CMaps
+  (1.7 MB); what a PDF with JPEG 2000 or JBIG2 images looks like without them has not been
+  tried.
+- **The highlight needs no new mechanism.** The text layer is real DOM text, one `<span>` per
+  text run, transparent and positioned over the canvas, so the CSS Custom Highlight API works
+  on it as on a web page. The colours are see-through and the highlighted text stays
+  transparent, so the drawn page shows beneath. Checked by eye on a screenshot of
+  `arxiv.org/pdf/1706.03762`: sentence and word marks sit on the right glyphs.
+- **Reading the text layer directly would not work.** Its spans are absolutely positioned, so
+  the DOM text map sees each as a block of its own and every line would be a "sentence".
+  Instead `pdfText` builds the paragraphs as before and also records, for every word, the run
+  and offset it came from. `TextLayer.textDivs` has one span per run in the same order (checked
+  in the pdf.js source: a span is pushed for every item with `str`, even an empty one), which
+  gives the text node for each word. The controller takes this map in place of the DOM one;
+  selections and "read from here" are translated through it.
+- **One range per sentence.** A sentence that runs over a page break spans the page number
+  between its halves. Spans that are not read get `data-unread`, and a
+  `[data-unread]::highlight()` rule keeps them uncoloured; Firefox applies `::highlight` rules
+  per element (computed style checked in the tests, and the uncoloured page number seen on a
+  screenshot).
+- **Cost.** Text layers for all pages are built when the file is opened; canvases are drawn
+  only within one window height of the view and emptied after. Measured in headless Firefox:
+  the arXiv paper (15 pages, 2,286 spans) opened in 0.5 s; generated PDFs of 100 and 500 pages
+  with 40 lines each opened in 0.5 s and 2.2 s, and reading started 0.07 s and 0.16 s after
+  the click.
+- **Following.** The page jumps to a sentence that starts out of view, but only while the
+  previous sentence was at least partly in view, so scrolling away to look at something is not
+  undone. Web pages are still not scrolled.
+- Pages refit when the window is resized (one CSS variable scales the text layer; visible
+  canvases are redrawn).
+- **Rotated pages.** pdf.js lays the text layer out unturned and sets `data-main-rotation` on
+  it; its stylesheet turns the layer with three transform rules, which had to be copied too.
+  Tested with a generated page with `/Rotate 90`: the text's box lies on the drawn ink.
+- **Pages of different sizes** are all scaled by one factor, chosen so the widest fits. Tested
+  with a page three times as wide as the first.
+- **Found in review (2026-11-21).** A reading stopped by hand did not tell the page that no
+  sentence was being read, so a later reading was not followed if the window had been
+  scrolled away. A selection that starts at an element boundary was read from the start of
+  its paragraph. Blank runs between words counted as "not read" and would have left holes in
+  the highlight. `saveSettings` reads before it writes, so two quick changes in the control bar
+  could lose one; saves are now ordered inside it, for every caller. All have tests.

@@ -3,12 +3,22 @@
 A Firefox add-on (Manifest V3) that reads web page text aloud with the
 [tiny-voca](https://github.com/n4ze3m/tiny-voca) text-to-speech model and highlights what is
 being spoken. Inference runs locally in the browser through ONNX Runtime Web. No text or audio
-leaves the machine, and the add-on makes no network requests at runtime.
+leaves the machine. The add-on makes one kind of network request, and only when you ask for it:
+downloading a PDF from the web so that it can read it to you.
 
 ## Using it
 
 - Click the Tiny Reader button in the toolbar and press **Read aloud**: it reads the selection, or the page's main
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
+- To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
+  in Tiny Reader…**, and it opens by itself if you try to read the PDF from the context menu or a shortcut. A Tiny
+  Reader page opens and shows the PDF's pages as they are. It reads them with the sentence and word highlighted on
+  the page, scrolls along as it reads, and has the same control bar, context menu and shortcuts as a web page.
+  - A PDF on the web is downloaded and opened for you. The first time for each site, press **Allow and open** and
+    accept Firefox's permission prompt; after that, PDFs from that site open at once.
+  - A PDF on your computer has to be picked with **Open a PDF…** or dropped on the page: Firefox does not let an
+    add-on open a local file by itself. The page names the file to look for.
+  - Either way the PDF is processed on your computer and never uploaded.
 - Select text, right-click, **Read with tiny-voca**. Or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.
 - Right-click a paragraph with nothing selected, **Read from here with tiny-voca**: reads from
   the start of that paragraph to the end of the article (`<article>`, `<main>`), or of the page.
@@ -60,6 +70,32 @@ export default defineWebExtConfig({
 });
 ```
 
+## Installing a development build in your own Firefox
+
+`pnpm dev` runs the add-on in a throwaway profile. To use it in your normal Firefox, load a build as a temporary
+add-on:
+
+1. Build it:
+
+   ```bash
+   pnpm build
+   ```
+
+   Without pnpm installed, `npx -y pnpm@12.21.0 build` does the same. That prefix works for every `pnpm` command in
+   this README.
+
+2. In Firefox, open `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on…** and choose `.output/firefox-mv3/manifest.json` inside this repository. `.output`
+   is a hidden folder, so the file picker does not show it: press <kbd>Ctrl</kbd>+<kbd>L</kbd> there and paste the
+   full path.
+4. The Tiny Reader button appears in the toolbar or in the extensions (puzzle piece) menu, from where it can be
+   pinned.
+
+After changing the code, run the build again and click **Reload** on the add-on's card on that page.
+
+A temporary add-on is removed when Firefox closes; load it again after a restart. Installing it permanently needs a
+build signed by Mozilla, see [Before publishing](#before-publishing).
+
 ## Scripts
 
 | Command             | What it does                                                                              |
@@ -74,9 +110,11 @@ export default defineWebExtConfig({
 | `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
 | `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
 
-`pnpm lint:ext` reports no errors and two accepted warnings:
+`pnpm lint:ext` reports no errors and four accepted warnings:
 
 - `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: the add-on is desktop only.
+- `UNSAFE_VAR_ASSIGNMENT` in the document page's script and in `pdf.worker.min-*.mjs`: both are pdf.js, bundled
+  unmodified from the `pdfjs-dist` npm package.
 - `UNSAFE_VAR_ASSIGNMENT` in `engine-worker.js`: ONNX Runtime loads its own wasm loader with a
   dynamic `import()`. The URL is always `ort/ort-wasm-simd-threaded.mjs` inside the add-on
   package, an unmodified file from the `onnxruntime-web` npm package.
@@ -140,10 +178,12 @@ and a test fails once that list is no longer needed.
 
 ```mermaid
 flowchart LR
-  subgraph page["Web page: content script, injected on demand"]
+  subgraph page["Reader: content script injected into a web page, or built into the PDF page"]
     direction TB
+    pdf["PDF page only: pdf.js<br/>pages on canvas, text layer over them"]
     bar["Control bar<br/>closed shadow root"]
     text["Text map and Intl.Segmenter<br/>selection to sentences"]
+    pdf --> text
     reader["Reader queue<br/>prefetch, pause, skip, cancel"]
     audio["Web Audio<br/>gapless playback"]
     marks["CSS Custom Highlight API<br/>sentence and word"]
@@ -157,6 +197,8 @@ flowchart LR
     router["Router<br/>menus, shortcuts, per-page request ids"]
   end
 
+  popup["Toolbar popup<br/>commands, settings"]
+
   subgraph worker["Engine Worker"]
     direction TB
     phonemizer["Phonemizer<br/>dizione"]
@@ -167,24 +209,34 @@ flowchart LR
 
   reader <-->|"runtime.Port<br/>sentence in, PCM and word timings out"| router
   router <-->|"postMessage"| worker
+  popup -->|"command"| router
+  router -->|"command"| bar
 ```
 
-- **Content script** ([entrypoints/reader.content.ts](entrypoints/reader.content.ts), [content/](content/)): reads the
-  selection from the DOM as one string, splits it into sentences, keeps two sentences synthesized ahead of the one
-  playing, and schedules each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a
-  change of voice or speed abort work that is no longer needed.
+- **Reader** ([content/controller.ts](content/controller.ts), [content/](content/)): reads the selection from the DOM
+  as one string, splits it into sentences, keeps two sentences synthesized ahead of the one playing, and schedules
+  each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a change of voice or speed
+  abort work that is no longer needed. It runs in web pages as a content script
+  ([entrypoints/reader.content.ts](entrypoints/reader.content.ts)), injected on demand, and is built into the
+  document page.
 - **Highlighting** ([content/text-map.ts](content/text-map.ts), [content/highlight.ts](content/highlight.ts)): offsets
   in that string map back to DOM ranges, which are registered with the CSS Custom Highlight API. Nothing is wrapped or
   inserted. The word highlight follows the audio clock; with `prefers-reduced-motion: reduce` only the sentence is
   marked.
 - **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
   add-on adds to a page.
+- **Document page** ([entrypoints/document/](entrypoints/document/), [content/pdf-text.ts](content/pdf-text.ts)): a
+  page of the add-on's own that shows a PDF you open with a bundled copy of pdf.js: each page drawn on a canvas, with
+  pdf.js's invisible text layer over it. Paragraphs are rebuilt from the positioned text runs, with a map from every
+  word back to its place in the text layer, so the same controller as the content script
+  ([content/controller.ts](content/controller.ts)) reads them and the highlight lands on the page.
 - **Toolbar popup** ([entrypoints/popup/](entrypoints/popup/)): the panel behind the toolbar button. Its buttons send
   a command to the background, which passes it to the reader in the active tab; its settings form is the one the
   options page uses ([content/settings-form.ts](content/settings-form.ts)).
 - **Background event page** ([entrypoints/background.ts](entrypoints/background.ts)): context menu, shortcuts and
   message routing. It owns the Worker, because a content script cannot start one, and prefixes request ids per page so
-  pages cannot see or cancel each other's requests.
+  pages cannot see or cancel each other's requests. It also tells the popup whether the active tab can be read, and
+  opens the popup when a reading could not start.
 - **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts), [engine/](engine/)): one request is
   one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
@@ -202,7 +254,13 @@ The reasoning and measurements behind these choices are in [docs/FINDINGS.md](do
 | `menus`     | Adds **Read with tiny-voca** (on a selection) and **Read from here with tiny-voca** (on the page) to the context menu, and tells the reader which element the menu was opened on.                                 |
 | `storage`   | Remembers your settings (voice, speed, pitch, prefetch depth) in `storage.local`. Nothing else is stored.                                                                                                         |
 
-There are no host permissions and no `web_accessible_resources`. The extension CSP is
+One optional permission is asked for at runtime, never at install:
+
+| Optional permission                              | Why                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Access to one site (`optional_host_permissions`) | Requested when you open a PDF from that site in the Tiny Reader page, so the add-on can download the file. It is used for that download only; the add-on still injects nothing into the site's pages unless you start a reading there. You can withdraw it under the add-on's Permissions in `about:addons`. |
+
+There are no host permissions at install and no `web_accessible_resources`. The extension CSP is
 `script-src 'self' 'wasm-unsafe-eval'`: wasm compilation is required by ONNX Runtime, and nothing
 else is allowed. The model, ONNX Runtime and the phonemizer run only in the add-on's own Worker,
 never in a page, so a page's CSP cannot affect them.
@@ -215,9 +273,18 @@ does not extend to such frames.
 - English only. Text in another script is skipped; if nothing can be read the bar says so. Text
   that Firefox's local language detector identifies as another language gets a warning in the bar
   and is read anyway, with English sounds.
-- Firefox's Reader View cannot be read, nor can Firefox's own pages or addons.mozilla.org: Firefox lets no add-on into
-  them, whatever its permissions. The toolbar button then shows a "!" badge with the reason, and the popup says so.
-  Leave Reader View and read the original page instead.
+- Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
+  addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. The toolbar button then shows a "!"
+  badge with the reason, and the popup says so. Leave Reader View and read the original page instead. For PDFs, use
+  **Read a PDF…**: the highlight is shown on the PDF's pages in Tiny Reader's own page, not in Firefox's viewer.
+- What is read from a PDF is rebuilt from the positions of its text, which works for single-column prose. Columns,
+  tables, footnotes and running headers may come out in the wrong order, and a scanned PDF (pages stored as pictures)
+  is shown but has no text to read. In a scientific paper the running text reads well, but formulas and table cells
+  come out as short fragments that are read aloud as they are.
+- PDF pages are drawn without pdf.js's extra data files, which are not bundled: text in a font the PDF does not embed
+  is drawn in a similar font of your system, and JPEG 2000 and JBIG2 images may be missing. The text is read all the
+  same. Links, form fields and comments in a PDF are not shown, and there is no zoom of its own: pages fit the width
+  of the window, up to a limit.
 - Text selected inside a frame from another site cannot be read (see Permissions).
 - A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
   150-digit number, is left out. Everything around it is read.
@@ -249,5 +316,8 @@ placeholder. Change it before submitting to addons.mozilla.org.
 
 - tiny-voca model and JavaScript phonemizer: Apache-2.0, © Muhammed Nazeem
 - Phonemizer dictionary: derived from the CMU Pronouncing Dictionary (BSD-style licence)
+- pdf.js (`pdfjs-dist`): Apache-2.0, © Mozilla Foundation. The text-layer rules in
+  [entrypoints/document/style.css](entrypoints/document/style.css) are taken from its `pdf_viewer.css`.
+- ONNX Runtime Web: MIT, © Microsoft
 
 The licence texts are bundled in the add-on under `assets/licenses/`.

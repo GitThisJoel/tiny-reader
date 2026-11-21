@@ -1,0 +1,140 @@
+:root {
+  color-scheme: light dark;
+  font:
+    16px / 1.5 system-ui,
+    sans-serif;
+}
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+}
+header {
+  position: sticky;
+  top: 0;
+  /* Above the pages, whose text layers are positioned. */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: color-mix(in srgb, CanvasText 8%, Canvas);
+}
+header img {
+  border-radius: 6px;
+}
+h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+/* The name of the open file. It is not part of the text that is read. */
+#name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: GrayText;
+}
+button {
+  font: inherit;
+  padding: 0.35rem 0.8rem;
+}
+main {
+  max-width: 62rem;
+  margin: 0 auto;
+  /* Room for the control bar at the bottom of the window. */
+  padding: 1.5rem 1rem 6rem;
+}
+#status {
+  color: GrayText;
+}
+#allow {
+  background: #ffc83d;
+  color: #1c1b22;
+  border: 1px solid GrayText;
+  border-radius: 8px;
+  font-weight: 600;
+}
+#status[data-kind="error"] {
+  color: light-dark(#a4000f, #ff9aa2);
+}
+body[data-dropping] {
+  outline: 3px dashed Highlight;
+  outline-offset: -8px;
+}
+/* A page: its picture on a canvas, and over it the text layer the highlight is painted on. */
+.page {
+  position: relative;
+  margin: 0 auto 1rem;
+  background: white;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.35);
+}
+.page canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The text layer's layout, from pdf.js's pdf_viewer.css (Apache-2.0), less what is not used here.
+   The text is in place but transparent: it is there to be selected, read by a screen reader,
+   and highlighted. pdf.js sets --min-font-size, --font-height, --scale-x and --rotate itself. */
+.textLayer {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  color-scheme: only light;
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+}
+/* A page stored turned: pdf.js lays the text out unturned and says how far to turn the layer. */
+.textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+.textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+.textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer > * {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer ::selection {
+  background: color-mix(in srgb, AccentColor, transparent 50%);
+  color: transparent;
+}
+/* The sentence being read and the word being spoken, under the names content/highlight.ts gives
+   them. See-through, so the page shows beneath. */
+::highlight(tiny-reader-sentence) {
+  background-color: rgb(255 208 0 / 0.4);
+  color: transparent;
+}
+::highlight(tiny-reader-word) {
+  background-color: rgb(255 106 0 / 0.5);
+  color: transparent;
+}
+/* Text that is not read, such as a page number in the middle of a sentence. */
+.textLayer [data-unread]::highlight(tiny-reader-sentence),
+.textLayer [data-unread]::highlight(tiny-reader-word) {
+  background-color: transparent;
+}

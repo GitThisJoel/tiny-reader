@@ -1,9 +1,17 @@
 import { type Browser, browser } from "wxt/browser";
 import { defineBackground } from "wxt/utils/define-background";
-import { BLOCKED, isCommand, isCommandMessage } from "@/content/commands.ts";
+import {
+  BLOCKED,
+  isCommand,
+  isCommandMessage,
+  PAGE_STATE,
+  type PageState,
+  pdfName,
+  webUrl,
+} from "@/content/commands.ts";
+import type { ReaderCommand } from "@/content/controller.ts";
 import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
 import { createRouter, type WorkerLike } from "@/engine/router.ts";
-import type { ReaderCommand } from "./reader.content.ts";
 
 const MENU_SELECTION = "read-selection";
 const MENU_FROM_HERE = "read-from-here";
@@ -21,8 +29,13 @@ export default defineBackground(() => {
   const router = createRouter(() => new Worker(browser.runtime.getURL("/engine-worker.js")) as unknown as WorkerLike);
   browser.runtime.onConnect.addListener((port) => router.connect(port));
 
+  /** The add-on's own document page: it has the reader built in, and no add-on can inject into it. */
+  const isDocumentPage = (tab: Browser.tabs.Tab) =>
+    tab.url?.startsWith(browser.runtime.getURL("/document.html")) ?? false;
+
   /** Puts the reader and the highlight colours into one frame, or every reachable frame. */
   async function inject(tabId: number, frameId: number | undefined) {
+    if (isDocumentPage(await browser.tabs.get(tabId))) return;
     const target = frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] };
     const injections = await browser.scripting.executeScript({ target, files: ["/content-scripts/reader.js"] });
     // First injection into a document: add the highlight colours too.
@@ -84,12 +97,9 @@ export default defineBackground(() => {
   menus.onClicked.addListener((info: MenuClick, tab) => {
     if (tab?.id === undefined) return;
     const frameId = info.frameId ?? 0;
-    if (info.menuItemId === MENU_SELECTION) void send(tab.id, frameId, { type: "read-selection" });
+    if (info.menuItemId === MENU_SELECTION) void send(tab.id, frameId, { type: "read-selection" }).then(explain);
     else if (info.menuItemId === MENU_FROM_HERE && info.targetElementId !== undefined)
-      void send(tab.id, frameId, {
-        type: "read-from-here",
-        target: info.targetElementId,
-      });
+      void send(tab.id, frameId, { type: "read-from-here", target: info.targetElementId }).then(explain);
   });
 
   /** Passes a command to the reader in the tab the user is looking at. */
@@ -100,9 +110,30 @@ export default defineBackground(() => {
     // the reading. Starting a reading in one frame does not stop one in another frame.
     return tab?.id !== undefined && send(tab.id, undefined, { type: name });
   }
-  // Keyboard shortcuts, and the buttons of the toolbar popup.
-  browser.commands.onCommand.addListener((name) => void toActiveTab(name));
+
+  /** A reading could not start, and nothing can be shown in the page: open the popup, which explains. */
+  const explain = (started: boolean) => {
+    if (!started) browser.action.openPopup().catch(() => {});
+  };
+
+  /** Whether the active tab can be read in place, found out by trying to run a script that does nothing. */
+  async function pageState(): Promise<PageState> {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id === undefined) return { kind: "blocked" };
+    if (isDocumentPage(tab)) return { kind: "readable" };
+    try {
+      await browser.scripting.executeScript({ target: { tabId: tab.id }, func: () => true });
+      return { kind: "readable" };
+    } catch {
+      const name = pdfName(tab.url ?? "", tab.title);
+      return name ? { kind: "pdf", name, url: webUrl(tab.url) } : { kind: "blocked" };
+    }
+  }
+
+  // Keyboard shortcuts, and the toolbar popup: its buttons, and its question about the tab.
+  browser.commands.onCommand.addListener((name) => void toActiveTab(name).then(explain));
   browser.runtime.onMessage.addListener((message: unknown) => {
     if (isCommandMessage(message)) return toActiveTab(message.name);
+    if ((message as { type?: unknown } | null)?.type === PAGE_STATE) return pageState();
   });
 });

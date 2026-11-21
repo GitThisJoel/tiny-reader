@@ -126,6 +126,11 @@ export class Firefox {
     this.current = tab;
   }
 
+  /** The handles of all open tabs. */
+  async tabs(): Promise<string[]> {
+    return this.send<string[]>("WebDriver:GetWindowHandles", {});
+  }
+
   /** Opens a tab and waits for the page to load. Returns the tab's handle. */
   async open(url: string): Promise<string> {
     const { handle } = await this.send<{ handle: string }>("WebDriver:NewWindow", { type: "tab" });
@@ -171,13 +176,19 @@ export class Firefox {
     }
   }
 
-  /** A real click on the first element matching `selector`. */
-  async click(tab: string, selector: string) {
+  /** Marionette's id for the first element matching `selector`. */
+  private async elementId(tab: string, selector: string): Promise<string> {
     const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
       selector,
     ]);
     const id = Object.values(element ?? {})[0];
     if (!id) throw new Error(`no element matches ${selector}`);
+    return id;
+  }
+
+  /** A real click on the first element matching `selector`. */
+  async click(tab: string, selector: string) {
+    const id = await this.elementId(tab, selector);
     await this.send("WebDriver:ElementClick", { id });
   }
 
@@ -204,6 +215,12 @@ export class Firefox {
   async reload(tab: string) {
     await this.focus(tab);
     await this.send("WebDriver:Refresh", {});
+  }
+
+  /** Chooses a file in an <input type="file">, as the file picker would. */
+  async upload(tab: string, selector: string, path: string) {
+    const id = await this.elementId(tab, selector);
+    await this.send("WebDriver:ElementSendKeys", { id, text: path });
   }
 
   /** Presses the left button at one viewport point, moves to another and releases. */
@@ -301,13 +318,10 @@ export class Firefox {
     if (picked !== "ok") throw new Error(`context menu "${label}": ${picked}`);
   }
 
-  /** A PNG of the element matching `selector`, as bytes. */
-  async screenshot(tab: string, selector: string): Promise<Buffer> {
-    const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
-      selector,
-    ]);
-    const id = Object.values(element ?? {})[0];
-    if (!id) throw new Error(`no element matches ${selector}`);
+  /** A PNG of the element matching `selector`, or of the window's view without one, as bytes. */
+  async screenshot(tab: string, selector?: string): Promise<Buffer> {
+    await this.focus(tab);
+    const id = selector ? await this.elementId(tab, selector) : undefined;
     const { value } = await this.send<{ value: string }>("WebDriver:TakeScreenshot", { id, full: false });
     return Buffer.from(value, "base64");
   }

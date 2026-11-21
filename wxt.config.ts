@@ -35,6 +35,9 @@ export default defineConfig({
     action: { default_title: "Tiny Reader", default_icon: "icon.svg" },
     // Each permission is justified in the README.
     permissions: ["activeTab", "scripting", "menus", "storage"],
+    // Never granted at install. Asked for one site at a time, when the user opens a PDF from that
+    // site in the add-on's document page, so that the add-on can download it.
+    optional_host_permissions: ["*://*/*"],
     // Defaults only; every key can be changed in Firefox's "Manage Extension Shortcuts".
     commands: {
       "read-selection": {
