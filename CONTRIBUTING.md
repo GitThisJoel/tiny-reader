@@ -53,19 +53,20 @@ export default defineWebExtConfig({
 
 ## Scripts
 
-| Command             | What it does                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------ |
-| `pnpm dev`          | Watch build and launch Firefox with the add-on                                             |
-| `pnpm build`        | Production build into `.output/firefox-mv3/`                                               |
-| `pnpm zip`          | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO  |
-| `pnpm lint`         | Biome lint and format check                                                                |
-| `pnpm format`       | Biome, applying fixes                                                                      |
-| `pnpm typecheck`    | `tsc --noEmit` in strict mode                                                              |
-| `pnpm test`         | Vitest unit tests                                                                          |
-| `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                       |
-| `pnpm fetch-assets` | Download and verify model and phonemizer assets                                            |
-| `pnpm build-espeak` | Build eSpeak NG to WebAssembly in a container; `--fixtures` rewrites its parity references |
-| `pnpm screenshots`  | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
+| Command                | What it does                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm dev`             | Watch build and launch Firefox with the add-on                                             |
+| `pnpm build`           | Production build into `.output/firefox-mv3/`                                               |
+| `pnpm zip`             | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO  |
+| `pnpm lint`            | Biome lint and format check                                                                |
+| `pnpm format`          | Biome, applying fixes                                                                      |
+| `pnpm typecheck`       | `tsc --noEmit` in strict mode                                                              |
+| `pnpm test`            | Vitest unit tests                                                                          |
+| `pnpm lint:ext`        | `web-ext lint` on the build (run `pnpm build` first)                                       |
+| `pnpm fetch-assets`    | Download and verify model and phonemizer assets                                            |
+| `pnpm build-espeak`    | Build eSpeak NG to WebAssembly in a container; `--fixtures` rewrites its parity references |
+| `pnpm german-fixtures` | Rewrite the German parity reference with apptor's Python front end, in a container         |
+| `pnpm screenshots`     | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
 
 `pnpm lint:ext` reports no errors and four accepted warnings:
 
@@ -140,8 +141,13 @@ writes `tests/parity/espeak-<language>.json`, which `pnpm test:parity` compares 
 which eSpeak NG version the model was trained with: output differs between versions for about one text in a
 hundred.
 
+A front end may need a file of its own that is too large to bundle: the German one reads words with a 12 MB
+letter-to-sound model. Such a file is the list entry's `helper`: pinned like the model, downloaded and stored with
+it, deleted with it, and handed to `loadFrontEnd`. It has to be data; code is never downloaded.
+
 `pnpm test:smoke` speaks a sentence with every downloadable model that has a front end of its own. It downloads
-each one once (about 21 MB) into `.cache/models/`, verified like in the add-on.
+each one once (about 21 MB) into `.cache/models/`, verified like in the add-on. The German parity test uses the
+same folder for the letter-to-sound model.
 
 `pnpm test:e2e` makes a second build in `.output/firefox-mv3-e2e` for
 [tests/e2e/models.test.ts](tests/e2e/models.test.ts): the production build with a stand-in model added to the list

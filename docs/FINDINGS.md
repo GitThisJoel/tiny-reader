@@ -463,10 +463,29 @@ add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es
   were trained, so these two front ends never report "nothing to pronounce" for Japanese or Cyrillic text.
 - Size: the package is 48.7 MB, the Worker script 232 kB.
 
+**German** (`apptor/apptor-tiny-tts`) needs no eSpeak NG: its makers trained a letter-to-sound model on eSpeak
+NG's readings and wrote the front end in JavaScript.
+
+- **A second downloaded file.** That model is 12.4 MB, too much to bundle for one language, and it is data. A list
+  entry can therefore name a `helper`: pinned like the model, downloaded before it, stored beside it, deleted with
+  it. A download that fails after the helper leaves nothing behind.
+- **A second session in the Worker**, and an asynchronous front end. The engine cuts long text with a synchronous
+  test, so a piece not phonemized yet counts as short enough, is phonemized after the pass, and the cutting is
+  repeated until nothing is new.
+- **Checked against the Python front end** (`pnpm german-fixtures`, in a pinned Python container with onnxruntime
+  1.32.0): identical ids and stress for all 50 sentences in
+  [tests/parity/german-sentences.json](../tests/parity/german-sentences.json), though one side runs the
+  letter-to-sound model natively and the other as wasm. Every spoken word is named, numbers included, because
+  this front end reads word by word.
+- In Firefox: both files downloaded through the settings page (stored as `apptor-de` and `apptor-de/helper`), and
+  "Hallo, der Zug fährt um 14:35 Uhr ab." came out as 2.8 s with all eight words timed.
+- **Not used: the Vocos sound filter.** The makers add a second stage (16.7 MB) that re-synthesises the audio and
+  say that without it the voice is "noticeably buzzy". Tiny Reader plays the model's own output.
+- The Austrian model of the same makers has one more input (`accent`) and is not in the list.
+
 **What is left of the survey.** With eSpeak NG in the package, a model trained on its output needs its dictionary
 in the build, its front-end code and a reference. Candidates, none of them done: Turkish (`erkint/zerre-tts`),
 Bengali (`Xeven7/tiny-swara`) and Malayalam (`Cyrax321/tui-voice-mini-ml`) have only Python front ends (200 to 500
 lines each to port, eSpeak NG versions not pinned); a second Italian and a second Brazilian Portuguese model were
-trained on eSpeak NG 1.51, not the version built. German (`apptor/apptor-tiny-tts`) needs no eSpeak NG but a 12 MB
-letter-to-sound model as a second ONNX session. Russian, Polish, Japanese, Arabic, Hebrew, Korean, Urdu, Greek,
+trained on eSpeak NG 1.51, not the version built. Russian, Polish, Japanese, Arabic, Hebrew, Korean, Urdu, Greek,
 Hindi, Swahili, Kurdish and Sanskrit stay out for the reasons at the top of this section.
