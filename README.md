@@ -178,10 +178,12 @@ and a test fails once that list is no longer needed.
 
 ```mermaid
 flowchart LR
-  subgraph page["Web page: content script, injected on demand"]
+  subgraph page["Reader: content script injected into a web page, or built into the PDF page"]
     direction TB
+    pdf["PDF page only: pdf.js<br/>pages on canvas, text layer over them"]
     bar["Control bar<br/>closed shadow root"]
     text["Text map and Intl.Segmenter<br/>selection to sentences"]
+    pdf --> text
     reader["Reader queue<br/>prefetch, pause, skip, cancel"]
     audio["Web Audio<br/>gapless playback"]
     marks["CSS Custom Highlight API<br/>sentence and word"]
@@ -195,6 +197,8 @@ flowchart LR
     router["Router<br/>menus, shortcuts, per-page request ids"]
   end
 
+  popup["Toolbar popup<br/>commands, settings"]
+
   subgraph worker["Engine Worker"]
     direction TB
     phonemizer["Phonemizer<br/>dizione"]
@@ -205,12 +209,16 @@ flowchart LR
 
   reader <-->|"runtime.Port<br/>sentence in, PCM and word timings out"| router
   router <-->|"postMessage"| worker
+  popup -->|"command"| router
+  router -->|"command"| bar
 ```
 
-- **Content script** ([entrypoints/reader.content.ts](entrypoints/reader.content.ts), [content/](content/)): reads the
-  selection from the DOM as one string, splits it into sentences, keeps two sentences synthesized ahead of the one
-  playing, and schedules each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a
-  change of voice or speed abort work that is no longer needed.
+- **Reader** ([content/controller.ts](content/controller.ts), [content/](content/)): reads the selection from the DOM
+  as one string, splits it into sentences, keeps two sentences synthesized ahead of the one playing, and schedules
+  each on the Web Audio clock exactly where the previous one ends. Pause, skip, stop and a change of voice or speed
+  abort work that is no longer needed. It runs in web pages as a content script
+  ([entrypoints/reader.content.ts](entrypoints/reader.content.ts)), injected on demand, and is built into the
+  document page.
 - **Highlighting** ([content/text-map.ts](content/text-map.ts), [content/highlight.ts](content/highlight.ts)): offsets
   in that string map back to DOM ranges, which are registered with the CSS Custom Highlight API. Nothing is wrapped or
   inserted. The word highlight follows the audio clock; with `prefers-reduced-motion: reduce` only the sentence is
@@ -227,7 +235,8 @@ flowchart LR
   options page uses ([content/settings-form.ts](content/settings-form.ts)).
 - **Background event page** ([entrypoints/background.ts](entrypoints/background.ts)): context menu, shortcuts and
   message routing. It owns the Worker, because a content script cannot start one, and prefixes request ids per page so
-  pages cannot see or cancel each other's requests.
+  pages cannot see or cancel each other's requests. It also tells the popup whether the active tab can be read, and
+  opens the popup when a reading could not start.
 - **Engine Worker** ([entrypoints/engine-worker.ts](entrypoints/engine-worker.ts), [engine/](engine/)): one request is
   one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
