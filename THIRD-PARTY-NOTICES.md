@@ -12,7 +12,7 @@ the licence texts that come with the model are in `assets/licenses/`.
 | Homograph data                                               | Hugging Face revision `1e73262` | Apache-2.0                              | `assets/tiny-voca-js.gguf`                                        | https://huggingface.co/n4ze3m/tiny-voca  |
 | ONNX Runtime Web                                             | 1.31.1                          | MIT, © Microsoft Corporation            | `ort/`, and bundled into `engine-worker.js`                       | https://github.com/microsoft/onnxruntime |
 | pdf.js (`pdfjs-dist`)                                        | 6.5.438                         | Apache-2.0, © Mozilla Foundation        | bundled into the document page, and `assets/pdf.worker.min-*.mjs` | https://github.com/mozilla/pdf.js        |
-| WXT runtime helpers                                          | 0.21.5                          | MIT                                     | a few lines in each script                                        | https://github.com/wxt-dev/wxt           |
+| WXT runtime helpers                                          | 0.21.5                          | MIT, © 2023 Aaron                       | a few lines in each script                                        | https://github.com/wxt-dev/wxt           |
 
 All of these are used unmodified. The text-layer rules in `entrypoints/document/style.css` are taken from pdf.js's
 `pdf_viewer.css`.
@@ -24,7 +24,7 @@ All of these are used unmodified. The text-layer rules in `entrypoints/document/
 - **CMU Pronouncing Dictionary**: `assets/licenses/cmudict.LICENSE.txt`.
 - **ONNX Runtime**: the MIT License below. Its WebAssembly binary contains further libraries, listed in
   `ThirdPartyNotices.txt` in its repository.
-- **WXT**: the MIT License below, with the copyright notice of the WXT authors in place of Microsoft's.
+- **WXT**: the MIT License below, with "Copyright (c) 2023 Aaron" in place of Microsoft's line.
 
 ### MIT License (ONNX Runtime)
 
