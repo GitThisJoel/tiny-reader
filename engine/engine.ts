@@ -1,7 +1,8 @@
 import type * as Ort from "onnxruntime-web";
 import { alignWords } from "./align.ts";
-import { checkIo, ModelError } from "./models.ts";
-import { loadPhonemizer, type Phonemes, phonemize } from "./phonemizer.ts";
+import type { FrontEnd } from "./frontends.ts";
+import { checkIo } from "./models.ts";
+import type { Phonemes } from "./phonemizer.ts";
 import { HOP, SAMPLE_RATE, type SynthOptions, type Utterance, type WordTiming } from "./protocol.ts";
 import { finished, normalize, splitLong } from "./text.ts";
 
@@ -14,8 +15,9 @@ export const MAX_TOKENS = 200;
 const PEAK = 0.99;
 
 export class NothingToPronounce extends Error {
-  constructor() {
-    super("Nothing to pronounce. tiny-voca only reads English.");
+  /** `why`: which language the model reads, for the user. */
+  constructor(why = "") {
+    super(`Nothing to pronounce.${why && ` ${why}.`}`);
   }
 }
 
@@ -31,29 +33,11 @@ export interface Engine {
 type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
 
 /**
- * The text front end called `name`, as the list of models names it: what turns text into a
- * model's tokens. Throws a ModelError for one this build does not have.
+ * `frontEnd` is the text front end the model was trained with (engine/frontends.ts).
+ * Rejects with a ModelError when the file's inputs and outputs are not a tiny-voca model's.
  */
-export function frontEnd(name: string): typeof loadPhonemizer {
-  // ponytail: one front end, so one comparison. Another language adds its code to the package and a case here.
-  if (name === "dizione") return loadPhonemizer;
-  throw new ModelError(`it needs the text front end "${name}", which this version of Tiny Reader does not have`);
-}
-
-/**
- * `frontend` is the front end the model needs (engine/models.ts) and `gguf` that front end's data.
- * Rejects with a ModelError when this build lacks the front end, before the model is loaded, or
- * when the file's inputs and outputs are not a tiny-voca model's.
- */
-export async function createEngine(
-  ort: OrtModule,
-  assets: { model: Uint8Array; gguf: ArrayBuffer; frontend: string },
-): Promise<Engine> {
-  const load = frontEnd(assets.frontend);
-  const [session, phonemizer] = await Promise.all([
-    ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] }),
-    load(assets.gguf),
-  ]);
+export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; frontEnd: FrontEnd }): Promise<Engine> {
+  const session = await ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] });
   try {
     checkIo(session);
   } catch (error) {
@@ -88,7 +72,7 @@ export async function createEngine(
       // Phonemizing each candidate piece once: the result is reused for synthesis.
       const cache = new Map<string, Phonemes | null>();
       const phonemesOf = (piece: string) => {
-        if (!cache.has(piece)) cache.set(piece, phonemize(phonemizer, finished(piece)));
+        if (!cache.has(piece)) cache.set(piece, assets.frontEnd(finished(piece)));
         return cache.get(piece) ?? null;
       };
       const pieces = splitLong(normalize(text), (piece) => (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS);

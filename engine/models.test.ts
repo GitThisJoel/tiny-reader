@@ -1,47 +1,52 @@
 import { describe, expect, it, vi } from "vitest";
 import { ASSETS } from "../scripts/fetch-assets.ts";
-import { frontEnd } from "./engine.ts";
 import {
   BUNDLED,
   checkIo,
   downloadModel,
+  languageName,
   MODELS,
   type Model,
   ModelError,
   modelById,
-  modelUrl,
+  readsOnly,
   verifyModel,
 } from "./models.ts";
-import { loadPhonemizer } from "./phonemizer.ts";
 
 describe("the list of models", () => {
   it("starts with the bundled model, at the revision and hash fetch-assets pins", () => {
     expect(MODELS[0]).toBe(BUNDLED);
     const shipped = ASSETS.find((asset) => asset.path === "public/assets/model.onnx");
-    expect(shipped).toMatchObject({ url: modelUrl(BUNDLED), sha256: BUNDLED.sha256 });
+    expect(shipped).toMatchObject({ url: BUNDLED.url, sha256: BUNDLED.sha256 });
   });
 
-  it("offers SobbieTTS and fiato besides it, and nothing else", () => {
-    expect(MODELS.map((model) => model.repo)).toEqual([
-      "n4ze3m/tiny-voca",
-      "PatnaikAshish/SobbieTTS",
-      "cfahlgren1/fiato",
+  it("offers these models and nothing else, each with the front end of its language", () => {
+    expect(MODELS.map((model) => [model.id, model.language, model.frontend])).toEqual([
+      ["tiny-voca", "en", "dizione"],
+      ["sobbie", "en", "dizione"],
+      ["fiato", "en", "dizione"],
+      ["tiny-voca-ptbr", "pt-BR", "dizione-ptbr"],
+      ["vocina", "it", "g2p-it"],
     ]);
   });
 
-  it("pins every model to a commit and a SHA-256, on Hugging Face over https", () => {
+  it("pins every model to an address that cannot drift unnoticed, and to a SHA-256", () => {
     for (const model of MODELS) {
-      expect(model.revision, model.id).toMatch(/^[0-9a-f]{40}$/);
+      // A commit on Hugging Face, or a release tag on GitHub; over https either way.
+      expect(model.url, model.id).toMatch(
+        /^https:\/\/huggingface\.co\/[\w.-]+\/[\w.-]+\/resolve\/[0-9a-f]{40}\/|^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/releases\/download\/v[\d.]+\//,
+      );
+      expect(model.url.startsWith(model.source), model.id).toBe(true);
       expect(model.sha256, model.id).toMatch(/^[0-9a-f]{64}$/);
       expect(model.size, model.id).toBeGreaterThan(1e6);
-      expect(model.url, model.id).toBeUndefined();
-      expect(modelUrl(model)).toBe(`https://huggingface.co/${model.repo}/resolve/${model.revision}/onnx/model.onnx`);
-      expect(model.source).toBe(`https://huggingface.co/${model.repo}`);
-      // What the engine and its English phonemizer can speak, under a licence that lets it be passed on.
-      expect(model).toMatchObject({ language: "en", frontend: "dizione", licence: "Apache-2.0" });
-      // Every listed model names a text front end the engine has.
-      expect(frontEnd(model.frontend), model.id).toBeTypeOf("function");
+      // Licences that let the file be passed on; the credit they ask for is shown with the model.
+      expect(["Apache-2.0", "CC-BY-4.0"], model.id).toContain(model.licence);
+      expect(model.author, model.id).not.toBe("");
       expect(model.voices.length, model.id).toBeGreaterThan(0);
+      // Only a site that sends no CORS headers needs more than its own address allowed.
+      expect(model.alsoAllow ?? [], model.id).toEqual(
+        model.url.startsWith("https://github.com/") ? ["https://release-assets.githubusercontent.com/*"] : [],
+      );
     }
     expect(new Set(MODELS.map((model) => model.id)).size).toBe(MODELS.length);
     expect(new Set(MODELS.map((model) => model.sha256)).size).toBe(MODELS.length);
@@ -50,6 +55,12 @@ describe("the list of models", () => {
   it("finds a model by its id, and nothing for anything else", () => {
     expect(modelById("fiato")?.voices).toEqual(["F1", "M1"]);
     for (const id of ["", "nope", undefined, null, 3, {}]) expect(modelById(id)).toBeUndefined();
+  });
+
+  it("names each model's language, for the settings and for warnings", () => {
+    expect(MODELS.map(languageName)).toEqual(["English", "English", "English", "Brazilian Portuguese", "Italian"]);
+    expect(readsOnly(BUNDLED)).toBe("tiny-voca only reads English");
+    expect(readsOnly(MODELS[4] ?? BUNDLED)).toBe("vocina only reads Italian");
   });
 });
 
@@ -91,7 +102,7 @@ describe("downloadModel", () => {
     const progress: number[] = [];
     expect(await downloadModel(model, (received) => progress.push(received), undefined, get)).toEqual(BYTES);
     expect(progress).toEqual([3, 8]);
-    expect(calls).toEqual([[modelUrl(BUNDLED), { credentials: "omit", signal: undefined }]]);
+    expect(calls).toEqual([[BUNDLED.url, { credentials: "omit", signal: undefined }]]);
   });
 
   it("returns nothing when what was served is not the pinned file", async () => {
@@ -115,19 +126,6 @@ describe("downloadModel", () => {
     const offline = (async () => Promise.reject(new TypeError("NetworkError"))) as unknown as typeof fetch;
     await expect(downloadModel(model, undefined, undefined, offline)).rejects.toThrow(
       "Tiny Reader could not reach huggingface.co.",
-    );
-  });
-});
-
-describe("frontEnd", () => {
-  it("gives the bundled English front end for the name the list uses", () => {
-    expect(frontEnd("dizione")).toBe(loadPhonemizer);
-  });
-
-  it("refuses a front end this build does not have, saying which", () => {
-    for (const name of ["espeak-de", "", "Dizione", "toString"]) expect(() => frontEnd(name)).toThrow(ModelError);
-    expect(() => frontEnd("espeak-de")).toThrow(
-      'it needs the text front end "espeak-de", which this version of Tiny Reader does not have',
     );
   });
 });

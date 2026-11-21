@@ -1,7 +1,7 @@
 // The settings form, used by the options page and by the toolbar popup.
 import { browser } from "wxt/browser";
 import { deleteModel, storedModels, storeModel } from "@/engine/model-store.ts";
-import { BUNDLED, downloadModel, MODELS, type Model, ModelError, modelById, modelUrl } from "@/engine/models.ts";
+import { BUNDLED, downloadModel, languageName, MODELS, type Model, ModelError, modelById } from "@/engine/models.ts";
 import { LIMITS } from "@/engine/protocol.ts";
 import { sitePattern } from "./commands.ts";
 import "./settings-form.css";
@@ -25,10 +25,11 @@ function slider(name: string, label: string, [min, max]: readonly [number, numbe
   return { input, output, nodes: [create("label", { htmlFor: name, textContent: label }), input, output, marks] };
 }
 
-/** "English · voices F, M · Apache-2.0 · 21 MB": what a model is, before it is downloaded. */
+/** "by PatnaikAshish · English · voices F, M · Apache-2.0 · 21 MB": what a model is, before it is downloaded. */
 const describeModel = (model: Model) =>
   [
-    new Intl.DisplayNames(["en"], { type: "language" }).of(model.language),
+    `by ${model.author}`,
+    languageName(model),
     `voices ${model.voices.join(", ")}`,
     model.licence,
     `${Math.round(model.size / 1e6)} MB`,
@@ -52,7 +53,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
     const chosen = model.value;
     model.replaceChildren(
       ...MODELS.filter((entry) => entry === BUNDLED || downloaded.has(entry.id)).map(
-        (entry) => new Option(entry.name, entry.id),
+        (entry) => new Option(`${entry.name} (${languageName(entry)})`, entry.id),
       ),
     );
     model.value = downloaded.has(chosen) ? chosen : BUNDLED.id;
@@ -191,14 +192,14 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       // Asked for in the click itself, or Firefox shows no prompt. With access to the site the
       // request carries no Origin header, which would name this installation of the add-on; without
       // it nothing is downloaded. Access the user gave before (for a PDF there) is left as it was.
-      const origins = [sitePattern(modelUrl(entry))];
+      const origins = [sitePattern(entry.url), ...(entry.alsoAllow ?? [])];
       const held = browser.permissions.contains({ origins });
       // No second prompt from a second click while the first is open.
       button.disabled = true;
       const allowed = await browser.permissions.request({ origins }).catch(() => false);
       button.disabled = false;
       if (!allowed)
-        return render(`Nothing was downloaded: Firefox was not allowed to reach ${new URL(modelUrl(entry)).hostname}.`);
+        return render(`Nothing was downloaded: Firefox was not allowed to reach ${new URL(entry.url).hostname}.`);
       download = new AbortController();
       const { signal } = download;
       progress.value = 0;
@@ -237,7 +238,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       create("p", {
         className: "hint",
         textContent:
-          "Other English voices, made by others from the same model. A voice is downloaded from huggingface.co when you press Download, after Firefox has asked for your permission to reach that site. It is checked against a fingerprint Tiny Reader carries and kept on this computer. Nothing about you or what you read is sent.",
+          "Other voices, some for other languages, made by others from the same model. A voice is downloaded from its page when you press Download, after Firefox has asked for your permission to reach that site. It is checked against a fingerprint Tiny Reader carries and kept on this computer. Nothing about you or what you read is sent.",
       }),
       ...rows.map(({ row }) => row),
     );

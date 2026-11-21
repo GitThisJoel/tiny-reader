@@ -24,7 +24,8 @@ interface SourceWord {
 }
 
 const segmenter = new Intl.Segmenter("en", { granularity: "word" });
-const fold = (word: string) => word.toLowerCase().replace(/[’ʼ]/g, "'");
+// Accents composed, so that "café" matches however the page or the PDF stored its accent.
+const fold = (word: string) => word.normalize("NFC").toLowerCase().replace(/[’ʼ]/g, "'");
 
 export function sourceWords(text: string): SourceWord[] {
   const words: SourceWord[] = [];

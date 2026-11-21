@@ -3,9 +3,11 @@
 import * as ort from "onnxruntime-web/wasm";
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 import { createEngine, NothingToPronounce } from "@/engine/engine.ts";
+import { type FrontEnd, loadFrontEnd } from "@/engine/frontends.ts";
 import { JobQueue } from "@/engine/job-queue.ts";
 import { createLoader } from "@/engine/loader.ts";
 import { readModel } from "@/engine/model-store.ts";
+import { readsOnly } from "@/engine/models.ts";
 import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
@@ -27,12 +29,23 @@ export default defineUnlistedScript(() => {
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
+  // A front end is set up once and kept: switching between models of one language costs only the model.
+  const frontEnds = new Map<string, Promise<FrontEnd>>();
+  function frontEnd(name: string) {
+    let loading = frontEnds.get(name);
+    if (!loading) {
+      loading = loadFrontEnd(name, asset);
+      frontEnds.set(name, loading);
+      loading.catch(() => frontEnds.delete(name));
+    }
+    return loading;
+  }
+
   const load = createLoader({
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
     stored: readModel,
-    // ponytail: the phonemizer is set up again with every model (0.5 s). Share it if switching models gets common.
-    create: async (file, { frontend }) =>
-      createEngine(ort, { model: file, frontend, gguf: await asset("/assets/tiny-voca-js.gguf") }),
+    // The front end comes first: a model whose front end this build lacks is refused before its file is loaded.
+    create: async (file, model) => createEngine(ort, { frontEnd: await frontEnd(model.frontend), model: file }),
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 
@@ -48,7 +61,10 @@ export default defineUnlistedScript(() => {
         const { engine, model, notice } = await load(options.model);
         // After a fallback the voice asked for may not exist in the model that speaks.
         const voice = Math.min(options.voice, model.voices.length - 1);
-        const result = await engine.speak(text, { ...options, voice }, signal);
+        const result = await engine.speak(text, { ...options, voice }, signal).catch((error: unknown) => {
+          // Said with the language of the model that tried: text in another one is the usual reason.
+          throw error instanceof NothingToPronounce ? new NothingToPronounce(readsOnly(model)) : error;
+        });
         return result && { ...result, notice };
       })
       .then(

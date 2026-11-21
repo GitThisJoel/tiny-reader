@@ -1,90 +1,130 @@
 // The voice models Tiny Reader can use. This list is all there is: nothing outside it can be
-// downloaded. A model belongs here only if it works with the engine and a text front end the
-// add-on has (same token table, inputs, outputs and sample rate). Today that is one: the bundled
-// English phonemizer. Another language would need its front end's code inside the package and
-// entries here that name it. See docs/FINDINGS.md §13.
+// downloaded. A model belongs here only if it works with the engine (same inputs, outputs and
+// sample rate) and with a text front end the add-on has (engine/frontends.ts), whose token
+// table is the model's. A new language means that front end's code inside the package and
+// entries here that name it. See docs/FINDINGS.md §13 and §14.
 
 export interface Model {
   id: string;
   name: string;
+  /** Who made it, as its page names them. Shown with the model: some licences ask for the credit. */
+  author: string;
   /** BCP 47. */
   language: string;
-  /** In the order of the model's `voice` input. */
-  voices: readonly string[];
   /**
    * The text front end the model was trained with: the code that turns text into its tokens.
-   * The engine has to have it (engine/engine.ts). This list is the authority, not the model's own
-   * `config.json`, which has been seen to claim a front end it does not match.
+   * The engine has to have it (engine/frontends.ts). This list is the authority, not the model's
+   * own `config.json`, which has been seen to claim a front end it does not match.
    */
   frontend: string;
+  /** In the order of the model's `voice` input. */
+  voices: readonly string[];
   /** SPDX identifier. */
   licence: string;
   /** The model's page, for people. */
   source: string;
-  /** Hugging Face repository, the commit it is pinned to (never a branch), and the ONNX file in it. */
-  repo: string;
-  revision: string;
-  file: string;
+  /** The ONNX file, at an address that is pinned: a commit on Hugging Face, a release tag on GitHub. */
+  url: string;
   /** Bytes and SHA-256 of that file. A download that differs is not stored. */
   size: number;
   sha256: string;
-  /** Where to download from instead of Hugging Face. Only the end-to-end tests' stand-in has one. */
-  url?: string;
+  /**
+   * Sites the download is redirected to that send no CORS headers, as match patterns. Firefox
+   * has to be allowed to reach them too. Hugging Face needs none.
+   */
+  alsoAllow?: readonly string[];
 }
 
-const english = (model: Omit<Model, "language" | "frontend" | "licence" | "file" | "source">): Model => ({
-  language: "en",
-  frontend: "dizione",
-  licence: "Apache-2.0",
-  file: "onnx/model.onnx",
-  source: `https://huggingface.co/${model.repo}`,
-  ...model,
+/** A file in a Hugging Face repository, at one commit (never a branch). */
+const huggingFace = (repo: string, revision: string, file = "onnx/model.onnx") => ({
+  source: `https://huggingface.co/${repo}`,
+  url: `https://huggingface.co/${repo}/resolve/${revision}/${file}`,
 });
 
 /** Ships inside the add-on (public/assets/model.onnx, fetched by scripts/fetch-assets.ts). Never downloaded. */
-export const BUNDLED = english({
+export const BUNDLED: Model = {
   id: "tiny-voca",
   name: "tiny-voca",
+  author: "Muhammed Nazeem",
+  language: "en",
+  frontend: "dizione",
   voices: ["F2", "M2"],
-  repo: "n4ze3m/tiny-voca",
-  revision: "1e73262226dbf4ef02e9df277e81aaa1db5ce16c",
+  licence: "Apache-2.0",
+  ...huggingFace("n4ze3m/tiny-voca", "1e73262226dbf4ef02e9df277e81aaa1db5ce16c"),
   size: 21_386_372,
   sha256: "fe6d918791a15b82e37465981d7f27a070e46b46635e5a3482fc8dff87a1ae46",
-});
+};
 
 /**
  * The end-to-end tests make a build of their own with one more entry, a stand-in served by the
  * local test site (tests/e2e/models.test.ts). In every other build this is undefined.
  */
-const standIn: string | undefined = import.meta.env.VITE_E2E_MODEL;
+const standIn: string | undefined = import.meta.env?.VITE_E2E_MODEL;
 
 export const MODELS: readonly Model[] = [
   BUNDLED,
-  english({
+  {
     id: "sobbie",
     name: "SobbieTTS",
+    author: "PatnaikAshish",
+    language: "en",
+    frontend: "dizione",
     voices: ["F", "M"],
-    repo: "PatnaikAshish/SobbieTTS",
-    revision: "6b6132c6d34b5fc163d8f5553580678a60532ac3",
+    licence: "Apache-2.0",
+    ...huggingFace("PatnaikAshish/SobbieTTS", "6b6132c6d34b5fc163d8f5553580678a60532ac3"),
     size: 21_386_372,
     sha256: "eafb38b736c17872091c0f05de87814257925a9c3c5aeff168c74afc496d9317",
-  }),
-  english({
+  },
+  {
     id: "fiato",
     name: "fiato",
+    author: "cfahlgren1",
+    language: "en",
+    frontend: "dizione",
     voices: ["F1", "M1"],
-    repo: "cfahlgren1/fiato",
-    revision: "967de50b6a9ab673ef7de9f8f276fa93a8c0db81",
+    licence: "Apache-2.0",
+    ...huggingFace("cfahlgren1/fiato", "967de50b6a9ab673ef7de9f8f276fa93a8c0db81"),
     size: 21_388_682,
     sha256: "179df2e1ede3935d4f928c0757947b25eb1f678ff347aef90e2efdf7ffb0048c",
-  }),
+  },
+  {
+    id: "tiny-voca-ptbr",
+    name: "tiny-voca-ptbr",
+    author: "SemFence (Gustavo Toledo)",
+    language: "pt-BR",
+    frontend: "dizione-ptbr",
+    voices: ["F_s4", "M_sm4"],
+    licence: "CC-BY-4.0",
+    ...huggingFace("semfence/tiny-voca-ptbr", "f231cbe318c9f972e27fd8dad5d8ebcfb40a672f"),
+    size: 21_370_200,
+    sha256: "0ac1ffc83e508973513182ed79d4626556e35bcffcccd99ee066dde6d2c77e5b",
+  },
+  {
+    id: "vocina",
+    name: "vocina",
+    author: "OfficinePixel",
+    language: "it",
+    frontend: "g2p-it",
+    voices: ["I1", "I2"],
+    licence: "Apache-2.0",
+    source: "https://github.com/OfficinePixel/vocina",
+    // A release tag can be moved; the SHA-256 below cannot.
+    url: "https://github.com/OfficinePixel/vocina/releases/download/v1.0/vocina.onnx",
+    size: 21_371_740,
+    sha256: "4de67fb83f475a556d3dd4bfc748be909cf6936d317ff7a17ac935f8da8e9cc6",
+    alsoAllow: ["https://release-assets.githubusercontent.com/*"],
+  },
   ...(standIn ? [JSON.parse(standIn) as Model] : []),
 ];
 
-export const modelById = (id: unknown): Model | undefined => MODELS.find((model) => model.id === id);
+/** "English", "Brazilian Portuguese": a model's language, named in English. */
+export const languageName = (model: Model): string =>
+  new Intl.DisplayNames(["en"], { type: "language" }).of(model.language) ?? model.language;
 
-export const modelUrl = (model: Model): string =>
-  model.url ?? `https://huggingface.co/${model.repo}/resolve/${model.revision}/${model.file}`;
+/** "tiny-voca only reads English": said where text in another language or script turns up. */
+export const readsOnly = (model: Model): string => `${model.name} only reads ${languageName(model)}`;
+
+export const modelById = (id: unknown): Model | undefined => MODELS.find((model) => model.id === id);
 
 /** Why a model could not be downloaded or used. The message is for the user. */
 export class ModelError extends Error {}
@@ -109,8 +149,8 @@ export async function downloadModel(
   signal?: AbortSignal,
   get: typeof fetch = fetch,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  const host = new URL(modelUrl(model)).hostname;
-  const response = await get(modelUrl(model), { credentials: "omit", signal }).catch((error: unknown) => {
+  const host = new URL(model.url).hostname;
+  const response = await get(model.url, { credentials: "omit", signal }).catch((error: unknown) => {
     if (signal?.aborted) throw error;
     throw new ModelError(`Tiny Reader could not reach ${host}.`);
   });

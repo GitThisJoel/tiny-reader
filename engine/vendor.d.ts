@@ -48,3 +48,29 @@ declare module "tiny-voca/dizione/engine.js" {
   }
   export function fromGGUF(file: GGUF): Promise<Phonemizer>;
 }
+
+// SemFence's TypeScript port of dizione-ptbr. Reached through a Vite alias only (wxt.config.ts),
+// so that tsc reads these declarations and not its sources, written for other compiler settings.
+declare module "dizione-ptbr/engine.ts" {
+  export class Dizione {
+    constructor(lexiconTsv: string, openTable: Readonly<Record<string, string>>);
+    phonemize(text: string): { symbols: string[]; stress: number[]; readonly ids: number[] };
+  }
+}
+declare module "dizione-ptbr/normalize.ts" {
+  /** Numbers, money, times and abbreviations written out in words. */
+  export function normalize(text: string): string;
+}
+declare module "dizione-ptbr/symbols.ts" {
+  export const SYMBOLS: readonly string[];
+}
+
+// vocina's Italian converter, plain JavaScript.
+declare module "vocina/g2p_it.js" {
+  export function creaG2P(data: Record<string, unknown>): {
+    /** Numbers, dates and abbreviations written out in words. */
+    normalizza(text: string): string;
+    fonemi(text: string): { symbols: string[]; ids: number[]; stress: number[] };
+    SYMBOLS: string[];
+  };
+}

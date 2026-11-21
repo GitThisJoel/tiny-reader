@@ -13,6 +13,7 @@ import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange, type TextMap } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
+import { modelById } from "@/engine/models.ts";
 import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 /** What a document can be told to do: by the background (menu, shortcut, popup) or by its own page. */
@@ -168,10 +169,10 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     const current: Session = { reader, end };
     session = current;
     reader.read(sentences.map((sentence) => sentence.text));
-    // Firefox's built-in detector, run locally. English only is a limit of the model.
+    // Firefox's built-in detector, run locally. One language only is a limit of each model.
     browser.i18n.detectLanguage(map.text.slice(0, SAMPLE_LENGTH)).then(
       (detection) => {
-        const warning = languageWarning(detection);
+        const warning = languageWarning(detection, modelById(options.model));
         if (warning && !ended) bar.notify(warning);
       },
       () => {},

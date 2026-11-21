@@ -44,7 +44,7 @@ describe("mountSettingsForm", () => {
     await mountSettingsForm(form);
     const texts = (name: string) =>
       [...(field(name) as unknown as HTMLSelectElement).options].map((option) => option.text);
-    expect(texts("model")).toEqual(["tiny-voca"]);
+    expect(texts("model")).toEqual(["tiny-voca (English)"]);
     expect(texts("voice")).toEqual(["F2", "M2"]);
     expect([field("model").value, field("voice").value]).toEqual(["tiny-voca", "1"]);
     // The popup has no downloads, only the way to them.
@@ -66,16 +66,30 @@ describe("mountSettingsForm", () => {
     ).toEqual([
       [
         "sobbie",
-        "SobbieTTS · English · voices F, M · Apache-2.0 · 21 MB",
+        "SobbieTTS · by PatnaikAshish · English · voices F, M · Apache-2.0 · 21 MB",
         "https://huggingface.co/PatnaikAshish/SobbieTTS",
         "Download SobbieTTS",
         true,
       ],
       [
         "fiato",
-        "fiato · English · voices F1, M1 · Apache-2.0 · 21 MB",
+        "fiato · by cfahlgren1 · English · voices F1, M1 · Apache-2.0 · 21 MB",
         "https://huggingface.co/cfahlgren1/fiato",
         "Download fiato",
+        true,
+      ],
+      [
+        "tiny-voca-ptbr",
+        "tiny-voca-ptbr · by SemFence (Gustavo Toledo) · Brazilian Portuguese · voices F_s4, M_sm4 · CC-BY-4.0 · 21 MB",
+        "https://huggingface.co/semfence/tiny-voca-ptbr",
+        "Download tiny-voca-ptbr",
+        true,
+      ],
+      [
+        "vocina",
+        "vocina · by OfficinePixel · Italian · voices I1, I2 · Apache-2.0 · 21 MB",
+        "https://github.com/OfficinePixel/vocina",
+        "Download vocina",
         true,
       ],
     ]);

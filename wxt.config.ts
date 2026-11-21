@@ -11,12 +11,15 @@ export default defineConfig({
   // The end-to-end tests make a build of their own with a stand-in voice model in the list
   // (tests/e2e/models.test.ts, engine/models.ts). It goes beside the real build, not over it.
   outDirTemplate: process.env.VITE_E2E_MODEL ? "firefox-mv3-e2e" : undefined,
-  // Upstream's JS phonemizer, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
-  alias: { "tiny-voca": "vendor/tiny-voca/js" },
+  // Text front ends, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
+  alias: { "tiny-voca": "vendor/tiny-voca/js", vocina: "vendor/vocina" },
   // The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
   zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**", "AGENTS.md"] },
   vite: () => ({
     resolve: {
+      // TypeScript sources fetched like the above. Aliased for Vite only, so that tsc checks
+      // engine/vendor.d.ts and not code written for other compiler settings.
+      alias: { "dizione-ptbr": resolve(import.meta.dirname, "vendor/dizione-ptbr/src") },
       // Selects onnxruntime-web's build that loads its wasm from a URL. The default build
       // would inline the 15 MB binary into the worker script as base64.
       conditions: ["onnxruntime-web-use-extern-wasm", "module", "browser", "development|production"],

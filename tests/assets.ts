@@ -14,3 +14,6 @@ export const readModel = () => read("public/assets/model.onnx");
 export const readGguf = async () => (await read("public/assets/tiny-voca-js.gguf")).buffer;
 export const readConfig = async () => JSON.parse(new TextDecoder().decode(await read("vendor/tiny-voca/config.json")));
 export const testPhonemizer = async () => loadPhonemizer(await readGguf());
+
+/** Reads a file of the add-on package from `public/`, as the engine Worker fetches it. */
+export const readAsset = async (path: string) => (await read(`public${path}`)).buffer;

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { frontEnd } from "./engine.ts";
 import { createLoader } from "./loader.ts";
-import { BUNDLED } from "./models.ts";
+import { BUNDLED, ModelError } from "./models.ts";
 
 const BUNDLED_FILE = Uint8Array.of(0);
 const GOOD = Uint8Array.of(1);
@@ -91,12 +90,15 @@ describe("createLoader", () => {
 
   it("falls back, with the reason, when the model needs a text front end the engine does not have", async () => {
     const made: string[] = [];
-    // An engine that has no front end at all, refusing as the real one does.
+    // An engine that has every front end but SobbieTTS's, refusing as loadFrontEnd does.
     const load = createLoader({
       bundled: async () => BUNDLED_FILE,
       stored: async () => GOOD,
       create: async (file, model) => {
-        if (file !== BUNDLED_FILE) frontEnd(`${model.frontend}-de`);
+        if (file !== BUNDLED_FILE)
+          throw new ModelError(
+            `it needs the text front end "${model.frontend}-de", which this version of Tiny Reader does not have`,
+          );
         made.push(model.id);
         return { release: async () => {} };
       },

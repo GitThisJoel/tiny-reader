@@ -1,3 +1,4 @@
+import { BUNDLED, modelById, readsOnly } from "@/engine/models.ts";
 import type { SynthOptions, Utterance } from "@/engine/protocol.ts";
 
 export type { Utterance };
@@ -216,7 +217,7 @@ export class Reader {
       );
     }
     if (this.current >= total && this.skipped.size === total && total > 0)
-      this.error = "Nothing here could be read. tiny-voca only reads English.";
+      this.error = `Nothing here could be read. ${readsOnly(modelById(this.options.model) ?? BUNDLED)}.`;
     this.emit();
   }
 

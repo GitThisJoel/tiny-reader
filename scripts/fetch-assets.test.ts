@@ -16,9 +16,9 @@ const never = (async () => {
 }) as typeof fetch;
 
 describe("fetch-assets", () => {
-  it("pins every asset to a commit and a SHA-256", () => {
+  it("pins every asset to a commit, or to a release tag, and a SHA-256", () => {
     for (const { url, sha256 } of ASSETS) {
-      expect(url).toMatch(/\/[0-9a-f]{40}\//);
+      expect(url).toMatch(/\/[0-9a-f]{40}\/|\/releases\/download\/v[\d.]+\//);
       expect(sha256).toMatch(/^[0-9a-f]{64}$/);
     }
     expect(new Set(ASSETS.map((a) => a.path)).size).toBe(ASSETS.length);

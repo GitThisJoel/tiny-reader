@@ -24,13 +24,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The pinned revisions and hashes live in the script, so its hash is the cache key.
+      # The pinned revisions and hashes live in the script and in the list of models (whose
+      # downloadable ones the smoke tests fetch), so their hash is the cache key.
       - uses: actions/cache@v6
         with:
           path: |
             public/assets
             vendor
-          key: assets-${{ hashFiles('scripts/fetch-assets.ts') }}
+            .cache/models
+          key: assets-${{ hashFiles('scripts/fetch-assets.ts', 'engine/models.ts') }}
       # Always runs: on a cache hit it only re-verifies the SHA-256 of every file.
       - run: pnpm fetch-assets
       - run: pnpm lint

@@ -21,14 +21,12 @@ beforeAll(async () => {
   const standIn: Model = {
     id: "stand-in",
     name: "Stand-in",
+    author: "the tests",
     language: "en",
     frontend: "dizione",
     voices: ["Left", "Right"],
     licence: "Apache-2.0",
     source: site.url,
-    repo: "",
-    revision: "",
-    file: "",
     size: STAND_IN.length,
     sha256: createHash("sha256").update(STAND_IN).digest("hex"),
     url: `${site.url}stand-in.onnx`,
@@ -161,10 +159,16 @@ const synthesize = (model: string) =>
 describe("extra voice models", () => {
   it("lists what can be downloaded and offers only the bundled model until something is", async () => {
     expect(await formWhen(`form.models.length`)).toEqual({
-      models: ["tiny-voca"],
+      models: ["tiny-voca (English)"],
       model: "tiny-voca",
       voices: ["F2", "M2"],
-      rows: { sobbie: ["Download", ""], fiato: ["Download", ""], "stand-in": ["Download", ""] },
+      rows: {
+        sobbie: ["Download", ""],
+        fiato: ["Download", ""],
+        "tiny-voca-ptbr": ["Download", ""],
+        vocina: ["Download", ""],
+        "stand-in": ["Download", ""],
+      },
     });
   }, 30_000);
 
@@ -186,7 +190,7 @@ describe("extra voice models", () => {
     const refused = await formWhen(`form.rows["stand-in"][1].startsWith("The download")`);
     site.tamper = false;
     expect(refused.rows["stand-in"]).toEqual(["Download", "The download is not the file Tiny Reader expects."]);
-    expect(refused.models).toEqual(["tiny-voca"]);
+    expect(refused.models).toEqual(["tiny-voca (English)"]);
     expect(await storedIds()).toEqual([]);
     expect(site.modelRequests).toHaveLength(1);
   }, 30_000);
@@ -196,7 +200,7 @@ describe("extra voice models", () => {
     await firefox.answerPrompt("allow");
     const downloaded = await formWhen(`form.rows["stand-in"][0] === "Delete"`);
     expect(downloaded.rows["stand-in"]).toEqual(["Delete", "Downloaded"]);
-    expect(downloaded.models).toEqual(["tiny-voca", "Stand-in"]);
+    expect(downloaded.models).toEqual(["tiny-voca (English)", "Stand-in (English)"]);
     expect(downloaded.model).toBe("tiny-voca"); // offered, not chosen for the user
     expect(await storedIds()).toEqual(["stand-in"]);
     // One request per download. No cookies, and no Origin header, which would carry the
@@ -253,7 +257,7 @@ describe("extra voice models", () => {
     await firefox.reload(options);
     // Its file is gone, so it is not offered, though it is still the stored choice.
     expect(await formWhen(`form.models.length`)).toMatchObject({
-      models: ["tiny-voca"],
+      models: ["tiny-voca (English)"],
       rows: { "stand-in": ["Download", ""] },
     });
     expect((await settings()).model).toBe("stand-in");
@@ -264,7 +268,7 @@ describe("extra voice models", () => {
 
     await press("stand-in"); // now Delete, which asks nothing
     expect(await formWhen(`form.rows["stand-in"][0] === "Download"`)).toMatchObject({
-      models: ["tiny-voca"],
+      models: ["tiny-voca (English)"],
       model: "tiny-voca",
       voices: ["F2", "M2"],
     });
