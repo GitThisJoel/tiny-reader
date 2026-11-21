@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import { defineConfig } from "wxt";
 
 const require = createRequire(import.meta.url);
@@ -26,6 +27,9 @@ export default defineConfig({
           absoluteSrc: require.resolve(`onnxruntime-web/${name}`),
           relativeDest: `ort/${name}`,
         });
+      // The licences go with every copy of the add-on, as they require.
+      for (const name of ["LICENSE", "NOTICE", "THIRD-PARTY-NOTICES.md"])
+        files.push({ absoluteSrc: resolve(import.meta.dirname, name), relativeDest: `licenses/${name}` });
     },
   },
   manifest: {
