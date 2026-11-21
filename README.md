@@ -12,8 +12,8 @@ downloading a PDF from the web so that it can read it to you.
   text when nothing is selected. The same panel has previous, pause, next and stop, and all the settings.
 - To hear a PDF, open the popup and choose **Read a PDF…**. On a PDF tab the popup says so and offers **Open this PDF
   in Tiny Reader…**, and it opens by itself if you try to read the PDF from the context menu or a shortcut. A Tiny
-  Reader page opens and shows the PDF's text as plain paragraphs, which it reads with the same highlighting, control
-  bar, context menu and shortcuts as a web page.
+  Reader page opens and shows the PDF's pages as they are. It reads them with the sentence and word highlighted on
+  the page, scrolls along as it reads, and has the same control bar, context menu and shortcuts as a web page.
   - A PDF on the web is downloaded and opened for you. The first time for each site, press **Allow and open** and
     accept Firefox's permission prompt; after that, PDFs from that site open at once.
   - A PDF on your computer has to be picked with **Open a PDF…** or dropped on the page: Firefox does not let an
@@ -218,9 +218,10 @@ flowchart LR
 - **Control bar** ([content/bar.ts](content/bar.ts)): a closed shadow root on one host element, the only node the
   add-on adds to a page.
 - **Document page** ([entrypoints/document/](entrypoints/document/), [content/pdf-text.ts](content/pdf-text.ts)): a
-  page of the add-on's own that parses a PDF you open with a bundled copy of pdf.js, rebuilds paragraphs from the
-  positioned text runs, and reads them with the same controller as the content script
-  ([content/controller.ts](content/controller.ts)).
+  page of the add-on's own that shows a PDF you open with a bundled copy of pdf.js: each page drawn on a canvas, with
+  pdf.js's invisible text layer over it. Paragraphs are rebuilt from the positioned text runs, with a map from every
+  word back to its place in the text layer, so the same controller as the content script
+  ([content/controller.ts](content/controller.ts)) reads them and the highlight lands on the page.
 - **Toolbar popup** ([entrypoints/popup/](entrypoints/popup/)): the panel behind the toolbar button. Its buttons send
   a command to the background, which passes it to the reader in the active tab; its settings form is the one the
   options page uses ([content/settings-form.ts](content/settings-form.ts)).
@@ -264,12 +265,17 @@ does not extend to such frames.
   that Firefox's local language detector identifies as another language gets a warning in the bar
   and is read anyway, with English sounds.
 - Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or
-  addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. For PDFs, use **Read a PDF…**.
-- PDFs are read as text only: no figures or layout. Paragraphs are rebuilt from the positions of the text, which works
-  for single-column prose. Columns, tables, footnotes and running headers may come out in the wrong order, and a
-  scanned PDF (pages stored as pictures) has no text to read. In a scientific paper the running text reads well, but
-  formulas and table cells come out as short fragments that are read aloud as they are. The toolbar button then shows a "!" badge with the reason, and the popup says so.
-  Leave Reader View and read the original page instead.
+  addons.mozilla.org: Firefox lets no add-on into them, whatever its permissions. The toolbar button then shows a "!"
+  badge with the reason, and the popup says so. Leave Reader View and read the original page instead. For PDFs, use
+  **Read a PDF…**: the highlight is shown on the PDF's pages in Tiny Reader's own page, not in Firefox's viewer.
+- What is read from a PDF is rebuilt from the positions of its text, which works for single-column prose. Columns,
+  tables, footnotes and running headers may come out in the wrong order, and a scanned PDF (pages stored as pictures)
+  is shown but has no text to read. In a scientific paper the running text reads well, but formulas and table cells
+  come out as short fragments that are read aloud as they are.
+- PDF pages are drawn without pdf.js's extra data files, which are not bundled: text in a font the PDF does not embed
+  is drawn in a similar font of your system, and JPEG 2000 and JBIG2 images may be missing. The text is read all the
+  same. Links, form fields and comments in a PDF are not shown, and there is no zoom of its own: pages fit the width
+  of the window, up to a limit.
 - Text selected inside a frame from another site cannot be read (see Permissions).
 - A single "word" that needs more than 200 phoneme tokens and has no space to cut at, such as a
   150-digit number, is left out. Everything around it is read.
@@ -301,7 +307,8 @@ placeholder. Change it before submitting to addons.mozilla.org.
 
 - tiny-voca model and JavaScript phonemizer: Apache-2.0, © Muhammed Nazeem
 - Phonemizer dictionary: derived from the CMU Pronouncing Dictionary (BSD-style licence)
-- pdf.js (`pdfjs-dist`): Apache-2.0, © Mozilla Foundation
+- pdf.js (`pdfjs-dist`): Apache-2.0, © Mozilla Foundation. The text-layer rules in
+  [entrypoints/document/style.css](entrypoints/document/style.css) are taken from its `pdf_viewer.css`.
 - ONNX Runtime Web: MIT, © Microsoft
 
 The licence texts are bundled in the add-on under `assets/licenses/`.

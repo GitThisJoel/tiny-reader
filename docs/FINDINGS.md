@@ -464,8 +464,8 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
 
 - **No permission and no network.** The file comes from a file picker or a drop, is parsed by
   pdf.js (`pdfjs-dist` 6.5.438, bundled, 1.7 MB) in a Worker of the page, and never leaves it.
-  pdf.js is told not to fetch anything: `useWorkerFetch: false`, `useWasm: false`,
-  `disableFontFace: true`.
+  pdf.js is told not to fetch anything: `useWorkerFetch: false`, `useWasm: false`
+  (and, until pages were drawn, §17, `disableFontFace: true`).
 - **The PDF open in another tab cannot be picked up automatically.** Tested from an add-on page
   in Firefox 158: `fetch` and `XMLHttpRequest` of a `file://` PDF fail with a network error,
   both without host permissions and with `<all_urls>` granted. So a local PDF always has to be
@@ -506,3 +506,46 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
   than half of the "paragraphs" were under 20 characters: section headings, but mostly pieces
   of formulas and table cells, which are read as they come. Footnotes and the arXiv margin
   stamp are read in page order. Filtering those is not built.
+
+## 17. Highlighting on the PDF's pages
+
+The document page first showed the extracted text as paragraphs. It now shows the pages
+themselves and paints the highlight on them (2026-11-21). Firefox's own viewer stays out of
+reach (§15), so "in the PDF" means in the add-on's page.
+
+- **Drawing works under the add-on's CSP.** `page.render()` onto a canvas plus pdf.js's
+  `TextLayer` run with `script-src 'self' 'wasm-unsafe-eval'` and no further data files.
+  Embedded fonts are loaded through the FontFace API from the PDF's own bytes
+  (`disableFontFace` is no longer set; with the arXiv paper open, `document.fonts` held its
+  fonts as `loaded`); nothing is fetched. A font the PDF does not embed
+  (Helvetica in the generated test PDF) is drawn with a system font, since pdf.js's
+  `standard_fonts` (820 kB) are not bundled. Nor are its wasm image decoders (1.4 MB) or CMaps
+  (1.7 MB); what a PDF with JPEG 2000 or JBIG2 images looks like without them has not been
+  tried.
+- **The highlight needs no new mechanism.** The text layer is real DOM text, one `<span>` per
+  text run, transparent and positioned over the canvas, so the CSS Custom Highlight API works
+  on it as on a web page. The colours are see-through and the highlighted text stays
+  transparent, so the drawn page shows beneath. Checked by eye on a screenshot of
+  `arxiv.org/pdf/1706.03762`: sentence and word marks sit on the right glyphs.
+- **Reading the text layer directly would not work.** Its spans are absolutely positioned, so
+  the DOM text map sees each as a block of its own and every line would be a "sentence".
+  Instead `pdfText` builds the paragraphs as before and also records, for every word, the run
+  and offset it came from. `TextLayer.textDivs` has one span per run in the same order (checked
+  in the pdf.js source: a span is pushed for every item with `str`, even an empty one), which
+  gives the text node for each word. The controller takes this map in place of the DOM one;
+  selections and "read from here" are translated through it.
+- **One range per sentence.** A sentence that runs over a page break spans the page number
+  between its halves. Spans that are not read get `data-unread`, and a
+  `[data-unread]::highlight()` rule keeps them uncoloured; Firefox applies `::highlight` rules
+  per element (computed style checked in the tests, and the uncoloured page number seen on a
+  screenshot).
+- **Cost.** Text layers for all pages are built when the file is opened; canvases are drawn
+  only within one window height of the view and emptied after. Measured in headless Firefox:
+  the arXiv paper (15 pages, 2,286 spans) opened in 0.5 s; generated PDFs of 100 and 500 pages
+  with 40 lines each opened in 0.5 s and 2.2 s, and reading started 0.07 s and 0.16 s after
+  the click.
+- **Following.** The page jumps to a sentence that starts out of view, but only while the
+  previous sentence was at least partly in view, so scrolling away to look at something is not
+  undone. Web pages are still not scrolled.
+- Pages refit when the window is resized (one CSS variable scales the text layer; visible
+  canvases are redrawn). Rotated pages have not been tried.
