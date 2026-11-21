@@ -92,6 +92,20 @@ describe("mountSettingsForm", () => {
         "Download vocina",
         true,
       ],
+      [
+        "tiny-voca-es",
+        "tiny-voca-es · by marcosmaceo · European Spanish · voices F2, M2 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/marcosmaceo/tiny-voca-es",
+        "Download tiny-voca-es",
+        true,
+      ],
+      [
+        "tiny-voca-fr",
+        "tiny-voca-fr · by DanielSuncost · French · voices FR_F1, FR_M1 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/DanielSuncost/tiny-voca-fr",
+        "Download tiny-voca-fr",
+        true,
+      ],
     ]);
   });
 

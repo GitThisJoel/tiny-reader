@@ -117,3 +117,44 @@ describe("Italian (vocina's g2p_it)", () => {
     ).toBeGreaterThan(0.95);
   });
 });
+
+// Spanish and French: each model's own Python front end, run with a native eSpeak NG 1.52.0
+// built from the same source as the wasm one, over tests/parity/espeak-sentences.json. The
+// reference files are written by `pnpm build-espeak --fixtures`.
+describe.each([
+  ["Castilian Spanish", "espeak-es", "es", "tiny-voca-es/model.json"],
+  ["French", "espeak-fr", "fr", "tiny-voca-fr/model.json"],
+])("%s (eSpeak NG)", (_, name, language, descriptor) => {
+  let frontEnd: FrontEnd;
+  let reference: {
+    espeak: string;
+    symbols: string[];
+    sentences: { text: string; ids?: number[]; stress?: number[] }[];
+  };
+  let model: { symbols: string[] };
+  beforeAll(async () => {
+    frontEnd = await loadFrontEnd(name, readAsset);
+    reference = JSON.parse(await readFile(join(import.meta.dirname, `espeak-${language}.json`), "utf8"));
+    model = await vendor(descriptor);
+  });
+
+  it("gives the ids and stress of the Python front end with native eSpeak NG 1.52.0", () => {
+    expect(reference.espeak).toContain("1.52.0");
+    expect(reference.sentences.length).toBeGreaterThanOrEqual(50);
+    for (const sentence of reference.sentences) {
+      const result = frontEnd(sentence.text);
+      expect(result?.ids, sentence.text).toEqual(sentence.ids);
+      expect(result?.stress, sentence.text).toEqual(sentence.stress);
+    }
+  });
+
+  it("uses the symbol table the released model was trained with", () => {
+    expect(reference.symbols).toEqual(model.symbols);
+  });
+
+  it("names the words of most pieces of text", () => {
+    const words = reference.sentences.flatMap((sentence) => frontEnd(sentence.text)?.words ?? []);
+    // These sentences are full of numbers, dates and amounts, whose pieces stay nameless.
+    expect(words.filter((word) => word.text).length / words.length).toBeGreaterThan(0.7);
+  });
+});

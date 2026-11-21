@@ -74,3 +74,46 @@ declare module "vocina/g2p_it.js" {
     SYMBOLS: string[];
   };
 }
+
+// eSpeak NG's emscripten glue, built by scripts/build-espeak.sh.
+declare module "espeak/espeak-ng-core.mjs" {
+  export interface EspeakCore {
+    FS: { mkdirTree(path: string): void; writeFile(path: string, data: Uint8Array): void };
+    HEAPU8: Uint8Array;
+    HEAP32: Int32Array;
+    lengthBytesUTF8(text: string): number;
+    stringToUTF8(text: string, pointer: number, size: number): void;
+    _malloc(size: number): number;
+    _free(pointer: number): void;
+    _tr_init(dataPath: number, voice: number): number;
+    _tr_phonemize(input: number, length: number, outputLength: number): number;
+  }
+  export default function createEspeakCore(options: {
+    wasmBinary: ArrayBuffer;
+    noInitialRun: boolean;
+    print(line: string): void;
+    printErr(line: string): void;
+  }): Promise<EspeakCore>;
+}
+
+// The parts shared by the front ends that work from eSpeak NG's output: each model's own
+// JavaScript port of tiny-voca's text.py for its language.
+declare module "*/espeak-front-end" {
+  export type EspeakWord = [phone: string, stress: number][];
+  export type EspeakPiece = [isPunctuation: true, mark: string] | [isPunctuation: false, words: EspeakWord[]];
+  /** Thrown when the text has no word, number or letter to say. */
+  export class NothingToPronounce extends Error {}
+  export const SYMBOLS: string[];
+  export function normalizeText(text: string): string;
+  /** The text cut at punctuation: [true, mark] or [false, text between marks]. */
+  export function chunks(text: string): ([isPunctuation: true, mark: string] | [isPunctuation: false, text: string])[];
+  /** eSpeak NG's output for one piece of text, as words. */
+  export function parseEspeak(output: string): EspeakWord[];
+  export function tokenize(pieces: EspeakPiece[]): { symbols: string[]; ids: number[]; stress: number[] };
+}
+declare module "tiny-voca-es/frontend.js" {
+  export * from "*/espeak-front-end";
+}
+declare module "tiny-voca-fr/frontend-fr.js" {
+  export * from "*/espeak-front-end";
+}

@@ -24,6 +24,9 @@ describe.each([
   ["dizione", "Hello! It costs $42.50 today.", ["hello", "it", "costs", "forty", "two", "dollars"]],
   ["dizione-ptbr", "Oi, tudo bem? Paguei R$ 15,50 às 10h30.", ["Oi", "tudo", "bem", "Paguei", "quinze", "reais"]],
   ["g2p-it", "L'amico arriva alle 14:35, poi parte.", ["L'amico", "arriva", "alle", "quattordici"]],
+  // eSpeak NG does not say which words it read: a piece is named from the text when the counts agree.
+  ["espeak-es", "Hola, ¿cómo estás? Cuesta 15 euros.", ["Hola", "cómo", "estás", "Cuesta", "15", "euros"]],
+  ["espeak-fr", "Bonjour, comment allez-vous ? Cela coûte 15 euros.", ["Bonjour", "comment", "allez-vous", "Cela"]],
 ])("the %s front end", (name, sentence, firstWords) => {
   let frontEnd: FrontEnd;
   beforeAll(async () => {
@@ -48,7 +51,18 @@ describe.each([
   });
 
   it("gives null for text with nothing to pronounce", () => {
-    for (const text of ["", "   ", "…", "こんにちは世界"]) expect(frontEnd(text), JSON.stringify(text)).toBeNull();
+    for (const text of ["", "   ", "…"]) expect(frontEnd(text), JSON.stringify(text)).toBeNull();
+    // eSpeak NG has something to say for any script, as when the models were trained; the others skip it.
+    if (!name.startsWith("espeak")) expect(frontEnd("こんにちは世界")).toBeNull();
+  });
+});
+
+describe("a front end fed by eSpeak NG", () => {
+  it("leaves the words of a piece nameless when eSpeak NG spoke another number of them", async () => {
+    const frontEnd = await loadFrontEnd("espeak-es", readAsset);
+    // "1250" is one word in the text and three when spoken; "Vale" stands alone before the comma.
+    const spoken = frontEnd("Vale, cuesta 1250 euros.");
+    expect(spoken?.words.map((word) => word.text)).toEqual(["Vale", "", "", "", "", ""]);
   });
 });
 
@@ -71,6 +85,14 @@ describe("fromSymbols", () => {
     expect(fromSymbols(spoken, "ab c")?.words).toEqual([]);
     expect(fromSymbols(spoken, "ab c d e")?.words).toEqual([]);
     expect(fromSymbols(spoken, "ab c")?.ids).toBe(spoken.ids);
+  });
+
+  it("takes the words' texts one by one when they are given, and other tokens for phones when told", () => {
+    const withUnknown = { ids: [1, 4, 3, 22, 2], stress: [0, 0, 0, 1, 0] };
+    expect(fromSymbols(withUnknown, ["x", ""], (id) => id >= 19 || id === 4)?.words).toEqual([
+      { text: "x", tokenStart: 1, tokenEnd: 2 },
+      { text: "", tokenStart: 3, tokenEnd: 4 },
+    ]);
   });
 
   it("gives null when there is no phone at all", () => {

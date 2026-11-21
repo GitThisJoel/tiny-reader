@@ -167,6 +167,8 @@ describe("extra voice models", () => {
         fiato: ["Download", ""],
         "tiny-voca-ptbr": ["Download", ""],
         vocina: ["Download", ""],
+        "tiny-voca-es": ["Download", ""],
+        "tiny-voca-fr": ["Download", ""],
         "stand-in": ["Download", ""],
       },
     });

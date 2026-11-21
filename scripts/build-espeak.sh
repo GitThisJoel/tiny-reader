@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# Builds eSpeak NG 1.52.0 as WebAssembly, with the data of the languages Tiny Reader reads
+# through it. eSpeak NG turns text into phonemes for the models that were trained on its output
+# (engine/frontends.ts). Needs Docker; nothing else is installed on the host.
+#
+#   pnpm build-espeak              # writes vendor/espeak/ and public/assets/espeak/
+#   pnpm build-espeak --fixtures   # instead rewrites tests/parity/espeak-*.json (see below)
+#
+# Everything runs inside a pinned emscripten/emsdk image:
+#   1. clone espeak-ng at tag 1.52.0 and check the commit hash;
+#   2. build it natively and compile the data from that same tree, as upstream's Makefile does;
+#   3. build libespeak-ng with emcc and link a small driver (tr_espeak.c below) that replays
+#      what the espeak-ng program does for
+#        espeak-ng -q --ipa --sep=_ -v <voice> --stdin
+#      writing the phoneme trace to a memory stream instead of stdout;
+#   4. pack only the data of LANGS into one gzip file.
+#
+# With --fixtures, step 2's native program is used instead to run each model's own Python front
+# end (fetched at the commit pinned below) over tests/parity/espeak-sentences.json, and the
+# token ids it gives are written to tests/parity/espeak-<language>.json. The parity tests
+# compare the JavaScript front ends, running on the wasm build, with those files.
+#
+# Adapted from scripts/build_espeak_wasm.sh in https://github.com/stdevMac/tiny-voca
+# (Apache-2.0), which builds the same thing for Spanish alone.
+# eSpeak NG is GPL-3.0-or-later: its licence is copied next to the build.
+set -euo pipefail
+
+ESPEAK_REPO=https://github.com/espeak-ng/espeak-ng.git
+ESPEAK_TAG=1.52.0
+ESPEAK_COMMIT=4870adfa25b1a32b4361592f1be8a40337c58d6c
+EMSDK_VERSION=4.0.10
+# Dictionaries and voice files to ship. English is there because every voice switches to it
+# for letters and signs its own dictionary lacks (the switch shows as "(en)…(es)").
+LANGS="es fr en"
+# The models' reference front ends, for --fixtures: language, repository, commit.
+REFERENCES="es https://github.com/stdevMac/tiny-voca a4bf2bd979fc40b1bd7e34e13c0164db627d14ec \
+fr https://github.com/DanielSuncost/tiny-voca-fr 4cc26ab23d934e3d33796eb06bf11f23f4c9ab34"
+
+# emscripten/emsdk publishes the amd64 image as <version> and the arm64 image as
+# <version>-arm64; both are pinned by digest. emcc output does not depend on which one runs it.
+case "$(uname -m)" in
+  arm64|aarch64) EMSDK_IMAGE="emscripten/emsdk:${EMSDK_VERSION}-arm64@sha256:46566098d0e12a11aed071a4aaa20e6a626ab3d011a246846ae2423a21b659d9" ;;
+  *)             EMSDK_IMAGE="emscripten/emsdk:${EMSDK_VERSION}@sha256:90b757eb11fa9a0e3ce4d2d9f76d932a56018e4accc37b5a28b2783751e60eb7" ;;
+esac
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FIXTURES=""
+[ "${1:-}" = "--fixtures" ] && FIXTURES=1
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/espeak-wasm.XXXXXX")"
+trap 'rm -rf "${WORK}"' EXIT
+mkdir -p "${WORK}/out"
+
+# ---------------------------------------------------------------- driver (C)
+cat > "${WORK}/tr_espeak.c" <<'EOF'
+/* Replays espeak-ng.c main() for: -q --ipa --sep=_ -v <voice> --stdin
+ * Initialisation happens once (tr_init); every tr_phonemize call is one
+ * "process run": the input bytes are what the program would read from stdin. */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <espeak-ng/espeak_ng.h>
+#include <espeak-ng/speak_lib.h>
+#include <emscripten/emscripten.h>
+
+static char voice_name[64];
+
+/* espeak-ng.c SynthCallback with quiet=true: discard audio, keep going. */
+static int synth_callback(short *wav, int numsamples, espeak_EVENT *events)
+{
+	(void)wav; (void)numsamples; (void)events;
+	return 0;
+}
+
+static int set_voice(void)
+{
+	espeak_ng_STATUS result = espeak_ng_SetVoiceByName(voice_name);
+	if (result != ENS_OK) {
+		espeak_VOICE voice_select;
+		memset(&voice_select, 0, sizeof(voice_select));
+		voice_select.languages = voice_name;
+		result = espeak_ng_SetVoiceByProperties(&voice_select);
+	}
+	return result == ENS_OK ? 0 : (int)result;
+}
+
+EMSCRIPTEN_KEEPALIVE int tr_init(const char *data_path, const char *voice)
+{
+	snprintf(voice_name, sizeof(voice_name), "%s", voice);
+	espeak_ng_InitializePath(data_path);
+	espeak_ng_ERROR_CONTEXT context = NULL;
+	espeak_ng_STATUS result = espeak_ng_Initialize(&context);
+	if (result != ENS_OK) {
+		espeak_ng_PrintStatusCodeMessage(result, stderr, context);
+		espeak_ng_ClearErrorContext(&context);
+		return (int)result;
+	}
+	result = espeak_ng_InitializeOutput(ENOUTPUT_MODE_SYNCHRONOUS, 0, NULL);
+	if (result != ENS_OK) {
+		espeak_ng_PrintStatusCodeMessage(result, stderr, NULL);
+		return (int)result;
+	}
+	espeak_SetSynthCallback(synth_callback);
+	return set_voice();
+}
+
+EMSCRIPTEN_KEEPALIVE const char *tr_version(void)
+{
+	return espeak_Info(NULL);
+}
+
+/* input: the bytes the program would read from stdin (not NUL terminated).
+ * Returns a malloc'd NUL-terminated copy of what it would print to stdout;
+ * the caller frees it. *out_len receives its length. */
+EMSCRIPTEN_KEEPALIVE char *tr_phonemize(const char *input, int input_len, int *out_len)
+{
+	char *out = NULL;
+	size_t size = 0;
+	FILE *f_phonemes_out = open_memstream(&out, &size);
+	if (f_phonemes_out == NULL)
+		return NULL;
+
+	/* --ipa sets espeakPHONEMES_IPA; --sep=_ sets espeakPHONEMES_SHOW and the
+	 * separator '_' in bits 8-23. */
+	espeak_SetPhonemeTrace(espeakPHONEMES_IPA | espeakPHONEMES_SHOW | ('_' << 8), f_phonemes_out);
+
+	/* espeak-ng.c "bulk input on stdin": read every byte, then overwrite the
+	 * last one with NUL and synthesise with size ix+1. */
+	int ix = input_len;
+	if (ix > 0) {
+		char *p_text = (char *)malloc((size_t)ix + 1);
+		if (p_text != NULL) {
+			memcpy(p_text, input, (size_t)ix);
+			p_text[ix] = 0;
+			p_text[ix-1] = 0;
+			int synth_flags = espeakCHARS_AUTO | espeakPHONEMES | espeakENDPAUSE;
+			espeak_Synth(p_text, (size_t)ix + 1, 0, POS_CHARACTER, 0, synth_flags, NULL, NULL);
+			free(p_text);
+		}
+	}
+	espeak_ng_Synchronize();
+
+	espeak_SetPhonemeTrace(0, stderr);
+	fclose(f_phonemes_out);
+	*out_len = (int)size;
+	return out;
+}
+EOF
+
+# ------------------------------------------------- reference outputs (Python)
+cat > "${WORK}/reference.py" <<'EOF'
+"""Runs a model's own Python front end over a list of sentences: in.json -> out.json."""
+import importlib
+import json
+import sys
+import types
+
+# Only tiny_voca/text.py is wanted: the package's own __init__ pulls in the model and torch.
+package = types.ModuleType("tiny_voca")
+package.__path__ = [sys.argv[4]]
+sys.modules["tiny_voca"] = package
+T = importlib.import_module("tiny_voca.text")
+
+out = []
+for sentence in json.load(open(sys.argv[1], encoding="utf-8"))[sys.argv[3]]:
+    try:
+        p = T.phonemize(sentence)
+        out.append({"text": sentence, "ids": list(p.ids), "stress": list(p.stress)})
+    except Exception as error:
+        out.append({"text": sentence, "error": type(error).__name__})
+json.dump({"espeak": T.espeak_version(), "voice": T.ESPEAK_VOICE, "symbols": list(T.SYMBOLS), "sentences": out},
+          open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False, indent=0)
+EOF
+[ -n "${FIXTURES}" ] && cp "${ROOT}/tests/parity/espeak-sentences.json" "${WORK}/sentences.json"
+
+# -------------------------------------------------------- in-container build
+UID_GID="$(id -u):$(id -g)"
+cat > "${WORK}/build.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq >/dev/null
+apt-get install -y -qq --no-install-recommends autoconf automake libtool >/dev/null
+
+git clone -q --depth 1 --branch "${ESPEAK_TAG}" "${ESPEAK_REPO}" /work/src
+got="\$(git -C /work/src rev-parse HEAD)"
+if [ "\${got}" != "${ESPEAK_COMMIT}" ]; then
+  echo "espeak-ng tag ${ESPEAK_TAG} is \${got}, expected ${ESPEAK_COMMIT}" >&2
+  exit 1
+fi
+echo "espeak-ng ${ESPEAK_TAG} at \${got}"
+
+CONFIG_OPTS="--without-pcaudiolib --without-sonic --without-speechplayer --without-mbrola --without-async --with-klatt"
+
+# Native build: to compile the data from this source tree, and for --fixtures.
+cp -a /work/src /work/native
+cd /work/native
+./autogen.sh >/dev/null 2>&1
+./configure \${CONFIG_OPTS} >/dev/null
+nice -n 10 make -j"\$(nproc)" src/espeak-ng >/dev/null
+nice -n 10 make phsource/phonemes.stamp >/dev/null
+for lang in ${LANGS}; do
+  nice -n 10 make "espeak-ng-data/\${lang}_dict" >/dev/null
+done
+ESPEAK_DATA_PATH=/work/native ./src/espeak-ng --version
+
+if [ -n "${FIXTURES}" ]; then
+  # The reference front ends call "espeak-ng" from PATH.
+  printf '#!/bin/sh\nESPEAK_DATA_PATH=/work/native exec /work/native/src/espeak-ng "\$@"\n' > /usr/local/bin/espeak-ng
+  chmod +x /usr/local/bin/espeak-ng
+  set -- ${REFERENCES}
+  while [ \$# -ge 3 ]; do
+    language="\$1"; repository="\$2"; commit="\$3"; shift 3
+    git init -q "/work/reference-\${language}"
+    git -C "/work/reference-\${language}" fetch -q --depth 1 "\${repository}" "\${commit}"
+    git -C "/work/reference-\${language}" checkout -q FETCH_HEAD
+    TINY_VOCA_LANGUAGE="\${language}" TINY_VOCA_FRONTEND=espeak python3 /build/reference.py \\
+      /build/sentences.json "/work/out/espeak-\${language}.json" "\${language}" "/work/reference-\${language}/src/tiny_voca"
+  done
+  chown -R "${UID_GID}" /work/out
+  exit 0
+fi
+
+# WebAssembly build of the library.
+cp -a /work/src /work/wasm
+cd /work/wasm
+./autogen.sh >/dev/null 2>&1
+# src/include/compat/wctype.h maps iswupper & co. to ucd_isupper & co. musl's
+# <wchar.h> also declares iswupper(wint_t), and wint_t is int on wasm32 while
+# ucd's codepoint_t is uint32_t, so the renamed declarations conflict. Reading
+# the system <wchar.h> first, before the macros exist, avoids that; the ucd
+# functions still replace the libc ones everywhere, as in the native build.
+SYS_WCHAR="\$(dirname "\$(command -v emcc)")/cache/sysroot/include/wchar.h"
+test -f "\${SYS_WCHAR}"
+emconfigure ./configure --host=wasm32-unknown-emscripten --disable-shared --enable-static \\
+  CFLAGS="-O2 -include \${SYS_WCHAR}" \${CONFIG_OPTS} >/dev/null
+nice -n 10 emmake make -j"\$(nproc)" src/libespeak-ng.la >/dev/null
+nice -n 10 emcc -O2 -I src/include /build/tr_espeak.c src/.libs/libespeak-ng.a \\
+  -o /work/out/espeak-ng-core.mjs \\
+  -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createEspeakCore \\
+  -sENVIRONMENT=web,worker,node \\
+  -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16MB \\
+  -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 \\
+  -sEXPORTED_FUNCTIONS=_tr_init,_tr_phonemize,_tr_version,_malloc,_free \\
+  -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,stringToUTF8,lengthBytesUTF8,HEAPU8,HEAP32
+
+# Pack the data of LANGS: one gzip stream of
+#   "TVPK" | u32le header length | JSON [[path, size], ...] | file bytes
+cd /work/native/espeak-ng-data
+LANG_FILES="\$(for lang in ${LANGS}; do echo "\${lang}_dict"; find lang -type f -name "\${lang}"; done)"
+LANG_FILES="\${LANG_FILES}" python3 - <<'PY'
+import gzip, json, os, struct
+files = ["phontab", "phonindex", "phondata", "intonations"] + os.environ["LANG_FILES"].split()
+blobs = [open(f, "rb").read() for f in files]
+header = json.dumps([[f, len(b)] for f, b in zip(files, blobs)]).encode()
+raw = b"TVPK" + struct.pack("<I", len(header)) + header + b"".join(blobs)
+with open("/work/out/espeak-ng-data.pack", "wb") as out:
+    out.write(gzip.compress(raw, compresslevel=9, mtime=0))
+PY
+cp /work/src/COPYING /work/out/espeak-ng.COPYING.txt
+chown -R "${UID_GID}" /work/out
+EOF
+
+nice -n 10 docker run --rm \
+  -v "${WORK}:/build:ro" -v "${WORK}/out:/work/out" \
+  "${EMSDK_IMAGE}" bash /build/build.sh
+
+if [ -n "${FIXTURES}" ]; then
+  cp "${WORK}"/out/espeak-*.json "${ROOT}/tests/parity/"
+  echo "wrote:" && ls -l "${ROOT}"/tests/parity/espeak-*.json
+  exit 0
+fi
+
+# The glue is code: it is bundled into the engine Worker. The rest is data, read at run time.
+mkdir -p "${ROOT}/vendor/espeak" "${ROOT}/public/assets/espeak" "${ROOT}/public/assets/licenses"
+cp "${WORK}/out/espeak-ng-core.mjs" "${ROOT}/vendor/espeak/"
+cp "${WORK}/out/espeak-ng-core.wasm" "${WORK}/out/espeak-ng-data.pack" "${ROOT}/public/assets/espeak/"
+cp "${WORK}/out/espeak-ng.COPYING.txt" "${ROOT}/public/assets/licenses/"
+echo "wrote:"
+( cd "${WORK}/out" && wc -c espeak-ng-core.mjs espeak-ng-core.wasm espeak-ng-data.pack )
+# The build has come out the same, byte for byte, every time so far (x86-64). A difference is
+# not an error, but it is worth knowing about before a release.
+if ( cd "${WORK}/out" && sha256sum --check --quiet - ) <<'EOF'
+e06facb2130784d127327320f8bd8006d559bbfc90491aaf10df9422bf0ad555  espeak-ng-core.mjs
+b46dc88f143784d6a52f1c9e6cebe4ce787fb0a042220902cb6fba18d918d2ef  espeak-ng-core.wasm
+b71dc1076d8c64e80092823b059c93f0748c3f166bce3ca9fda623da76e09a42  espeak-ng-data.pack
+EOF
+then echo "identical to the recorded build"
+else echo "NOTE: this build differs from the recorded one (see the hashes in this script)" >&2
+fi

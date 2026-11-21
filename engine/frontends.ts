@@ -4,7 +4,10 @@
 // downloaded. See docs/FINDINGS.md §13 and §14.
 import { Dizione } from "dizione-ptbr/engine.ts";
 import { normalize as normalizePortuguese } from "dizione-ptbr/normalize.ts";
+import * as spanish from "tiny-voca-es/frontend.js";
+import * as french from "tiny-voca-fr/frontend-fr.js";
 import { creaG2P } from "vocina/g2p_it.js";
+import { loadEspeak } from "./espeak.ts";
 import { ModelError } from "./models.ts";
 import { loadPhonemizer, type Phonemes, phonemize, type WordTokens } from "./phonemizer.ts";
 
@@ -31,12 +34,12 @@ const FIRST_PHONE = 17;
 /**
  * Phonemes from a front end that gives one flat list of symbols. Words are separated by a
  * pause token or a mark, so each run of phones is one spoken word. Their texts come from the
- * front end's rewritten text; unless there is exactly one text per run, the words are dropped
- * rather than guessed, and only the sentence is highlighted.
+ * front end's rewritten text, or are given one by one; unless there is exactly one text per
+ * run, the words are dropped rather than guessed, and only the sentence is highlighted.
  */
 export function fromSymbols(
   spoken: { ids: number[]; stress: number[] },
-  rewritten: string,
+  rewritten: string | string[],
   isPhone = (id: number) => id >= FIRST_PHONE,
 ): Phonemes | null {
   const runs: WordTokens[] = [];
@@ -50,12 +53,56 @@ export function fromSymbols(
     }
   });
   if (!runs.length) return null;
-  const texts = wordsOf(rewritten);
+  const texts = typeof rewritten === "string" ? wordsOf(rewritten) : rewritten;
   const named = texts.length === runs.length;
   return {
     ids: spoken.ids,
     stress: spoken.stress,
     words: named ? runs.map((run, index) => ({ ...run, text: texts[index] ?? "" })) : [],
+  };
+}
+
+/**
+ * What stands between spaces and has a letter or a digit in it, without the signs around it.
+ * This is what eSpeak NG takes for one word: "allez-vous" is one, "50 %" is one.
+ */
+const spacedWords = (text: string) =>
+  text
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ""))
+    .filter(Boolean);
+
+/** A model's own JavaScript port of tiny-voca's `text.py` for its language: see engine/vendor.d.ts. */
+type EspeakParts = typeof spanish;
+
+/**
+ * A front end that works from eSpeak NG's output, as the model was trained. `parts` is the
+ * model's own code for everything around eSpeak NG; this is its `phonemize`, which also notes
+ * how many words eSpeak NG spoke for each piece of text.
+ *
+ * eSpeak NG gives phonemes and not the words it read ("15" comes back as the sounds of
+ * "quince"). A piece between two marks where it spoke as many words as the text has gets its
+ * words named one for one. In any other piece the words stay nameless, and the alignment
+ * gives that piece's words one span together.
+ */
+function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): FrontEnd {
+  // After the special tokens and this language's punctuation marks; <unk> stands for a phone too.
+  const firstPhone = parts.SYMBOLS.findIndex((symbol, index) => index > 4 && /\p{L}/u.test(symbol));
+  return (input) => {
+    const names: string[] = [];
+    try {
+      const pieces = parts.chunks(parts.normalizeText(input)).map(([isPunctuation, piece]): spanish.EspeakPiece => {
+        if (isPunctuation) return [true, piece];
+        const spoken = parts.parseEspeak(espeak(piece));
+        const written = spacedWords(piece);
+        names.push(...(written.length === spoken.length ? written : spoken.map(() => "")));
+        return [false, spoken];
+      });
+      return fromSymbols(parts.tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
+    } catch (error) {
+      if (error instanceof parts.NothingToPronounce) return null;
+      throw error;
+    }
   };
 }
 
@@ -90,6 +137,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset): Promise<Front
       // The last eight symbols of its table are reserved and never produced.
       return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
     }
+    // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
+    case "espeak-es":
+      return espeakFrontEnd(spanish, await loadEspeak(read, "es"));
+    case "espeak-fr":
+      return espeakFrontEnd(french, await loadEspeak(read, "fr-fr"));
     default:
       throw new ModelError(`it needs the text front end "${name}", which this version of Tiny Reader does not have`);
   }

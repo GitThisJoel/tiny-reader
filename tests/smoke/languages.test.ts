@@ -37,6 +37,16 @@ describe.each([
     ["Oi", "tudo", "bem", "Paguei", "R$ 15,50", "às", "10h30"],
   ],
   ["vocina", "L'amico arriva alle 14:35, poi parte.", ["L'amico", "arriva", "alle", "14:35", "poi", "parte"]],
+  [
+    "tiny-voca-es",
+    "Hola, ¿cómo estás? El tren sale a las 14:35.",
+    ["Hola", "cómo", "estás", "El tren sale a las 14:35"],
+  ],
+  [
+    "tiny-voca-fr",
+    "Bonjour, comment allez-vous ? Cela coûte 15 euros.",
+    ["Bonjour", "comment", "allez-vous", "Cela", "coûte", "15", "euros"],
+  ],
 ])("%s", (id, text, sourceWords) => {
   const model = MODELS.find((entry) => entry.id === id) ?? BUNDLED;
   let engine: Engine;

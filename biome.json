@@ -7,7 +7,13 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!tests/parity/fixtures.json", "!.claude/skills"]
+    "includes": [
+      "**",
+      "!tests/parity/fixtures.json",
+      "!tests/parity/espeak-es.json",
+      "!tests/parity/espeak-fr.json",
+      "!.claude/skills"
+    ]
   },
   "formatter": {
     "enabled": true,

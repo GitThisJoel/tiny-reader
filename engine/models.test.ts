@@ -27,6 +27,8 @@ describe("the list of models", () => {
       ["fiato", "en", "dizione"],
       ["tiny-voca-ptbr", "pt-BR", "dizione-ptbr"],
       ["vocina", "it", "g2p-it"],
+      ["tiny-voca-es", "es-ES", "espeak-es"],
+      ["tiny-voca-fr", "fr", "espeak-fr"],
     ]);
   });
 
@@ -58,7 +60,15 @@ describe("the list of models", () => {
   });
 
   it("names each model's language, for the settings and for warnings", () => {
-    expect(MODELS.map(languageName)).toEqual(["English", "English", "English", "Brazilian Portuguese", "Italian"]);
+    expect(MODELS.map(languageName)).toEqual([
+      "English",
+      "English",
+      "English",
+      "Brazilian Portuguese",
+      "Italian",
+      "European Spanish",
+      "French",
+    ]);
     expect(readsOnly(BUNDLED)).toBe("tiny-voca only reads English");
     expect(readsOnly(MODELS[4] ?? BUNDLED)).toBe("vocina only reads Italian");
   });

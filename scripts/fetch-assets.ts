@@ -15,6 +15,9 @@ const GH = "https://raw.githubusercontent.com/n4ze3m/tiny-voca/0eea2be213b53ec0b
 // Text front ends for other languages: code that must ship in the add-on, and its data.
 const PTBR = "https://raw.githubusercontent.com/SemFence/dizione-ptbr-js/8fbb77e579fe684f3afd9cb2a801d0adce8c89cf";
 const VOCINA = "https://raw.githubusercontent.com/OfficinePixel/vocina/8dd17b31b0b6e40ce132105f5d0ea9eb7da98f34";
+// Front ends that work from eSpeak NG's output. eSpeak NG itself is built by scripts/build-espeak.sh.
+const SPANISH = "https://raw.githubusercontent.com/stdevMac/tiny-voca/a4bf2bd979fc40b1bd7e34e13c0164db627d14ec";
+const FRENCH = "https://raw.githubusercontent.com/DanielSuncost/tiny-voca-fr/4cc26ab23d934e3d33796eb06bf11f23f4c9ab34";
 
 export interface Asset {
   url: string;
@@ -167,12 +170,37 @@ export const ASSETS: Asset[] = [
     "vendor/vocina/vettori.json",
     "72a09515c2d6ce3cefabc58a887f740725f2d124317d28b714cfa46290be972c",
   ), // tests only
+  // Spanish and French: each model's own JavaScript front end (Apache-2.0), fed by eSpeak NG.
+  from(
+    SPANISH,
+    "site/frontend.js",
+    "vendor/tiny-voca-es/frontend.js",
+    "ba9b1ff1608e096d91c8ad2eee39e70a00559f629c29a945a4d01989c4b34c0a",
+  ),
+  from(
+    FRENCH,
+    "web/public/frontend-fr.js",
+    "vendor/tiny-voca-fr/frontend-fr.js",
+    "fb429d3e1fabc9dc1256427dbf8c9a0c597c1e61779bf5217134bfc2f860bf02",
+  ),
   // Each model's own description, to test that its symbol table is its front end's.
   from(
     "https://huggingface.co/semfence/tiny-voca-ptbr/resolve/f231cbe318c9f972e27fd8dad5d8ebcfb40a672f",
     "onnx/model.json",
     "vendor/dizione-ptbr/test/model.json",
     "0cef74c03aa5b4d705c8ea9810ec71b053da9b33a40925dbdf880ed471120060",
+  ),
+  from(
+    "https://huggingface.co/marcosmaceo/tiny-voca-es/resolve/9898eaef9b245d7a5240156eed919ee1bd2a9b84",
+    "tiny-voca-es.json",
+    "vendor/tiny-voca-es/model.json",
+    "bec46d85ccf80f746f7052c8532c9e74d04c00763831620c47f5442b52afc05f",
+  ),
+  from(
+    "https://huggingface.co/DanielSuncost/tiny-voca-fr/resolve/73f7700f514e70eef3b459aedcc49829d41945d4",
+    "onnx/model.json",
+    "vendor/tiny-voca-fr/model.json",
+    "b36144a5aeefc07a1ed94d40d20f9bf8514d962236ffd3dee39f0be8a6d9c459",
   ),
   from(
     "https://github.com/OfficinePixel/vocina/releases/download/v1.0",

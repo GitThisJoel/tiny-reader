@@ -12,7 +12,14 @@ export default defineConfig({
   // (tests/e2e/models.test.ts, engine/models.ts). It goes beside the real build, not over it.
   outDirTemplate: process.env.VITE_E2E_MODEL ? "firefox-mv3-e2e" : undefined,
   // Text front ends, fetched by `pnpm fetch-assets`. Typed in engine/vendor.d.ts.
-  alias: { "tiny-voca": "vendor/tiny-voca/js", vocina: "vendor/vocina" },
+  alias: {
+    "tiny-voca": "vendor/tiny-voca/js",
+    vocina: "vendor/vocina",
+    "tiny-voca-es": "vendor/tiny-voca-es",
+    "tiny-voca-fr": "vendor/tiny-voca-fr",
+    // eSpeak NG's emscripten glue, built by scripts/build-espeak.sh.
+    espeak: "vendor/espeak",
+  },
   // The sources zip is for AMO review: assets are re-downloaded with `pnpm fetch-assets`.
   zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**", "AGENTS.md"] },
   vite: () => ({
