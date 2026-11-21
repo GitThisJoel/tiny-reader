@@ -20,7 +20,7 @@ export const PDF_BLOCKED =
 export type PageState =
   | { kind: "readable" }
   /**
-   * Firefox's PDF viewer. `name` is the file's name, taken from the address. `url` is that
+   * Firefox's PDF viewer. `name` is the file's name, from the tab's address or title. `url` is the
    * address when the PDF is on the web, where the add-on can download it; null for a local file.
    */
   | { kind: "pdf"; name: string; url: string | null }
@@ -45,9 +45,7 @@ export function pdfName(url: string, title = ""): string | null {
     // Not an address: the title may still tell.
   }
   const named = title.trim();
-  if (!/\.pdf$/i.test(named)) return null;
-  const file = named.split(" - ").pop() ?? named;
-  return /\.pdf$/i.test(file) ? file : named;
+  return /\.pdf$/i.test(named) ? (named.split(" - ").pop() ?? named) : null;
 }
 
 /** `url` if it is an http(s) address, else null. Nothing else can be downloaded by the add-on. */

@@ -29,10 +29,13 @@ export default defineBackground(() => {
   const router = createRouter(() => new Worker(browser.runtime.getURL("/engine-worker.js")) as unknown as WorkerLike);
   browser.runtime.onConnect.addListener((port) => router.connect(port));
 
+  /** The add-on's own document page: it has the reader built in, and no add-on can inject into it. */
+  const isDocumentPage = (tab: Browser.tabs.Tab) =>
+    tab.url?.startsWith(browser.runtime.getURL("/document.html")) ?? false;
+
   /** Puts the reader and the highlight colours into one frame, or every reachable frame. */
   async function inject(tabId: number, frameId: number | undefined) {
-    // The add-on's own document page has the reader built in, and no add-on can inject into it.
-    if ((await browser.tabs.get(tabId)).url?.startsWith(browser.runtime.getURL("/document.html"))) return;
+    if (isDocumentPage(await browser.tabs.get(tabId))) return;
     const target = frameId === undefined ? { tabId, allFrames: true } : { tabId, frameIds: [frameId] };
     const injections = await browser.scripting.executeScript({ target, files: ["/content-scripts/reader.js"] });
     // First injection into a document: add the highlight colours too.
@@ -117,7 +120,7 @@ export default defineBackground(() => {
   async function pageState(): Promise<PageState> {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (tab?.id === undefined) return { kind: "blocked" };
-    if (tab.url?.startsWith(browser.runtime.getURL("/document.html"))) return { kind: "readable" };
+    if (isDocumentPage(tab)) return { kind: "readable" };
     try {
       await browser.scripting.executeScript({ target: { tabId: tab.id }, func: () => true });
       return { kind: "readable" };
