@@ -4,8 +4,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { type FrontEnd, loadFrontEnd } from "../../engine/frontends.ts";
-import { readAsset } from "../assets.ts";
+import { type SyncFrontEnd as FrontEnd, loadSyncFrontEnd } from "../assets.ts";
 
 const vendor = async (path: string) =>
   JSON.parse(await readFile(join(import.meta.dirname, "../../vendor", path), "utf8"));
@@ -37,7 +36,7 @@ describe("Brazilian Portuguese (dizione-ptbr)", () => {
   let symbols: string[];
   let golden: { sentences: [string, string][]; edge: [string, string][] };
   beforeAll(async () => {
-    frontEnd = await loadFrontEnd("dizione-ptbr", readAsset);
+    frontEnd = await loadSyncFrontEnd("dizione-ptbr");
     // The model's own table: ids are positions in it.
     symbols = (await vendor("dizione-ptbr/test/model.json")).symbols;
     golden = await vendor("dizione-ptbr/test/golden.sample.json");
@@ -79,7 +78,7 @@ describe("Italian (vocina's g2p_it)", () => {
   let vectors: { testo: string; varianti?: string[]; ids: number[]; stress: number[]; symbols: string[] }[];
   let model: { symbols: string[] };
   beforeAll(async () => {
-    frontEnd = await loadFrontEnd("g2p-it", readAsset);
+    frontEnd = await loadSyncFrontEnd("g2p-it");
     // Vectors with optional readings switched on are for a setting the add-on does not use.
     vectors = (await vendor("vocina/vettori.json")).vettori.filter(
       (vector: { varianti?: string[] }) => !vector.varianti?.length,
@@ -133,7 +132,7 @@ describe.each([
   };
   let model: { symbols: string[] };
   beforeAll(async () => {
-    frontEnd = await loadFrontEnd(name, readAsset);
+    frontEnd = await loadSyncFrontEnd(name);
     reference = JSON.parse(await readFile(join(import.meta.dirname, `espeak-${language}.json`), "utf8"));
     model = await vendor(descriptor);
   });

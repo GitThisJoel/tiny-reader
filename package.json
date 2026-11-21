@@ -15,6 +15,7 @@
     "zip": "wxt zip",
     "fetch-assets": "tsx scripts/fetch-assets.ts",
     "build-espeak": "bash scripts/build-espeak.sh",
+    "german-fixtures": "bash scripts/german-fixtures.sh",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "wxt prepare && tsc --noEmit",

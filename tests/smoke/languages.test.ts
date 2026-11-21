@@ -3,32 +3,13 @@
 // `.cache/models/` is fetched from its pinned address and verified first.
 //
 //   pnpm test:smoke
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import * as ort from "onnxruntime-web";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createEngine, type Engine } from "../../engine/engine.ts";
 import { loadFrontEnd } from "../../engine/frontends.ts";
-import { BUNDLED, downloadModel, MODELS, verifyModel } from "../../engine/models.ts";
+import { BUNDLED, MODELS } from "../../engine/models.ts";
 import { DEFAULT_OPTIONS, HOP } from "../../engine/protocol.ts";
-import { readAsset } from "../assets.ts";
-
-const CACHE = join(import.meta.dirname, "../../.cache/models");
-async function modelFile(id: string) {
-  const model = MODELS.find((entry) => entry.id === id);
-  if (!model) throw new Error(`${id} is not in the list`);
-  const path = join(CACHE, `${id}.onnx`);
-  const cached = await readFile(path).catch(() => null);
-  if (cached) {
-    const bytes = new Uint8Array(cached);
-    await verifyModel(bytes, model);
-    return bytes;
-  }
-  const bytes = await downloadModel(model);
-  await mkdir(CACHE, { recursive: true });
-  await writeFile(path, bytes);
-  return bytes;
-}
+import { cached, readAsset } from "../assets.ts";
 
 describe.each([
   [
@@ -42,6 +23,7 @@ describe.each([
     "Hola, ¿cómo estás? El tren sale a las 14:35.",
     ["Hola", "cómo", "estás", "El tren sale a las 14:35"],
   ],
+  ["apptor-de", "Hallo, der Zug fährt um 14:35 Uhr ab.", ["Hallo", "der", "Zug", "fährt", "um", "14:35", "Uhr", "ab"]],
   [
     "tiny-voca-fr",
     "Bonjour, comment allez-vous ? Cela coûte 15 euros.",
@@ -52,9 +34,10 @@ describe.each([
   let engine: Engine;
   beforeAll(async () => {
     ort.env.wasm.numThreads = 1;
+    const helper = model.helper && (await cached(model.helper, `${id}.helper.onnx`));
     engine = await createEngine(ort, {
-      model: await modelFile(id),
-      frontEnd: await loadFrontEnd(model.frontend, readAsset),
+      model: await cached(model, `${id}.onnx`),
+      frontEnd: await loadFrontEnd(model.frontend, readAsset, { ort, helper: async () => helper ?? null }),
     });
   }, 120_000);
 

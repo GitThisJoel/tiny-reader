@@ -52,18 +52,29 @@ ${Array.from(
 
 /** Served at /stand-in.onnx, as Hugging Face serves a model: to any origin. */
 export const STAND_IN = standInModel();
+/** Served at /stand-in-helper.bin: a second file that goes with the stand-in model. */
+export const STAND_IN_HELPER = Uint8Array.from({ length: 64 }, (_, index) => index);
 
 export async function startSite(): Promise<{
   url: string;
   strictUrl: string;
   /** The headers of every request for the stand-in model. */
   modelRequests: IncomingHttpHeaders[];
+  /** How often the stand-in model's helper file was asked for. */
+  helperRequests: number;
   /** While true, the stand-in model is served with one byte changed. */
   tamper: boolean;
   close(): void;
 }> {
   const modelRequests: IncomingHttpHeaders[] = [];
   const server: Server = createServer((request, response) => {
+    if (request.url === "/stand-in-helper.bin") {
+      site.helperRequests += 1;
+      response
+        .writeHead(200, { "content-type": "application/octet-stream", "access-control-allow-origin": "*" })
+        .end(STAND_IN_HELPER);
+      return;
+    }
     if (request.url === "/stand-in.onnx") {
       modelRequests.push(request.headers);
       const file = Uint8Array.from(STAND_IN);
@@ -101,6 +112,7 @@ export async function startSite(): Promise<{
     url: `http://127.0.0.1:${port}/`,
     strictUrl: `http://127.0.0.1:${port}/strict`,
     modelRequests,
+    helperRequests: 0,
     tamper: false,
     close: () => server.close(),
   };

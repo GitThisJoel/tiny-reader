@@ -21,8 +21,9 @@ function run<T>(mode: IDBTransactionMode, request: (store: IDBObjectStore) => ID
   });
 }
 
-/** The ids of the models in storage. */
-export const storedModels = () => run("readonly", (store) => store.getAllKeys()) as Promise<string[]>;
+/** The ids of the models in storage. A model's helper file is stored under its own key (`helperKey`), which is no id. */
+export const storedModels = async () =>
+  ((await run("readonly", (store) => store.getAllKeys())) as string[]).filter((key) => !key.includes("/"));
 
 export const storeModel = (id: string, bytes: Uint8Array<ArrayBuffer>) =>
   run("readwrite", (store) => store.put(new Blob([bytes]), id));

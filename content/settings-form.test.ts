@@ -106,6 +106,14 @@ describe("mountSettingsForm", () => {
         "Download tiny-voca-fr",
         true,
       ],
+      [
+        "apptor-de",
+        // The voice and the letter-to-sound model its front end needs, together.
+        "apptor-tiny-tts · by apptor · German · voices F2, M2 · Apache-2.0 · 34 MB",
+        "https://huggingface.co/apptor/apptor-tiny-tts",
+        "Download apptor-tiny-tts",
+        true,
+      ],
     ]);
   });
 

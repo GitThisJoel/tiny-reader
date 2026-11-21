@@ -4,6 +4,7 @@ import {
   BUNDLED,
   checkIo,
   downloadModel,
+  helperKey,
   languageName,
   MODELS,
   type Model,
@@ -29,6 +30,7 @@ describe("the list of models", () => {
       ["vocina", "it", "g2p-it"],
       ["tiny-voca-es", "es-ES", "espeak-es"],
       ["tiny-voca-fr", "fr", "espeak-fr"],
+      ["apptor-de", "de", "g2p-de"],
     ]);
   });
 
@@ -50,6 +52,13 @@ describe("the list of models", () => {
         model.url.startsWith("https://github.com/") ? ["https://release-assets.githubusercontent.com/*"] : [],
       );
     }
+    // A helper file is pinned like the model, in the same repository at the same commit.
+    for (const { id, url, helper } of MODELS.filter((model) => model.helper)) {
+      expect(helper?.url.slice(0, helper.url.lastIndexOf("/")), id).toBe(url.slice(0, url.lastIndexOf("/")));
+      expect(helper?.sha256, id).toMatch(/^[0-9a-f]{64}$/);
+      expect(helper?.size, id).toBeGreaterThan(1e6);
+      expect(helperKey(id)).toBe(`${id}/helper`);
+    }
     expect(new Set(MODELS.map((model) => model.id)).size).toBe(MODELS.length);
     expect(new Set(MODELS.map((model) => model.sha256)).size).toBe(MODELS.length);
   });
@@ -68,6 +77,7 @@ describe("the list of models", () => {
       "Italian",
       "European Spanish",
       "French",
+      "German",
     ]);
     expect(readsOnly(BUNDLED)).toBe("tiny-voca only reads English");
     expect(readsOnly(MODELS[4] ?? BUNDLED)).toBe("vocina only reads Italian");

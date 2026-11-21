@@ -4,7 +4,15 @@
 // table is the model's. A new language means that front end's code inside the package and
 // entries here that name it. See docs/FINDINGS.md §13 and §14.
 
-export interface Model {
+/** A file to download: where from, and exactly which bytes. One that differs is not stored. */
+export interface PinnedFile {
+  /** An address that is pinned: a commit on Hugging Face, a release tag on GitHub. */
+  url: string;
+  size: number;
+  sha256: string;
+}
+
+export interface Model extends PinnedFile {
   id: string;
   name: string;
   /** Who made it, as its page names them. Shown with the model: some licences ask for the credit. */
@@ -23,11 +31,11 @@ export interface Model {
   licence: string;
   /** The model's page, for people. */
   source: string;
-  /** The ONNX file, at an address that is pinned: a commit on Hugging Face, a release tag on GitHub. */
-  url: string;
-  /** Bytes and SHA-256 of that file. A download that differs is not stored. */
-  size: number;
-  sha256: string;
+  /**
+   * A second file the model's front end needs, downloaded, verified and stored with the model.
+   * It is data: the German front end's letter-to-sound model. Front-end code is never downloaded.
+   */
+  helper?: PinnedFile;
   /**
    * Sites the download is redirected to that send no CORS headers, as match patterns. Firefox
    * has to be allowed to reach them too. Hugging Face needs none.
@@ -138,6 +146,23 @@ export const MODELS: readonly Model[] = [
     size: 21_368_019,
     sha256: "698249cf63768ecd6011d9ddc4137ed16b4d2856a3bc3ba1ab7e1e4e153fc727",
   },
+  {
+    id: "apptor-de",
+    name: "apptor-tiny-tts",
+    author: "apptor",
+    language: "de",
+    frontend: "g2p-de",
+    voices: ["F2", "M2"],
+    licence: "Apache-2.0",
+    ...huggingFace("apptor/apptor-tiny-tts", "0b6962273a1d6618f250cdbd621b56ba04b62cef", "apptor-tiny-tts-de.onnx"),
+    size: 21_379_442,
+    sha256: "594d7536b0138957167bd2a6c9e1ca0301f726e981cab14296799444abdb5e46",
+    helper: {
+      url: "https://huggingface.co/apptor/apptor-tiny-tts/resolve/0b6962273a1d6618f250cdbd621b56ba04b62cef/apptor-g2p-de.onnx",
+      size: 12_364_141,
+      sha256: "d981694e7a03030b2169be46b2094775dde4ec5a3e9406c92a3fc8f1ed8bbec3",
+    },
+  },
   ...(standIn ? [JSON.parse(standIn) as Model] : []),
 ];
 
@@ -153,8 +178,11 @@ export const modelById = (id: unknown): Model | undefined => MODELS.find((model)
 /** Why a model could not be downloaded or used. The message is for the user. */
 export class ModelError extends Error {}
 
-/** Throws unless `bytes` is exactly the file the list pins for `model`. */
-export async function verifyModel(bytes: Uint8Array<ArrayBuffer>, model: Model) {
+/** Where a model's helper file is kept in storage, beside the model under its id. */
+export const helperKey = (id: string) => `${id}/helper`;
+
+/** Throws unless `bytes` is exactly the file the list pins. */
+export async function verifyModel(bytes: Uint8Array<ArrayBuffer>, model: PinnedFile) {
   if (bytes.length !== model.size)
     throw new ModelError(`The download is ${bytes.length} bytes long, not the ${model.size} expected.`);
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
@@ -163,12 +191,12 @@ export async function verifyModel(bytes: Uint8Array<ArrayBuffer>, model: Model) 
 }
 
 /**
- * Downloads a model's file and resolves to it only once it has been verified. Nothing is sent
+ * Downloads a file of a model and resolves to it only once it has been verified. Nothing is sent
  * but the request itself: no cookies, no body. `onProgress` is told the bytes received so far.
  * The caller holds the host permission for the site, so that Firefox adds no Origin header.
  */
 export async function downloadModel(
-  model: Model,
+  model: PinnedFile,
   onProgress: (received: number) => void = () => {},
   signal?: AbortSignal,
   get: typeof fetch = fetch,

@@ -71,11 +71,23 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
     async speak(text, options, signal) {
       // Phonemizing each candidate piece once: the result is reused for synthesis.
       const cache = new Map<string, Phonemes | null>();
-      const phonemesOf = (piece: string) => {
-        if (!cache.has(piece)) cache.set(piece, assets.frontEnd(finished(piece)));
-        return cache.get(piece) ?? null;
-      };
-      const pieces = splitLong(normalize(text), (piece) => (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS);
+      const phonemesOf = (piece: string) => cache.get(piece) ?? null;
+      // A front end may take its time (the German one runs a model of its own), and the cutting
+      // is synchronous. So a piece not phonemized yet is taken as short enough, phonemized after
+      // the pass, and the cutting is done again until it meets nothing new.
+      let pieces: ReturnType<typeof splitLong>;
+      for (;;) {
+        const unknown: string[] = [];
+        pieces = splitLong(normalize(text), (piece) => {
+          if (!cache.has(piece)) unknown.push(piece);
+          return (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS;
+        });
+        if (!unknown.length) break;
+        for (const piece of unknown) {
+          if (signal?.aborted) return null;
+          cache.set(piece, await assets.frontEnd(finished(piece)));
+        }
+      }
 
       const chunks: Float32Array[] = [];
       const words: WordTiming[] = [];

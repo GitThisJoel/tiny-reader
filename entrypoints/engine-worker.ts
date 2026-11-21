@@ -7,7 +7,7 @@ import { type FrontEnd, loadFrontEnd } from "@/engine/frontends.ts";
 import { JobQueue } from "@/engine/job-queue.ts";
 import { createLoader } from "@/engine/loader.ts";
 import { readModel } from "@/engine/model-store.ts";
-import { readsOnly } from "@/engine/models.ts";
+import { helperKey, type Model, readsOnly } from "@/engine/models.ts";
 import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
@@ -31,12 +31,12 @@ export default defineUnlistedScript(() => {
 
   // A front end is set up once and kept: switching between models of one language costs only the model.
   const frontEnds = new Map<string, Promise<FrontEnd>>();
-  function frontEnd(name: string) {
-    let loading = frontEnds.get(name);
+  function frontEnd(model: Model) {
+    let loading = frontEnds.get(model.frontend);
     if (!loading) {
-      loading = loadFrontEnd(name, asset);
-      frontEnds.set(name, loading);
-      loading.catch(() => frontEnds.delete(name));
+      loading = loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) });
+      frontEnds.set(model.frontend, loading);
+      loading.catch(() => frontEnds.delete(model.frontend));
     }
     return loading;
   }
@@ -45,7 +45,7 @@ export default defineUnlistedScript(() => {
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
     stored: readModel,
     // The front end comes first: a model whose front end this build lacks is refused before its file is loaded.
-    create: async (file, model) => createEngine(ort, { frontEnd: await frontEnd(model.frontend), model: file }),
+    create: async (file, model) => createEngine(ort, { frontEnd: await frontEnd(model), model: file }),
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 

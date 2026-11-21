@@ -1,7 +1,33 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { readAsset } from "../tests/assets.ts";
-import { type FrontEnd, fromSymbols, loadFrontEnd } from "./frontends.ts";
+import { loadSyncFrontEnd, readAsset, type SyncFrontEnd } from "../tests/assets.ts";
+import { fromSymbols, loadFrontEnd } from "./frontends.ts";
 import { MODELS, ModelError } from "./models.ts";
+
+/**
+ * In place of the German letter-to-sound model, which is a download: a model that hears "a" in
+ * every letter. The time steps of its output are the letters; class 0 is the unit "a".
+ */
+const fakeNeeds = {
+  ort: {
+    Tensor: class {
+      dims: number[];
+      constructor(_type: string, _data: unknown, dims: number[]) {
+        this.dims = dims;
+      }
+    },
+    InferenceSession: {
+      create: async () => ({
+        run: async ({ chars }: { chars: { dims: number[] } }) => {
+          const [steps, classes] = [chars.dims[1] ?? 0, 179];
+          const data = new Float32Array(steps * classes).fill(-9);
+          for (let step = 0; step < steps; step++) data[step * classes + (step % 2 ? 178 : 0)] = 0;
+          return { logp: { dims: [1, steps, classes], data } };
+        },
+      }),
+    },
+  },
+  helper: async () => Uint8Array.of(1),
+};
 
 describe("loadFrontEnd", () => {
   it("refuses a front end this build does not have, saying which, before reading anything", async () => {
@@ -16,7 +42,7 @@ describe("loadFrontEnd", () => {
 
   it("has the front end of every model in the list", async () => {
     for (const name of new Set(MODELS.map((model) => model.frontend)))
-      expect(await loadFrontEnd(name, readAsset), name).toBeTypeOf("function");
+      expect(await loadFrontEnd(name, readAsset, fakeNeeds), name).toBeTypeOf("function");
   });
 });
 
@@ -28,9 +54,9 @@ describe.each([
   ["espeak-es", "Hola, ¿cómo estás? Cuesta 15 euros.", ["Hola", "cómo", "estás", "Cuesta", "15", "euros"]],
   ["espeak-fr", "Bonjour, comment allez-vous ? Cela coûte 15 euros.", ["Bonjour", "comment", "allez-vous", "Cela"]],
 ])("the %s front end", (name, sentence, firstWords) => {
-  let frontEnd: FrontEnd;
+  let frontEnd: SyncFrontEnd;
   beforeAll(async () => {
-    frontEnd = await loadFrontEnd(name, readAsset);
+    frontEnd = await loadSyncFrontEnd(name);
   });
 
   it("gives tokens between <bos> and <eos>, a stress value for each, and the words it speaks", () => {
@@ -57,9 +83,36 @@ describe.each([
   });
 });
 
+describe("the German front end", () => {
+  it("is refused while its letter-to-sound model is not downloaded", async () => {
+    for (const needs of [{}, { ...fakeNeeds, helper: async () => null }])
+      await expect(loadFrontEnd("g2p-de", readAsset, needs)).rejects.toThrow(
+        new ModelError("its letter-to-sound model is not downloaded"),
+      );
+  });
+
+  it("writes numbers out, reads known words from its table and the others with the model, and keeps each word", async () => {
+    const frontEnd = await loadFrontEnd("g2p-de", readAsset, fakeNeeds);
+    const spoken = await frontEnd("Hallo, der Zug fährt um 14:35 Uhr.");
+    if (!spoken) throw new Error("nothing");
+    expect([spoken.ids[0], spoken.ids.at(-1)]).toEqual([1, 2]);
+    expect(spoken.words.map((word) => word.text)).toEqual([
+      "Hallo",
+      "der",
+      "Zug",
+      "fährt",
+      "um",
+      "vierzehn",
+      "Uhr",
+      "fünfunddreißig",
+    ]);
+    expect(await frontEnd("…")).toBeNull();
+  });
+});
+
 describe("a front end fed by eSpeak NG", () => {
   it("leaves the words of a piece nameless when eSpeak NG spoke another number of them", async () => {
-    const frontEnd = await loadFrontEnd("espeak-es", readAsset);
+    const frontEnd = await loadSyncFrontEnd("espeak-es");
     // "1250" is one word in the text and three when spoken; "Vale" stands alone before the comma.
     const spoken = frontEnd("Vale, cuesta 1250 euros.");
     expect(spoken?.words.map((word) => word.text)).toEqual(["Vale", "", "", "", "", ""]);

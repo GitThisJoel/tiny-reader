@@ -117,3 +117,25 @@ declare module "tiny-voca-es/frontend.js" {
 declare module "tiny-voca-fr/frontend-fr.js" {
   export * from "*/espeak-front-end";
 }
+
+// apptor's German front end: normalising, numbers and a letter-to-sound model run with ONNX Runtime.
+declare module "apptor/apptor-tts.js" {
+  type Units = [phone: string, stress: number][];
+  /** The tables in frontend-de.json. */
+  export type Tables = Record<string, unknown>;
+  export class G2P {
+    /** `session` is the letter-to-sound model; `meta` its description; `exceptions` words read from a table. */
+    constructor(ort: unknown, session: unknown, meta: unknown, exceptions?: Record<string, string>);
+    /** One written word to its phones. Empty for a word with nothing to say. */
+    word(word: string): Promise<Units>;
+  }
+  export function normalizeText(text: string): string;
+  export function makePrepare(tables: Tables): (text: string) => string;
+  export function makeNormalizeGerman(tables: Tables): (text: string) => string;
+  export function makeChunks(
+    tables: Tables,
+  ): (text: string) => ([isPunctuation: true, mark: string] | [isPunctuation: false, text: string])[];
+  export function makeTokenize(
+    tables: Tables,
+  ): (pieces: ([true, string] | [false, Units[]])[]) => { symbols: string[]; ids: number[]; stress: number[] };
+}

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Model } from "../../engine/models.ts";
 import { ADDON_URL, Firefox } from "./firefox.ts";
-import { STAND_IN, startSite } from "./site.ts";
+import { STAND_IN, STAND_IN_HELPER, startSite } from "./site.ts";
 
 const ROOT = join(import.meta.dirname, "../..");
 let firefox: Firefox;
@@ -30,6 +30,12 @@ beforeAll(async () => {
     size: STAND_IN.length,
     sha256: createHash("sha256").update(STAND_IN).digest("hex"),
     url: `${site.url}stand-in.onnx`,
+    // A second file, as the German model has: downloaded first, stored beside the model, deleted with it.
+    helper: {
+      url: `${site.url}stand-in-helper.bin`,
+      size: STAND_IN_HELPER.length,
+      sha256: createHash("sha256").update(STAND_IN_HELPER).digest("hex"),
+    },
   };
   execFileSync(join(ROOT, "node_modules/.bin/wxt"), ["build"], {
     cwd: ROOT,
@@ -80,7 +86,7 @@ const choose = (model: string) =>
      }`,
     [model],
   );
-/** The ids of the models in the add-on's storage, read the way the add-on reads them. */
+/** Everything in the add-on's model storage, by key: a model under its id, its helper beside it. */
 const storedIds = () =>
   firefox.evaluate<string[]>(
     options,
@@ -169,6 +175,7 @@ describe("extra voice models", () => {
         vocina: ["Download", ""],
         "tiny-voca-es": ["Download", ""],
         "tiny-voca-fr": ["Download", ""],
+        "apptor-de": ["Download", ""],
         "stand-in": ["Download", ""],
       },
     });
@@ -182,7 +189,7 @@ describe("extra voice models", () => {
       "Download",
       "Nothing was downloaded: Firefox was not allowed to reach 127.0.0.1.",
     ]);
-    expect(site.modelRequests).toHaveLength(0);
+    expect([site.modelRequests.length, site.helperRequests]).toEqual([0, 0]);
   }, 30_000);
 
   it("stores nothing when the download is not the file the list pins", async () => {
@@ -193,8 +200,9 @@ describe("extra voice models", () => {
     site.tamper = false;
     expect(refused.rows["stand-in"]).toEqual(["Download", "The download is not the file Tiny Reader expects."]);
     expect(refused.models).toEqual(["tiny-voca (English)"]);
+    // Its helper was fine and came first; without the model it is not kept either.
     expect(await storedIds()).toEqual([]);
-    expect(site.modelRequests).toHaveLength(1);
+    expect([site.modelRequests.length, site.helperRequests]).toEqual([1, 1]);
   }, 30_000);
 
   it("downloads a model once access is given, sending nothing that tells who asks, and offers it", async () => {
@@ -204,10 +212,10 @@ describe("extra voice models", () => {
     expect(downloaded.rows["stand-in"]).toEqual(["Delete", "Downloaded"]);
     expect(downloaded.models).toEqual(["tiny-voca (English)", "Stand-in (English)"]);
     expect(downloaded.model).toBe("tiny-voca"); // offered, not chosen for the user
-    expect(await storedIds()).toEqual(["stand-in"]);
+    expect(await storedIds()).toEqual(["stand-in", "stand-in/helper"]);
     // One request per download. No cookies, and no Origin header, which would carry the
     // add-on's address: an id of this installation.
-    expect(site.modelRequests).toHaveLength(2);
+    expect([site.modelRequests.length, site.helperRequests]).toEqual([2, 2]);
     for (const headers of site.modelRequests)
       expect([headers.cookie, headers.authorization, headers.origin, headers.referer]).toEqual([
         undefined,
@@ -278,6 +286,7 @@ describe("extra voice models", () => {
       options,
       `return (await browser.storage.local.get("settings")).settings.model === "tiny-voca";`,
     );
+    expect(await storedIds()).toEqual([]); // the helper went with the model
     expect(await read()).toMatchObject({ voices: ["F2", "M2"], notice: null });
     await stop();
   }, 60_000);

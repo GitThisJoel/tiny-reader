@@ -15,6 +15,9 @@ const GH = "https://raw.githubusercontent.com/n4ze3m/tiny-voca/0eea2be213b53ec0b
 // Text front ends for other languages: code that must ship in the add-on, and its data.
 const PTBR = "https://raw.githubusercontent.com/SemFence/dizione-ptbr-js/8fbb77e579fe684f3afd9cb2a801d0adce8c89cf";
 const VOCINA = "https://raw.githubusercontent.com/OfficinePixel/vocina/8dd17b31b0b6e40ce132105f5d0ea9eb7da98f34";
+// German: apptor's front end, in the repository of its Austrian model, and the German model's description.
+const APPTOR = "https://huggingface.co/apptor/apptor-tiny-tts-at/resolve/e28eb444250b4d06162e6ba8e5090c4284345913";
+const APPTOR_DE = "https://huggingface.co/apptor/apptor-tiny-tts/resolve/0b6962273a1d6618f250cdbd621b56ba04b62cef";
 // Front ends that work from eSpeak NG's output. eSpeak NG itself is built by scripts/build-espeak.sh.
 const SPANISH = "https://raw.githubusercontent.com/stdevMac/tiny-voca/a4bf2bd979fc40b1bd7e34e13c0164db627d14ec";
 const FRENCH = "https://raw.githubusercontent.com/DanielSuncost/tiny-voca-fr/4cc26ab23d934e3d33796eb06bf11f23f4c9ab34";
@@ -183,6 +186,38 @@ export const ASSETS: Asset[] = [
     "vendor/tiny-voca-fr/frontend-fr.js",
     "fb429d3e1fabc9dc1256427dbf8c9a0c597c1e61779bf5217134bfc2f860bf02",
   ),
+  // German: apptor's JavaScript front end (Apache-2.0) and its tables. Its letter-to-sound model
+  // is downloaded with the German voice (engine/models.ts), not bundled.
+  from(
+    APPTOR,
+    "web/apptor-tts.js",
+    "vendor/apptor/apptor-tts.js",
+    "35e5570304efb3c86a5e2ee5c22c5629f768cdcde6b643b263959a91e5e02bba",
+  ),
+  from(
+    APPTOR,
+    "web/frontend-de.json",
+    "public/assets/g2p-de/frontend-de.json",
+    "d02f049df4da463bff99b6dd0d626d8a792aaef380e97595c137b2a67cb10300",
+  ),
+  from(
+    APPTOR,
+    "web/exceptions-de.json",
+    "public/assets/g2p-de/exceptions-de.json",
+    "3c954207d913c749f9a970b5aed9310968ea96225782ed6e2c66c11df4bc0994",
+  ),
+  from(
+    APPTOR,
+    "apptor-g2p-de.json",
+    "public/assets/g2p-de/apptor-g2p-de.json",
+    "82759d03b9ff4ae01112a470bb4b34960b3471187a3dd6060292c4fc232fd6d5",
+  ),
+  from(
+    APPTOR_DE,
+    "apptor-tiny-tts-de.json",
+    "vendor/apptor/model.json",
+    "50835666366dafb41e8d865deba76405e76523623df85cf24329e5e7fb9401c8",
+  ), // tests only
   // Each model's own description, to test that its symbol table is its front end's.
   from(
     "https://huggingface.co/semfence/tiny-voca-ptbr/resolve/f231cbe318c9f972e27fd8dad5d8ebcfb40a672f",

@@ -15,6 +15,7 @@ export default defineConfig({
   alias: {
     "tiny-voca": "vendor/tiny-voca/js",
     vocina: "vendor/vocina",
+    apptor: "vendor/apptor",
     "tiny-voca-es": "vendor/tiny-voca-es",
     "tiny-voca-fr": "vendor/tiny-voca-fr",
     // eSpeak NG's emscripten glue, built by scripts/build-espeak.sh.

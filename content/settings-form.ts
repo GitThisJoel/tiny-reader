@@ -1,7 +1,16 @@
 // The settings form, used by the options page and by the toolbar popup.
 import { browser } from "wxt/browser";
 import { deleteModel, storedModels, storeModel } from "@/engine/model-store.ts";
-import { BUNDLED, downloadModel, languageName, MODELS, type Model, ModelError, modelById } from "@/engine/models.ts";
+import {
+  BUNDLED,
+  downloadModel,
+  helperKey,
+  languageName,
+  MODELS,
+  type Model,
+  ModelError,
+  modelById,
+} from "@/engine/models.ts";
 import { LIMITS } from "@/engine/protocol.ts";
 import { sitePattern } from "./commands.ts";
 import "./settings-form.css";
@@ -32,7 +41,7 @@ const describeModel = (model: Model) =>
     languageName(model),
     `voices ${model.voices.join(", ")}`,
     model.licence,
-    `${Math.round(model.size / 1e6)} MB`,
+    `${Math.round((model.size + (model.helper?.size ?? 0)) / 1e6)} MB`,
   ].join(" · ");
 
 /**
@@ -159,7 +168,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
     );
     const button = create("button", { type: "button" });
     const progress = create("progress");
-    progress.max = entry.size;
+    progress.max = entry.size + (entry.helper?.size ?? 0);
     progress.setAttribute("aria-label", `Downloading ${entry.name}`);
     const status = create("span");
     status.setAttribute("role", "status");
@@ -178,7 +187,9 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       if (download) return download.abort();
       if (downloaded.has(entry.id)) {
         try {
+          // The model first: without it the helper is only a file nothing asks for.
           await deleteModel(entry.id);
+          if (entry.helper) await deleteModel(helperKey(entry.id));
         } catch {
           return render("It could not be deleted.");
         }
@@ -192,7 +203,10 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       // Asked for in the click itself, or Firefox shows no prompt. With access to the site the
       // request carries no Origin header, which would name this installation of the add-on; without
       // it nothing is downloaded. Access the user gave before (for a PDF there) is left as it was.
-      const origins = [sitePattern(entry.url), ...(entry.alsoAllow ?? [])];
+      const origins = [
+        ...new Set([sitePattern(entry.url), ...(entry.helper ? [sitePattern(entry.helper.url)] : [])]),
+        ...(entry.alsoAllow ?? []),
+      ];
       const held = browser.permissions.contains({ origins });
       // No second prompt from a second click while the first is open.
       button.disabled = true;
@@ -205,20 +219,29 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       progress.value = 0;
       render("Downloading…");
       try {
-        // The only request: the file itself, verified against the list before it is returned.
-        const bytes = await downloadModel(
-          entry,
-          (received) => {
-            progress.value = received;
-          },
-          signal,
-        );
-        await storeModel(entry.id, bytes);
+        // The only requests: the files themselves, each verified against the list before it is
+        // returned. The model is stored last, so a model in storage has its helper there too.
+        const files = entry.helper ? [entry.helper, entry] : [entry];
+        let before = 0;
+        for (const file of files) {
+          const start = before;
+          const bytes = await downloadModel(
+            file,
+            (received) => {
+              progress.value = start + received;
+            },
+            signal,
+          );
+          await storeModel(file === entry ? entry.id : helperKey(entry.id), bytes);
+          before += file.size;
+        }
         downloaded.add(entry.id);
         download = null;
         offerModels();
         render();
       } catch (error) {
+        // A helper without its model is of no use to anyone.
+        if (entry.helper) await deleteModel(helperKey(entry.id)).catch(() => {});
         download = null;
         render(signal.aborted ? "" : error instanceof ModelError ? error.message : "The model could not be stored.");
       } finally {

@@ -2,6 +2,7 @@
 // names the one it was trained with (engine/models.ts). The code of every front end ships in
 // the add-on, fetched at a pinned commit by scripts/fetch-assets.ts; it can never be
 // downloaded. See docs/FINDINGS.md §13 and §14.
+import { G2P, makeChunks, makeNormalizeGerman, makePrepare, makeTokenize, normalizeText } from "apptor/apptor-tts.js";
 import { Dizione } from "dizione-ptbr/engine.ts";
 import { normalize as normalizePortuguese } from "dizione-ptbr/normalize.ts";
 import * as spanish from "tiny-voca-es/frontend.js";
@@ -11,8 +12,19 @@ import { loadEspeak } from "./espeak.ts";
 import { ModelError } from "./models.ts";
 import { loadPhonemizer, type Phonemes, phonemize, type WordTokens } from "./phonemizer.ts";
 
-/** Text to token ids, stress and the tokens of every spoken word. Null: nothing to pronounce. */
-export type FrontEnd = (text: string) => Phonemes | null;
+/**
+ * Text to token ids, stress and the tokens of every spoken word. Null: nothing to pronounce.
+ * A front end that runs a model of its own answers with a promise.
+ */
+export type FrontEnd = (text: string) => Phonemes | null | Promise<Phonemes | null>;
+
+/** What some front ends need besides the package's files. */
+export interface FrontEndNeeds {
+  /** ONNX Runtime, for a front end with a model of its own. */
+  ort?: { InferenceSession: { create(model: Uint8Array, options: object): Promise<unknown> }; Tensor: unknown };
+  /** The model's helper file from storage (engine/models.ts), or null when it is not there. */
+  helper?: () => Promise<Uint8Array | null>;
+}
 
 /** Reads a file of the add-on package, by its path from the package root. */
 type ReadAsset = (path: string) => Promise<ArrayBuffer>;
@@ -110,7 +122,7 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
  * Sets up the front end called `name`. Rejects with a ModelError for one this build does not
  * have: a model that names it cannot be used.
  */
-export async function loadFrontEnd(name: string, read: ReadAsset): Promise<FrontEnd> {
+export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEndNeeds = {}): Promise<FrontEnd> {
   const text = async (path: string) => new TextDecoder().decode(await read(path));
   switch (name) {
     // English: upstream's JavaScript port of dizione.
@@ -136,6 +148,54 @@ export async function loadFrontEnd(name: string, read: ReadAsset): Promise<Front
       const g2p = creaG2P({ ...JSON.parse(data), wikizionario: JSON.parse(lexicon).voci });
       // The last eight symbols of its table are reserved and never produced.
       return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
+    }
+    // German: apptor's front end. Words are read by a letter-to-sound model, downloaded with the voice.
+    case "g2p-de": {
+      const [model, tables, exceptions, meta] = await Promise.all([
+        needs.helper?.(),
+        text("/assets/g2p-de/frontend-de.json").then(JSON.parse),
+        text("/assets/g2p-de/exceptions-de.json").then(JSON.parse),
+        text("/assets/g2p-de/apptor-g2p-de.json").then(JSON.parse),
+      ]);
+      if (!needs.ort || !model) throw new ModelError("its letter-to-sound model is not downloaded");
+      const session = await needs.ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
+      const g2p = new G2P(needs.ort, session, meta, exceptions);
+      const [prepare, normalizeGerman, chunks, tokenize] = [
+        makePrepare,
+        makeNormalizeGerman,
+        makeChunks,
+        makeTokenize,
+      ].map((make) => make(tables)) as [
+        ReturnType<typeof makePrepare>,
+        ReturnType<typeof makeNormalizeGerman>,
+        ReturnType<typeof makeChunks>,
+        ReturnType<typeof makeTokenize>,
+      ];
+      const firstPhone = (tables.symbols as string[]).indexOf((tables.phones as string[])[0] ?? "");
+      // Its own `phonemize`, which also keeps the word each run of phones was read from.
+      return async (input) => {
+        const names: string[] = [];
+        const pieces: Parameters<typeof tokenize>[0] = [];
+        for (const [isPunctuation, piece] of chunks(normalizeText(normalizeGerman(normalizeText(prepare(input)))))) {
+          if (isPunctuation) {
+            pieces.push([true, piece]);
+            continue;
+          }
+          const words = [];
+          for (const word of piece.split(" ").filter(Boolean)) {
+            const units = await g2p.word(word);
+            if (!units.length) continue;
+            words.push(units);
+            names.push(...spacedWords(word), ...(spacedWords(word).length ? [] : [""]));
+          }
+          pieces.push([false, words]);
+        }
+        try {
+          return fromSymbols(tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
+        } catch {
+          return null; // its "nothing to pronounce"
+        }
+      };
     }
     // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
     case "espeak-es":
