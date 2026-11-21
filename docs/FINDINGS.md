@@ -465,8 +465,14 @@ Since the add-on cannot enter Firefox's PDF viewer (§15), it reads PDFs in a pa
 - **No permission and no network.** The file comes from a file picker or a drop, is parsed by
   pdf.js (`pdfjs-dist` 6.5.438, bundled, 1.7 MB) in a Worker of the page, and never leaves it.
   pdf.js is told not to fetch anything: `useWorkerFetch: false`, `useWasm: false`,
-  `disableFontFace: true`. An add-on cannot `fetch` a `file://` URL, so the PDF open in another
-  tab cannot be picked up automatically; the user has to choose the file again.
+  `disableFontFace: true`.
+- **The PDF open in another tab cannot be picked up automatically.** Tested from an add-on page
+  in Firefox 158: `fetch` and `XMLHttpRequest` of a `file://` PDF fail with a network error,
+  both without host permissions and with `<all_urls>` granted. So a local PDF always has to be
+  chosen or dropped by the user. An `http(s)` PDF can be fetched once the add-on has a host
+  permission for that site (200, full file); without one it fails the same way. Opening web
+  PDFs directly would therefore cost a permission prompt per site and a network request by the
+  add-on, which the project's constraints rule out so far. Not built.
 - **Text, not layout.** `getTextContent()` gives positioned runs. Lines are found by baseline,
   paragraphs by vertical gap and font size, a word hyphenated at a line end is rejoined, page
   numbers are dropped, and a sentence that runs over a page break is carried on. Verified on a
