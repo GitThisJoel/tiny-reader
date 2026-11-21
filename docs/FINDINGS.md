@@ -548,4 +548,15 @@ reach (§15), so "in the PDF" means in the add-on's page.
   previous sentence was at least partly in view, so scrolling away to look at something is not
   undone. Web pages are still not scrolled.
 - Pages refit when the window is resized (one CSS variable scales the text layer; visible
-  canvases are redrawn). Rotated pages have not been tried.
+  canvases are redrawn).
+- **Rotated pages.** pdf.js lays the text layer out unturned and sets `data-main-rotation` on
+  it; its stylesheet turns the layer with three transform rules, which had to be copied too.
+  Tested with a generated page with `/Rotate 90`: the text's box lies on the drawn ink.
+- **Pages of different sizes** are all scaled by one factor, chosen so the widest fits. Tested
+  with a page three times as wide as the first.
+- **Found in review (2026-11-21).** A reading stopped by hand did not tell the page that no
+  sentence was being read, so a later reading was not followed if the window had been
+  scrolled away. A selection that starts at an element boundary was read from the start of
+  its paragraph. Blank runs between words counted as "not read" and would have left holes in
+  the highlight. `saveSettings` reads before it writes, so two quick changes in the control bar
+  could lose one; saves are now ordered inside it, for every caller. All have tests.
