@@ -1,10 +1,10 @@
 // The add-on's own page for documents Firefox will not let it read in place, PDFs above all.
-// It shows the document's text as plain paragraphs and reads them like any web page.
+// It shows the document's pages as they are and reads them with the highlight on the page.
 import { browser } from "wxt/browser";
 import { parseDocumentFragment, sitePattern } from "@/content/commands.ts";
 import { createController, type ReaderCommand } from "@/content/controller.ts";
-import { HIGHLIGHT_CSS } from "@/content/highlight.ts";
-import { readPdf } from "./pdf.ts";
+import { mapWithin } from "@/content/text-map.ts";
+import { type ShownPdf, showPdf } from "./pdf.ts";
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const article = byId("document");
@@ -13,13 +13,34 @@ const name = byId("name");
 const startButton = byId<HTMLButtonElement>("start");
 const fileInput = byId<HTMLInputElement>("file");
 
+/** The PDF on show, once all of it has been read in. */
+let shown: ShownPdf | null = null;
+/** Counts the files opened, so one that is overtaken while loading can step aside. */
+let opened = 0;
+
+/** Whether the sentence starts in view: its first line clear of the header and of the control bar's usual place. */
+function startsInView(range: Range): boolean {
+  const { top, bottom } = range.getClientRects()[0] ?? range.getBoundingClientRect();
+  return top >= byId("header").offsetHeight && bottom <= innerHeight - 80;
+}
+let sentence: Range | null = null;
+/** Keeps the sentence being read in view, unless the reader has scrolled away from the last one. */
+function follow(range: Range | null) {
+  const last = sentence?.getBoundingClientRect();
+  const following = !last || (last.bottom > 0 && last.top < innerHeight);
+  sentence = range;
+  // A jump, not a glide: nothing moves between two sentences.
+  if (range && following && !startsInView(range))
+    range.startContainer.parentElement?.scrollIntoView({ block: "center" });
+}
+
 // The same commands a web page gets: toolbar popup, shortcuts and the context menu work here too.
-const controller = createController();
+// What is read is the PDF's text as rebuilt from its pages, not the text layer's scattered pieces.
+const controller = createController({
+  textOf: (range) => mapWithin(shown?.text ?? "", shown?.runs ?? [], range),
+  onSentence: follow,
+});
 browser.runtime.onMessage.addListener((message: ReaderCommand) => controller.handle(message));
-// The highlight colours, which the background injects into web pages. A constructed sheet is not inline style.
-const highlights = new CSSStyleSheet();
-highlights.replaceSync(HIGHLIGHT_CSS);
-document.adoptedStyleSheets = [...document.adoptedStyleSheets, highlights];
 
 function say(message: string, kind: "info" | "error" = "info") {
   status.textContent = message;
@@ -31,31 +52,37 @@ class DownloadError extends Error {}
 
 /** Shows the PDF called `fileName`, whose bytes `bytes` delivers, replacing whatever was open. */
 async function load(fileName: string, bytes: () => Promise<ArrayBuffer>) {
+  const mine = ++opened;
   controller.handle({ type: "stop" });
   document.getElementById("allow")?.remove();
-  article.replaceChildren();
+  shown?.close();
+  shown = null;
+  sentence = null;
+  const pages = document.createElement("div");
+  article.replaceChildren(pages);
   name.textContent = "";
   document.title = "Tiny Reader";
   startButton.disabled = true;
   say(`Opening ${fileName}…`);
   try {
-    const paragraphs = await readPdf(await bytes(), (page, pages) => say(`Reading page ${page} of ${pages}…`));
-    if (!paragraphs.length) {
+    const pdf = await showPdf(await bytes(), pages, (page, total) => {
+      if (mine === opened) say(`Reading page ${page} of ${total}…`);
+    });
+    if (mine !== opened) {
+      pdf.close();
+      return;
+    }
+    shown = pdf;
+    name.textContent = fileName;
+    document.title = `${fileName.replace(/\.pdf$/i, "")} · Tiny Reader`;
+    if (!pdf.text) {
       say("This PDF has no text to read. It may be a scan: pages stored as pictures.", "error");
       return;
     }
-    name.textContent = fileName;
-    article.append(
-      ...paragraphs.map((text) => {
-        const paragraph = document.createElement("p");
-        paragraph.textContent = text;
-        return paragraph;
-      }),
-    );
-    document.title = `${fileName.replace(/\.pdf$/i, "")} · Tiny Reader`;
     startButton.disabled = false;
-    say("Press Read from the start, or right-click a paragraph and choose Read from here with tiny-voca.");
+    say("Press Read from the start, or right-click a line and choose Read from here with tiny-voca.");
   } catch (error) {
+    if (mine !== opened) return;
     if (error instanceof DownloadError) say(`${error.message} Choose the file with Open a PDF instead.`, "error");
     else say(`This file could not be read as a PDF. ${error instanceof Error ? error.message : ""}`.trim(), "error");
   }

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { paragraphsOf, type TextItem } from "./pdf-text.ts";
+import { pdfText, type TextItem } from "./pdf-text.ts";
+
+const paragraphsOf = (pages: TextItem[][]) => {
+  const { text } = pdfText(pages);
+  return text ? text.split("\n") : [];
+};
 
 /** A line of text at height `y`, as one run that ends its line. */
 const line = (str: string, y: number, height = 12): TextItem => ({ str, x: 72, y, height, hasEOL: true });
@@ -81,5 +86,45 @@ describe("paragraphsOf", () => {
   it("gives nothing for a document without text", () => {
     expect(paragraphsOf([])).toEqual([]);
     expect(paragraphsOf([[], [{ str: "  ", x: 0, y: 0, height: 0, hasEOL: true }]])).toEqual([]);
+  });
+});
+
+describe("pdfText", () => {
+  it("maps every word back to its run, and joining spaces to none", () => {
+    const pages: TextItem[][] = [
+      [line("and then it con-", 700), line("tinues  on.", 686), line("1", 40, 10)],
+      [
+        { str: "It ", x: 72, y: 700, height: 12, hasEOL: false },
+        { str: "ends.", x: 90, y: 700, height: 12, hasEOL: true },
+      ],
+    ];
+    const { text, runs } = pdfText(pages);
+    expect(text).toBe("and then it continues on.\nIt ends.");
+    // Each run gives back exactly its stretch of the text, taken from the page's own string.
+    for (const run of runs)
+      expect(pages[run.page]?.[run.item]?.str.slice(run.start, run.start + run.length)).toBe(
+        text.slice(run.textStart, run.textStart + run.length),
+      );
+    // "continues" is two runs, on two lines, without its hyphen. The page number has none.
+    expect(runs.map((run) => text.slice(run.textStart, run.textStart + run.length))).toEqual([
+      "and",
+      "then",
+      "it",
+      "con",
+      "tinues",
+      "on.",
+      "It",
+      "ends.",
+    ]);
+    expect(runs.map((run) => [run.page, run.item])).toEqual([
+      [0, 0],
+      [0, 0],
+      [0, 0],
+      [0, 0],
+      [0, 1],
+      [0, 1],
+      [1, 0],
+      [1, 1],
+    ]);
   });
 });

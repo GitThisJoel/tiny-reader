@@ -316,13 +316,17 @@ export class Firefox {
     if (picked !== "ok") throw new Error(`context menu "${label}": ${picked}`);
   }
 
-  /** A PNG of the element matching `selector`, as bytes. */
-  async screenshot(tab: string, selector: string): Promise<Buffer> {
-    const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
-      selector,
-    ]);
-    const id = Object.values(element ?? {})[0];
-    if (!id) throw new Error(`no element matches ${selector}`);
+  /** A PNG of the element matching `selector`, or of the window's view without one, as bytes. */
+  async screenshot(tab: string, selector?: string): Promise<Buffer> {
+    await this.focus(tab);
+    let id: string | undefined;
+    if (selector) {
+      const element = await this.evaluate<Record<string, string>>(tab, "return document.querySelector(arguments[0]);", [
+        selector,
+      ]);
+      id = Object.values(element ?? {})[0];
+      if (!id) throw new Error(`no element matches ${selector}`);
+    }
     const { value } = await this.send<{ value: string }>("WebDriver:TakeScreenshot", { id, full: false });
     return Buffer.from(value, "base64");
   }

@@ -35,8 +35,13 @@ async function popupFor(front: string) {
   }
   throw new Error("the popup did not find out about its tab");
 }
-const paragraphs = (tab: string) =>
-  firefox.evaluate<string[]>(tab, `return [...document.querySelectorAll("#document p")].map((p) => p.textContent);`);
+/** The lines of text on the pages the document page shows. */
+const lines = (tab: string) =>
+  firefox.evaluate<string[]>(
+    tab,
+    `return [...document.querySelectorAll("#document .textLayer span")].map((span) => span.textContent);`,
+  );
+const OPENED = `return !document.getElementById("start").disabled;`;
 
 /** Waits for Firefox's own permission prompt, answers it, and returns what it said. */
 const answerPrompt = (answer: "allow" | "refuse") =>
@@ -127,12 +132,12 @@ describe("a PDF in Firefox's viewer", () => {
         "To open “My report.pdf” here, Tiny Reader has to download it from 127.0.0.1, and Firefox asks for your permission first. Or choose the file with Open a PDF.",
       allow: "Allow and open",
     });
-    expect(await paragraphs(documentPage)).toEqual([]);
+    expect(await lines(documentPage)).toEqual([]);
 
     await firefox.click(documentPage, "#allow");
     expect(await answerPrompt("allow")).toMatch(/127\.0\.0\.1/);
-    await firefox.waitFor(documentPage, `return document.querySelectorAll("#document p").length > 0;`);
-    expect(await paragraphs(documentPage)).toEqual([
+    await firefox.waitFor(documentPage, OPENED);
+    expect(await lines(documentPage)).toEqual([
       "A sample document",
       "This file exists to be shown in the PDF viewer of the browser.",
     ]);
@@ -148,7 +153,7 @@ describe("a PDF in Firefox's viewer", () => {
     const again = await firefox.open(
       `${ADDON_URL}/document.html${documentFragment({ name: "Other.pdf", url: `${site.url}other/Other.pdf` })}`,
     );
-    await firefox.waitFor(again, `return document.querySelectorAll("#document p").length > 0;`);
+    await firefox.waitFor(again, OPENED);
     expect(
       await firefox.evaluate(
         again,
@@ -172,7 +177,7 @@ describe("a PDF in Firefox's viewer", () => {
         `return document.getElementById("allow") ? null : document.getElementById("status").textContent.trim();`,
       ),
     ).toBe("Without that permission, choose the file with Open a PDF, or drop it on this page.");
-    expect(await paragraphs(refused)).toEqual([]);
+    expect(await lines(refused)).toEqual([]);
   }, 60_000);
 
   it("says so when the site does not deliver the file", async () => {
@@ -227,9 +232,9 @@ describe("a PDF whose address does not end in .pdf", () => {
       opened = (await firefox.tabs()).find((handle) => !before.includes(handle)) ?? "";
     }
     // Permission for this site was given in the tests above, so it opens with no prompt.
-    await firefox.waitFor(opened, `return document.querySelectorAll("#document p").length > 0;`);
+    await firefox.waitFor(opened, OPENED);
     expect(await firefox.evaluate(opened, `return document.getElementById("name").textContent;`)).toBe("paper-v7.pdf");
-    expect(await paragraphs(opened)).toHaveLength(2);
+    expect(await lines(opened)).toHaveLength(2);
   }, 60_000);
 });
 
