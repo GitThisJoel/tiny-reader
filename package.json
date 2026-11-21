@@ -22,7 +22,8 @@
     "postinstall": "wxt prepare",
     "test:parity": "vitest run tests/parity",
     "test:smoke": "vitest run tests/smoke",
-    "test:e2e": "vitest run tests/e2e"
+    "test:e2e": "vitest run tests/e2e",
+    "screenshots": "tsx scripts/screenshots.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",

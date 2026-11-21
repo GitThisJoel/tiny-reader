@@ -36,13 +36,14 @@ export class Firefox {
   private pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
   private current = "";
 
-  static async launch(): Promise<Firefox> {
+  /** Starts Firefox with the built add-on. `extraPrefs` are set on top of the test profile's own. */
+  static async launch(extraPrefs: Record<string, unknown> = {}): Promise<Firefox> {
     const firefox = new Firefox();
-    await firefox.start();
+    await firefox.start(extraPrefs);
     return firefox;
   }
 
-  private async start() {
+  private async start(extraPrefs: Record<string, unknown>) {
     const binary = BINARIES.find((path) => path && existsSync(path));
     if (!binary) throw new Error("Firefox not found. Set FIREFOX to the binary.");
     const build = join(ROOT, ".output/firefox-mv3");
@@ -55,6 +56,7 @@ export class Firefox {
       "datareporting.policy.dataSubmissionEnabled": false,
       "media.autoplay.default": 5, // Firefox's default: block audible autoplay
       "media.volume_scale": "0.0", // silent: audio still plays through Web Audio, at zero volume
+      ...extraPrefs,
     };
     await writeFile(
       join(this.profile, "user.js"),
