@@ -1,13 +1,14 @@
 ---
 name: release
-description: Cut a Tiny Reader release - bump the version, run every check, build the add-on and source packages, prove the source package rebuilds to the same files, tag it, and hand the packages to the user to upload to addons.mozilla.org. Use when asked to release, publish or tag a version.
+description: Cut a Tiny Reader release - bump the version, run every check, build the add-on and source packages, prove the source package rebuilds to the same files, tag it, create the GitHub release, and hand the packages to the user to upload to addons.mozilla.org. Use when asked to release, publish or tag a version.
 argument-hint: "[version, for example 0.2.0]"
 disable-model-invocation: true
 ---
 
 # Releasing Tiny Reader
 
-A release is a version bump merged to `main`, a tag, and two zip files the user uploads to addons.mozilla.org (AMO).
+A release is a version bump merged to `main`, a tag, a GitHub release, and two zip files the user uploads to
+addons.mozilla.org (AMO).
 You prepare everything; **the user uploads**. Never submit to AMO yourself, and ask before pushing a tag or creating a
 GitHub release.
 
@@ -80,17 +81,32 @@ It must print `IDENTICAL`. If it does not, something the build needs is missing 
   `git push origin vX.Y.Z`.
 - Rebuild the packages from the tagged commit (`pnpm zip`) so that what is uploaded is exactly the tag.
 
-## 6. Hand over
+## 6. Write the release notes
+
+A short list of what changed since the last release, taken from the `feat` and `fix` commits and written for users,
+not developers: what they can now do, and what no longer goes wrong. Leave out refactoring, tests, tooling and docs.
+The same text goes to addons.mozilla.org and to GitHub.
+
+## 7. Create the GitHub release
+
+With the user's go-ahead, from the tag, with the add-on package attached:
+
+```bash
+gh release create vX.Y.Z .output/tiny-reader-X.Y.Z-firefox.zip --verify-tag --title "vX.Y.Z" --notes-file NOTES.md
+```
+
+`NOTES.md` is a temporary file outside the repository holding the release notes, followed by this line: "Install
+Tiny Reader from addons.mozilla.org. The attached package is unsigned, so Firefox only loads it as a temporary
+add-on." Until the add-on is listed there, say that instead.
+
+## 8. Hand over
 
 Tell the user:
 
 - the two files to upload and their sizes: the add-on package first, the source package when the form asks for
   source code;
-- what changed since the last release, as a short list for the release notes, taken from the `feat` and `fix`
-  commits and written for users, not developers;
+- the release notes, to paste into the form;
 - anything a reviewer will ask about that is new in this version: a new permission, a new bundled library, a new
   linter warning;
-- the choices on the form that stay the same: Firefox for desktop only, licence Apache-2.0, no data collected.
-
-If the user wants a GitHub release as well, create it from the tag with the same notes and attach the add-on
-package. Say in the notes that the package is unsigned: Firefox installs it permanently only from AMO.
+- the choices on the form that stay the same: Firefox for desktop only, licence Apache-2.0, no data collected;
+- the link to the GitHub release.
