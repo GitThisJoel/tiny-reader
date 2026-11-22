@@ -125,7 +125,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset): Promise<Front
         text("/assets/dizione-ptbr/open_table.json"),
       ]);
       const dizione = new Dizione(lexicon, JSON.parse(table));
-      return (input) => fromSymbols(dizione.phonemize(composed(input)), normalizePortuguese(composed(input)));
+      return (input) => {
+        // Rewritten once, and phonemized as it is. An apostrophe ends a word for this front end ("d'água" is two).
+        const rewritten = normalizePortuguese(composed(input));
+        return fromSymbols(dizione.phonemize(rewritten, true, false), rewritten.replace(/['’]/g, " "));
+      };
     }
     // Italian: vocina's own converter, with the Wiktionary lexicon it was trained with.
     case "g2p-it": {
@@ -135,7 +139,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset): Promise<Front
       ]);
       const g2p = creaG2P({ ...JSON.parse(data), wikizionario: JSON.parse(lexicon).voci });
       // The last eight symbols of its table are reserved and never produced.
-      return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
+      // ponytail: `fonemi` rewrites the text itself and cannot be told not to, so it is rewritten twice.
+      return (input) => {
+        const text = composed(input);
+        return fromSymbols(g2p.fonemi(text), g2p.normalizza(text));
+      };
     }
     // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
     case "espeak-es":

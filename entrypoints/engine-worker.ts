@@ -44,8 +44,8 @@ export default defineUnlistedScript(() => {
   const load = createLoader({
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
     stored: readModel,
-    // The front end comes first: a model whose front end this build lacks is refused before its file is loaded.
-    create: async (file, model) => createEngine(ort, { frontEnd: await frontEnd(model.frontend), model: file }),
+    // The front end and the model load together. A model whose front end this build lacks is refused.
+    create: (file, model) => createEngine(ort, { frontEnd: frontEnd(model.frontend), model: file }),
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 

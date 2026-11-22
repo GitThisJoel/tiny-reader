@@ -33,6 +33,11 @@ const STALE = [
 ];
 
 describe("Brazilian Portuguese (dizione-ptbr)", () => {
+  it("names both words an apostrophe joins, as the front end speaks them", () => {
+    for (const text of ["Um copo d'água, por favor.", "Um copo d’água, por favor."])
+      expect(frontEnd(text)?.words.map((word) => word.text)).toEqual(["Um", "copo", "d", "água", "por", "favor"]);
+  });
+
   let frontEnd: FrontEnd;
   let symbols: string[];
   let golden: { sentences: [string, string][]; edge: [string, string][] };

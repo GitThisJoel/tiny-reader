@@ -54,7 +54,11 @@ declare module "tiny-voca/dizione/engine.js" {
 declare module "dizione-ptbr/engine.ts" {
   export class Dizione {
     constructor(lexiconTsv: string, openTable: Readonly<Record<string, string>>);
-    phonemize(text: string): { symbols: string[]; stress: number[]; readonly ids: number[] };
+    phonemize(
+      text: string,
+      useLexicon?: boolean,
+      doNormalize?: boolean,
+    ): { symbols: string[]; stress: number[]; readonly ids: number[] };
   }
 }
 declare module "dizione-ptbr/normalize.ts" {
