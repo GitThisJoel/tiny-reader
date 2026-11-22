@@ -260,9 +260,21 @@ cp /work/src/COPYING /work/out/espeak-ng.COPYING.txt
 chown -R "${UID_GID}" /work/out
 EOF
 
-nice -n 10 docker run --rm \
+# The container says a great deal while it works: compiler warnings in eSpeak NG's own code, its
+# Makefile, configure asking the compiler for its version. None of it is this script's news, so
+# it goes to a log that is shown only when the build fails.
+echo "Building eSpeak NG ${ESPEAK_TAG} in a container. This takes about a minute."
+if ! nice -n 10 docker run --rm \
   -v "${WORK}:/build:ro" -v "${WORK}/out:/work/out" \
-  "${EMSDK_IMAGE}" bash /build/build.sh
+  "${EMSDK_IMAGE}" bash /build/build.sh > "${WORK}/build.log" 2>&1
+then
+  cat "${WORK}/build.log" >&2
+  echo >&2
+  echo "The build failed. Everything it printed is above." >&2
+  exit 1
+fi
+# What was built from: the commit that was checked, and the version the native build reports.
+grep -E "^(espeak-ng ${ESPEAK_TAG} at |eSpeak NG text-to-speech: )" "${WORK}/build.log" || true
 
 if [ -n "${FIXTURES}" ]; then
   cp "${WORK}"/out/espeak-*.json "${ROOT}/tests/parity/"
