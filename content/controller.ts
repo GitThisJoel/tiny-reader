@@ -13,7 +13,7 @@ import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange, type TextMap } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
-import { modelById } from "@/engine/models.ts";
+import { BUNDLED, modelById } from "@/engine/models.ts";
 import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 /** What a document can be told to do: by the background (menu, shortcut, popup) or by its own page. */
@@ -90,8 +90,11 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     const client = new EngineClient(
       () => browser.runtime.connect({ name: PORT_NAME }),
       undefined,
-      // A downloaded model that is gone or broken: the built-in one spoke, and the bar says so.
-      (notice) => bar.notify(notice),
+      // A downloaded model that is gone or broken: the built-in one spoke. The bar says so and offers its voices.
+      (notice) => {
+        bar.notify(notice);
+        bar.offerVoices(BUNDLED.voices);
+      },
     );
     const sink = new WebAudioSink();
     // A highlight that jumps from word to word is motion; with reduced motion only the

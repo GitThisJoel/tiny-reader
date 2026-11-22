@@ -26,6 +26,10 @@ export default defineConfig({
     },
   }),
   hooks: {
+    // A package to publish never carries the tests' stand-in model, whatever the shell has exported.
+    "zip:start"() {
+      if (process.env.VITE_E2E_MODEL) throw new Error("VITE_E2E_MODEL is set: unset it before packaging.");
+    },
     // ONNX Runtime's wasm binary and its loader ship inside the add-on, unmodified.
     "build:publicAssets"(_, files) {
       for (const name of ["ort-wasm-simd-threaded.wasm", "ort-wasm-simd-threaded.mjs"])

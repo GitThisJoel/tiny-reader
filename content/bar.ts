@@ -103,6 +103,12 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
   const status = document.createElement("span");
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
+  const voices = select(
+    "Voice",
+    (modelById(options.model) ?? BUNDLED).voices.map((name, index) => [index, name]),
+    options.voice,
+    (voice) => handlers.setOptions({ voice }),
+  );
   toolbar.append(
     grip,
     button("previous", "Previous sentence", handlers.previous),
@@ -115,12 +121,7 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
       options.speed,
       (speed) => handlers.setOptions({ speed }),
     ),
-    select(
-      "Voice",
-      (modelById(options.model) ?? BUNDLED).voices.map((name, index) => [index, name]),
-      options.voice,
-      (voice) => handlers.setOptions({ voice }),
-    ),
+    voices,
     button("stop", "Stop reading", handlers.stop),
   );
   toolbar.addEventListener("keydown", (event) => {
@@ -198,6 +199,11 @@ export function createBar(handlers: BarHandlers, options: SynthOptions) {
       notices.add(message);
       notice.textContent = [...notices].join(" ");
       notice.hidden = false;
+    },
+    /** The voices of the model that reads, when that is not the one the bar was made for. The engine picks the same one. */
+    offerVoices(names: readonly string[]) {
+      const chosen = Math.min(voices.selectedIndex, names.length - 1);
+      voices.replaceChildren(...names.map((name, index) => new Option(name, String(index), false, index === chosen)));
     },
     focus() {
       toggle.focus();
