@@ -226,6 +226,7 @@ package = types.ModuleType("tui_voice")
 package.__path__ = [sys.argv[3]]
 sys.modules["tui_voice"] = package
 P = importlib.import_module("tui_voice.phonemes")
+T = importlib.import_module("tui_voice.text")
 
 # The English model's symbols in the order of their slots, as its training took them.
 vocab = json.load(open(sys.argv[4], encoding="utf-8"))["vocab"]
@@ -233,7 +234,7 @@ upstream = sorted(vocab, key=vocab.get)
 plan = json.load(open(sys.argv[5], encoding="utf-8"))
 out = []
 for sentence in json.load(open(sys.argv[1], encoding="utf-8"))["ml"]:
-    ids = P.encode(P.phonemize(sentence), plan, upstream)
+    ids = P.encode(P.phonemize(T.normalize(sentence)), plan, upstream)
     out.append({"text": sentence, "ids": ids, "stress": [0] * len(ids)})
 version = subprocess.run(["espeak-ng", "--version"], capture_output=True, text=True, check=True).stdout.strip()
 json.dump({"espeak": version, "voice": "ml", "symbols": plan["new_symbols"], "sentences": out},

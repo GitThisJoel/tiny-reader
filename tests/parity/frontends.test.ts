@@ -152,7 +152,8 @@ describe.each([
   it("gives the ids and stress of the Python front end with native eSpeak NG 1.52.0", async () => {
     expect(reference.espeak).toContain("1.52.0");
     expect(await espeakVersion(readAsset)).toContain("1.52.0");
-    expect(reference.sentences.length).toBeGreaterThanOrEqual(20);
+    // Malayalam has its makers' example prompts, which are fewer.
+    expect(reference.sentences.length).toBeGreaterThanOrEqual(language === "ml" ? 20 : 50);
     for (const sentence of reference.sentences) {
       const result = frontEnd(sentence.text);
       expect(result?.ids, sentence.text).toEqual(sentence.ids);

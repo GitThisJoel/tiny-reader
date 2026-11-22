@@ -31,6 +31,30 @@ describe("malayalamFrontEnd", () => {
     expect(slotOf("ɶ̃")).toBe(43); // a vowel: the neutral one
   });
 
+  it("cleans the text as the makers' training did: marks made plain, signs and invisible characters dropped", () => {
+    const heard: string[] = [];
+    const frontEnd = malayalamFrontEnd((clause) => {
+      heard.push(clause);
+      return "m_a";
+    }, words);
+    // An ellipsis and a danda end a clause like a full stop; quotes and signs are not handed to eSpeak NG.
+    const spoken = frontEnd("\u201cമഴ\u201d\u2026 വീട്\u0964 50% \u200bമ");
+    expect(heard).toEqual(["മഴ", "വീട്", "50 മ"]);
+    expect(spoken?.ids.filter((id) => id === 6)).toHaveLength(2); // two full stops
+  });
+
+  it("keeps a number whole, and takes no language mark of eSpeak NG's for a sound", () => {
+    const heard: string[] = [];
+    const frontEnd = malayalamFrontEnd((clause) => {
+      heard.push(clause);
+      return clause.includes("Google") ? "ɲ_aː_n (en)ɡ_ˈuː_ɡ_əl(ml) u_p_a" : "m_a";
+    }, words);
+    frontEnd("വില 3.5, സമയം 10:30, ആകെ 10,000.");
+    expect(heard).toEqual(["വില 3.5", "സമയം 10:30", "ആകെ 10,000"]);
+    // ɡ uː ɡ əl: four sounds for the English word, none of them made of brackets and letters.
+    expect(frontEnd("ഞാൻ Google ഉപ")?.words.map((word) => word.tokenEnd - word.tokenStart)).toEqual([3, 4, 3]);
+  });
+
   it("leaves the words nameless when eSpeak NG spoke another number of them, and gives null for nothing", () => {
     const frontEnd = malayalamFrontEnd((clause) => (clause.trim() === "൧൨" ? "o_n_n_ɨ r_a_ɳ_ʈ_ɨ" : ""), words);
     expect(frontEnd("൧൨")?.words.map((word) => word.text)).toEqual(["", ""]);
