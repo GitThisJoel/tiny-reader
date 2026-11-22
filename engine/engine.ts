@@ -85,12 +85,12 @@ export async function createEngine(
       // the pass, and the cutting is done again until it meets nothing new.
       let pieces: ReturnType<typeof splitLong>;
       for (;;) {
-        const unknown: string[] = [];
+        const unknown = new Set<string>();
         pieces = splitLong(normalize(text), (piece) => {
-          if (!cache.has(piece)) unknown.push(piece);
+          if (!cache.has(piece)) unknown.add(piece);
           return (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS;
         });
-        if (!unknown.length) break;
+        if (!unknown.size) break;
         for (const piece of unknown) {
           if (signal?.aborted) return null;
           cache.set(piece, await frontEnd(finished(piece)));

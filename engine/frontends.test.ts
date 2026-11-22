@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { loadSyncFrontEnd, readAsset, type SyncFrontEnd } from "../tests/assets.ts";
-import { fromSymbols, loadFrontEnd } from "./frontends.ts";
-import { MODELS, ModelError } from "./models.ts";
+import { fromSymbols, keepLast, loadFrontEnd } from "./frontends.ts";
+import { BUNDLED, MODELS, ModelError } from "./models.ts";
 
 /**
  * In place of the German letter-to-sound model, which is a download: a model that hears "a" in
@@ -17,6 +17,7 @@ const fakeNeeds = {
     },
     InferenceSession: {
       create: async () => ({
+        release: async () => {},
         run: async ({ chars }: { chars: { dims: number[] } }) => {
           const [steps, classes] = [chars.dims[1] ?? 0, 179];
           const data = new Float32Array(steps * classes).fill(-9);
@@ -80,6 +81,42 @@ describe.each([
     for (const text of ["", "   ", "…"]) expect(frontEnd(text), JSON.stringify(text)).toBeNull();
     // eSpeak NG has something to say for any script, as when the models were trained; the others skip it.
     if (!name.startsWith("espeak")) expect(frontEnd("こんにちは世界")).toBeNull();
+  });
+});
+
+describe("keepLast", () => {
+  it("sets a front end up once for models that share it, and lets it go when another is asked for", async () => {
+    const log: string[] = [];
+    const frontEnd = keepLast(async (model) => {
+      log.push(`load ${model.frontend}`);
+      return Object.assign(() => null, { release: async () => void log.push(`release ${model.frontend}`) });
+    });
+    const english = { ...BUNDLED, frontend: "dizione" };
+    const german = { ...BUNDLED, frontend: "g2p-de", helper: { url: "", size: 1, sha256: "a" } };
+    expect(await frontEnd(english)).toBe(await frontEnd({ ...english, id: "another" }));
+    await frontEnd(german);
+    // The same front end with another helper file is not the same front end.
+    await frontEnd({ ...german, helper: { url: "", size: 1, sha256: "b" } });
+    await frontEnd(english);
+    expect(log).toEqual([
+      "load dizione",
+      "load g2p-de",
+      "release dizione",
+      "load g2p-de",
+      "release g2p-de",
+      "load dizione",
+      "release g2p-de",
+    ]);
+  });
+
+  it("tries again after a front end could not be set up", async () => {
+    let tries = 0;
+    const frontEnd = keepLast(async () => {
+      if (!tries++) throw new Error("no");
+      return () => null;
+    });
+    await expect(frontEnd(BUNDLED)).rejects.toThrow("no");
+    expect(await frontEnd(BUNDLED)).toBeTypeOf("function");
   });
 });
 

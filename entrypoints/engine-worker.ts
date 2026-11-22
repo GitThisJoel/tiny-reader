@@ -3,11 +3,11 @@
 import * as ort from "onnxruntime-web/wasm";
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 import { createEngine, NothingToPronounce } from "@/engine/engine.ts";
-import { type FrontEnd, loadFrontEnd } from "@/engine/frontends.ts";
+import { keepLast, loadFrontEnd } from "@/engine/frontends.ts";
 import { JobQueue } from "@/engine/job-queue.ts";
 import { createLoader } from "@/engine/loader.ts";
 import { readModel } from "@/engine/model-store.ts";
-import { helperKey, type Model, readsOnly } from "@/engine/models.ts";
+import { helperKey, readsOnly } from "@/engine/models.ts";
 import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
@@ -29,17 +29,9 @@ export default defineUnlistedScript(() => {
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
-  // A front end is set up once and kept: switching between models of one language costs only the model.
-  const frontEnds = new Map<string, Promise<FrontEnd>>();
-  function frontEnd(model: Model) {
-    let loading = frontEnds.get(model.frontend);
-    if (!loading) {
-      loading = loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) });
-      frontEnds.set(model.frontend, loading);
-      loading.catch(() => frontEnds.delete(model.frontend));
-    }
-    return loading;
-  }
+  const frontEnd = keepLast((model) =>
+    loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) }),
+  );
 
   const load = createLoader({
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
