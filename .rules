@@ -10,7 +10,7 @@ design in docs/ARCHITECTURE.md, the reasons behind it in docs/FINDINGS.md.
 - Before committing: `pnpm lint`, `pnpm typecheck` and `pnpm test`. For anything that runs in the browser, also
   `pnpm build` and then `pnpm test:e2e`. For a text front end or the list of models, also `pnpm test:parity` and
   `pnpm test:smoke`.
-- Work on a branch, never on `main`. Commit messages are `type(scope): subject`.
+- Work on a branch, never on `main`. Commit messages are `type(scope): subject`, the scope optional.
 - The licence is GPL-3.0-or-later, because eSpeak NG is part of the add-on. Anything added has to be compatible with
   it and credited in THIRD-PARTY-NOTICES.md.
 - These must hold:

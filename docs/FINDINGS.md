@@ -501,10 +501,15 @@ here, which the first six languages did not need.
 - **Malayalam** (`Cyrax321/tui-voice-mini-ml`) has a front end of its makers' own. The model keeps the English
   model's 76 token slots and gives those Malayalam has no use for to Malayalam sounds;
   [engine/malayalam.ts](../engine/malayalam.ts) ports that mapping. It uses no stress, and its makers run it with
-  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`). The model has
-  two voice slots; its makers name data for one, and only that one is offered.
-- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 22
-  Malayalam sentences (the makers' own example prompts), from the same fixture run as Spanish and French.
+  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`; the sliders
+  work from there and stop at the engine's limits). The model has two voice slots; its makers name data for one,
+  and only that one is offered. Text is cleaned as their training text was (`normalize` of their `text.py`). Two
+  things go beyond their code, because they left sentences with digits or Latin letters out of the training and a
+  web page has both: a mark between two digits stays in its number, and eSpeak NG's "(en)" marks around a Latin
+  word are taken out. **Unverified:** how the model sounds on numbers and Latin words.
+- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 24
+  Malayalam sentences (the makers' 22 example prompts and two with the marks their clean-up rewrites), from the
+  same fixture run as Spanish and French.
 - **The published fingerprint checks the tables.** A model's `frontend_fingerprint` is a hash of its symbols and
   fallback table. The Turkish profile reproduces the model's. The Bengali one reproduces what tiny-swara's own
   `text.py` computes from its published tables, but **the model's description carries another fingerprint**: its
