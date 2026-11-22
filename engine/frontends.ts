@@ -95,7 +95,10 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
         if (isPunctuation) return [true, piece];
         const spoken = parts.parseEspeak(espeak(piece));
         const written = spacedWords(piece);
-        names.push(...(written.length === spoken.length ? written : spoken.map(() => "")));
+        // Digits in groups ("1 000 000") are several written words and fewer spoken ones. Beside a number said in
+        // more words ("100 %") the counts could agree by accident and shift every name, so such a piece has none.
+        const countable = written.length === spoken.length && !/\d\s+\d/.test(piece);
+        names.push(...(countable ? written : spoken.map(() => "")));
         return [false, spoken];
       });
       return fromSymbols(parts.tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
@@ -145,7 +148,7 @@ export async function loadFrontEnd(name: string, read: ReadAsset): Promise<Front
         return fromSymbols(g2p.fonemi(text), g2p.normalizza(text));
       };
     }
-    // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
+    // European Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
     case "espeak-es":
       return espeakFrontEnd(spanish, await loadEspeak(read, "es"));
     case "espeak-fr":

@@ -12,7 +12,7 @@ addons.mozilla.org (AMO).
 You prepare everything; **the user uploads**. Never submit to AMO yourself, and ask before pushing a tag or creating a
 GitHub release.
 
-Run pnpm as `npx -y pnpm@12.21.0 <command>` where `pnpm` is not installed.
+Run pnpm as `npx -y pnpm@12.21.0 <command>` where `pnpm` is not installed. `pnpm build-espeak` needs Docker.
 
 ## 1. Decide the version
 
@@ -34,7 +34,8 @@ On a branch `release/vX.Y.Z` from an up-to-date `main` with a clean working tree
 
 - Set `version` in `package.json`.
 - If `onnxruntime-web`, `pdfjs-dist` or `wxt` changed in `package.json`, or a pinned revision changed in
-  `scripts/fetch-assets.ts`, update the table in `THIRD-PARTY-NOTICES.md`.
+  `scripts/fetch-assets.ts` or `scripts/build-espeak.sh`, update the table in `THIRD-PARTY-NOTICES.md`.
+- If a model was added to or changed in `engine/models.ts`, bring the table of models in the README in line.
 - If the popup changed (`entrypoints/popup/`, `content/settings-form.*`), redraw its pictures: `pnpm build`, then
   `pnpm screenshots`.
 
@@ -45,6 +46,7 @@ All of these must pass. Report any failure with its output and stop.
 ```bash
 pnpm install --frozen-lockfile
 pnpm fetch-assets
+pnpm build-espeak
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -54,6 +56,9 @@ pnpm build
 pnpm test:e2e
 pnpm lint:ext
 ```
+
+`pnpm build-espeak` must end with "identical to the recorded build". If it says the build differs, stop and report
+it: the reviewer's rebuild would differ too.
 
 `pnpm lint:ext` must report 0 errors. Four warnings are known and accepted (they are listed in CONTRIBUTING.md); a
 new one needs explaining to the reviewer.
@@ -70,7 +75,7 @@ the reviewer). AMO's reviewer rebuilds from the source package, so check that it
 ```bash
 CLEAN=$(mktemp -d)
 unzip -q .output/tiny-reader-X.Y.Z-sources.zip -d "$CLEAN"
-(cd "$CLEAN" && pnpm install --frozen-lockfile && pnpm fetch-assets && pnpm build)
+(cd "$CLEAN" && pnpm install --frozen-lockfile && pnpm fetch-assets && pnpm build-espeak && pnpm build)
 diff -r "$CLEAN/.output/firefox-mv3" .output/firefox-mv3 && echo IDENTICAL
 ```
 
@@ -114,7 +119,7 @@ Tell the user:
   source code;
 - the release notes, to paste into the form;
 - anything a reviewer will ask about that is new in this version: a new permission, a new bundled library, a new
-  linter warning;
+  linter warning, a new model or host in the list of downloads;
 - the choices on the form that stay the same: Firefox for desktop only, licence GPL-3.0-or-later, no data collected;
 - the link to the GitHub release;
 - for the first release: once Mozilla has listed the add-on, the README's "Trying it" still says it is not on

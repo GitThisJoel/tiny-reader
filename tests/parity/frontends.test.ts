@@ -4,6 +4,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { espeakVersion } from "../../engine/espeak.ts";
 import { type FrontEnd, loadFrontEnd } from "../../engine/frontends.ts";
 import { readAsset } from "../assets.ts";
 
@@ -127,7 +128,7 @@ describe("Italian (vocina's g2p_it)", () => {
 // built from the same source as the wasm one, over tests/parity/espeak-sentences.json. The
 // reference files are written by `pnpm build-espeak --fixtures`.
 describe.each([
-  ["Castilian Spanish", "espeak-es", "es", "tiny-voca-es/model.json"],
+  ["European Spanish", "espeak-es", "es", "tiny-voca-es/model.json"],
   ["French", "espeak-fr", "fr", "tiny-voca-fr/model.json"],
 ])("%s (eSpeak NG)", (_, name, language, descriptor) => {
   let frontEnd: FrontEnd;
@@ -143,8 +144,9 @@ describe.each([
     model = await vendor(descriptor);
   });
 
-  it("gives the ids and stress of the Python front end with native eSpeak NG 1.52.0", () => {
+  it("gives the ids and stress of the Python front end with native eSpeak NG 1.52.0", async () => {
     expect(reference.espeak).toContain("1.52.0");
+    expect(await espeakVersion(readAsset)).toContain("1.52.0");
     expect(reference.sentences.length).toBeGreaterThanOrEqual(50);
     for (const sentence of reference.sentences) {
       const result = frontEnd(sentence.text);
@@ -157,9 +159,36 @@ describe.each([
     expect(reference.symbols).toEqual(model.symbols);
   });
 
-  it("names the words of most pieces of text", () => {
+  // How many, not whether each name is the right one: eSpeak NG does not say which word it read, so
+  // there is nothing to compare a name with. The names are right when the counts agree for the right reason.
+  it("gives a name to the words of most pieces of text", () => {
     const words = reference.sentences.flatMap((sentence) => frontEnd(sentence.text)?.words ?? []);
     // These sentences are full of numbers, dates and amounts, whose pieces stay nameless.
     expect(words.filter((word) => word.text).length / words.length).toBeGreaterThan(0.7);
+  });
+});
+
+describe("eSpeak NG, one instance for every voice", () => {
+  it("gives each language's reference ids when the voices take turns", async () => {
+    const turns = await Promise.all(
+      (["es", "fr"] as const).map(async (language) => ({
+        frontEnd: await loadFrontEnd(`espeak-${language}`, readAsset),
+        sentences: JSON.parse(await readFile(join(import.meta.dirname, `espeak-${language}.json`), "utf8"))
+          .sentences as { text: string; ids?: number[] }[],
+      })),
+    );
+    for (let index = 0; index < 10; index++)
+      for (const { frontEnd, sentences } of turns) {
+        const sentence = sentences[index];
+        expect((await frontEnd(sentence?.text ?? ""))?.ids, sentence?.text).toEqual(sentence?.ids);
+      }
+  });
+
+  it("leaves a piece nameless where digit groups and a longer number could make the counts agree by accident", async () => {
+    const french = await loadFrontEnd("espeak-fr", readAsset);
+    // "1 000 000 000" is four written words and two spoken, "100 %" one written and three spoken.
+    const words = (await french("Il y a 1 000 000 000 soit 100 % de plus."))?.words ?? [];
+    expect(words.length).toBeGreaterThan(5);
+    expect(words.every((word) => word.text === "")).toBe(true);
   });
 });
