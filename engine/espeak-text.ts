@@ -75,7 +75,7 @@ export function espeakText(profile: EspeakProfile) {
   const marks = new Set(PUNCTUATION);
   const abbreviations = new Set(profile.abbreviations);
   const quotes = { ...QUOTES, ...profile.marks };
-  const wordBefore = profile.abbreviationLetters === "ascii" ? /([A-Za-z]+)$/ : /([\p{L}\p{Nl}\p{No}]+)$/u;
+  const inAbbreviation = profile.abbreviationLetters === "ascii" ? /^[A-Za-z]$/ : /^[\p{L}\p{Nl}\p{No}]$/u;
 
   class NothingToPronounce extends ModelError {}
 
@@ -102,8 +102,10 @@ export function espeakText(profile: EspeakProfile) {
       if (char === "'" && isAlnum(previous) && isAlnum(following)) return;
       if (".,:".includes(char) && isDigit(previous) && isDigit(following)) return;
       if (char === ".") {
-        const word = wordBefore.exec(chars.slice(0, i).join(""));
-        if (word?.[1] && abbreviations.has(word[1].toLowerCase())) return;
+        // The word that ends here, found by walking back from the full stop.
+        let from = i;
+        while (from > 0 && inAbbreviation.test(chars[from - 1] ?? "")) from--;
+        if (from < i && abbreviations.has(chars.slice(from, i).join("").toLowerCase())) return;
         if (isAlpha(previous) && isAlpha(following)) return;
       }
       const piece = chars.slice(start, i).join("").trim();
@@ -259,6 +261,7 @@ export const TURKISH: EspeakProfile = {
     cʰ: ["c"],
     tʃʰ: ["tʃ"],
   },
+  // As in zerre's tr.py, word for word. Its last entry has a full stop and so never matches: "yy" does the work.
   abbreviations: "dr prof doç av vb vs bkz örn mah cad sok no tel tk tbmm trt ab abd bk yy yy.".split(" "),
   doubledIsLong: true,
   normalize: (text) =>

@@ -27,8 +27,9 @@ are never committed. Running it again only re-verifies what is on disk.
 `pnpm build-espeak` builds eSpeak NG 1.52.0 from source to WebAssembly, inside a pinned emscripten container, and
 puts its loader in `vendor/espeak/` and its binary and data in `public/assets/espeak/`
 ([scripts/build-espeak.sh](scripts/build-espeak.sh)). The Spanish and French models need it. The build is
-reproducible: the script prints whether the files are the ones it has on record. Without it the add-on does not
-build.
+reproducible: the files it makes are on record in [scripts/espeak.sha256](scripts/espeak.sha256), and a build
+that comes out different fails and installs nothing (`--allow-different` installs it anyway, for trying a change
+out). Without it the add-on does not build.
 
 ## Development
 

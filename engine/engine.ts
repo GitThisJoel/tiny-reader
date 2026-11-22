@@ -39,15 +39,20 @@ type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
  */
 export async function createEngine(
   ort: OrtModule,
-  assets: { model: Uint8Array; frontEnd: FrontEnd; inputs?: Readonly<Record<string, number>> },
+  assets: { model: Uint8Array; frontEnd: FrontEnd | Promise<FrontEnd>; inputs?: Readonly<Record<string, number>> },
 ): Promise<Engine> {
+  // A front end still being set up is waited for while the model loads. If either cannot be used, the model is let go.
+  const loading = Promise.resolve(assets.frontEnd);
+  loading.catch(() => {}); // reported below
   const session = await ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] });
   const more = Object.entries(assets.inputs ?? {});
+  let frontEnd: FrontEnd;
   try {
     checkIo(
       session,
       more.map(([name]) => name),
     );
+    frontEnd = await loading;
   } catch (error) {
     await session.release();
     throw error;
@@ -86,15 +91,15 @@ export async function createEngine(
       // the pass, and the cutting is done again until it meets nothing new.
       let pieces: ReturnType<typeof splitLong>;
       for (;;) {
-        const unknown: string[] = [];
+        const unknown = new Set<string>();
         pieces = splitLong(normalize(text), (piece) => {
-          if (!cache.has(piece)) unknown.push(piece);
+          if (!cache.has(piece)) unknown.add(piece);
           return (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS;
         });
-        if (!unknown.length) break;
+        if (!unknown.size) break;
         for (const piece of unknown) {
           if (signal?.aborted) return null;
-          cache.set(piece, await assets.frontEnd(finished(piece)));
+          cache.set(piece, await frontEnd(finished(piece)));
         }
       }
 

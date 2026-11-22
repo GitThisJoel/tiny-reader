@@ -12,19 +12,25 @@ import { isWord } from "./align.ts";
 import { loadEspeak } from "./espeak.ts";
 import { BENGALI, bengaliMixed, espeakText, TURKISH } from "./espeak-text.ts";
 import { malayalamFrontEnd } from "./malayalam.ts";
-import { ModelError } from "./models.ts";
+import { type Model, ModelError } from "./models.ts";
 import { loadPhonemizer, type Phonemes, phonemize, type WordTokens } from "./phonemizer.ts";
 
 /**
  * Text to token ids, stress and the tokens of every spoken word. Null: nothing to pronounce.
  * A front end that runs a model of its own answers with a promise.
  */
-export type FrontEnd = (text: string) => Phonemes | null | Promise<Phonemes | null>;
+export type FrontEnd = ((text: string) => Phonemes | null | Promise<Phonemes | null>) & {
+  /** Lets go of what the front end holds besides plain memory: a model of its own. */
+  release?: () => Promise<void>;
+};
 
 /** What some front ends need besides the package's files. */
 export interface FrontEndNeeds {
   /** ONNX Runtime, for a front end with a model of its own. */
-  ort?: { InferenceSession: { create(model: Uint8Array, options: object): Promise<unknown> }; Tensor: unknown };
+  ort?: {
+    InferenceSession: { create(model: Uint8Array, options: object): Promise<{ release(): Promise<void> }> };
+    Tensor: unknown;
+  };
   /** The model's helper file from storage (engine/models.ts), or null when it is not there. */
   helper?: () => Promise<Uint8Array | null>;
 }
@@ -116,7 +122,10 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
         if (isPunctuation) return [true, piece];
         const spoken = parts.parseEspeak(espeak(piece));
         const written = spacedWords(piece);
-        names.push(...(written.length === spoken.length ? written : spoken.map(() => "")));
+        // Digits in groups ("1 000 000") are several written words and fewer spoken ones. Beside a number said in
+        // more words ("100 %") the counts could agree by accident and shift every name, so such a piece has none.
+        const countable = written.length === spoken.length && !/\d\s+\d/.test(piece);
+        names.push(...(countable ? written : spoken.map(() => "")));
         return [false, spoken];
       });
       return fromSymbols(parts.tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
@@ -124,6 +133,31 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
       if (error instanceof parts.NothingToPronounce) return null;
       throw error;
     }
+  };
+}
+
+/**
+ * Keeps the front end asked for last, so that models which share one (the English ones) set it up
+ * once. Asking for another lets the kept one go with what it holds: the German letter-to-sound
+ * model does not stay in memory beside a model that has no use for it.
+ */
+export function keepLast(load: (model: Model) => Promise<FrontEnd>) {
+  let kept: { key: string; loading: Promise<FrontEnd> } | undefined;
+  return (model: Model): Promise<FrontEnd> => {
+    // The same front end fed another helper file is another front end.
+    const key = `${model.frontend} ${model.helper?.sha256 ?? ""}`;
+    if (kept?.key === key) return kept.loading;
+    kept?.loading.then(
+      (old) => old.release?.(),
+      () => {},
+    );
+    const mine = { key, loading: load(model) };
+    kept = mine;
+    // Tried again by the next request.
+    mine.loading.catch(() => {
+      if (kept === mine) kept = undefined;
+    });
+    return mine.loading;
   };
 }
 
@@ -146,7 +180,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
         text("/assets/dizione-ptbr/open_table.json"),
       ]);
       const dizione = new Dizione(lexicon, JSON.parse(table));
-      return (input) => fromSymbols(dizione.phonemize(composed(input)), normalizePortuguese(composed(input)));
+      return (input) => {
+        // Rewritten once, and phonemized as it is. An apostrophe ends a word for this front end ("d'água" is two).
+        const rewritten = normalizePortuguese(composed(input));
+        return fromSymbols(dizione.phonemize(rewritten, true, false), rewritten.replace(/['’]/g, " "));
+      };
     }
     // Italian: vocina's own converter, with the Wiktionary lexicon it was trained with.
     case "g2p-it": {
@@ -156,7 +194,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       ]);
       const g2p = creaG2P({ ...JSON.parse(data), wikizionario: JSON.parse(lexicon).voci });
       // The last eight symbols of its table are reserved and never produced.
-      return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
+      // ponytail: `fonemi` rewrites the text itself and cannot be told not to, so it is rewritten twice.
+      return (input) => {
+        const text = composed(input);
+        return fromSymbols(g2p.fonemi(text), g2p.normalizza(text));
+      };
     }
     // German and Austrian German: apptor's front end. Words are read by a letter-to-sound model,
     // downloaded with the voice. With the accent on (its makers: from 0.5 up), a short list of
@@ -174,20 +216,13 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       if (!needs.ort || !model) throw new ModelError("its letter-to-sound model is not downloaded");
       const session = await needs.ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
       const g2p = new G2P(needs.ort, session, meta, exceptions, austrianReadings);
-      const [prepare, normalizeGerman, chunks, tokenize] = [
-        makePrepare,
-        makeNormalizeGerman,
-        makeChunks,
-        makeTokenize,
-      ].map((make) => make(tables)) as [
-        ReturnType<typeof makePrepare>,
-        ReturnType<typeof makeNormalizeGerman>,
-        ReturnType<typeof makeChunks>,
-        ReturnType<typeof makeTokenize>,
-      ];
+      const prepare = makePrepare(tables);
+      const normalizeGerman = makeNormalizeGerman(tables);
+      const chunks = makeChunks(tables);
+      const tokenize = makeTokenize(tables);
       const firstPhone = (tables.symbols as string[]).indexOf((tables.phones as string[])[0] ?? "");
       // Its own `phonemize`, which also keeps the word each run of phones was read from.
-      return async (input) => {
+      const frontEnd: FrontEnd = async (input) => {
         const names: string[] = [];
         const pieces: Parameters<typeof tokenize>[0] = [];
         for (const [isPunctuation, piece] of chunks(normalizeText(normalizeGerman(normalizeText(prepare(input)))))) {
@@ -200,18 +235,22 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
             const units = await g2p.word(word, austrian);
             if (!units.length) continue;
             words.push(units);
-            names.push(...spacedWords(word), ...(spacedWords(word).length ? [] : [""]));
+            names.push(spacedWords(word)[0] ?? ""); // one name for each run of phones
           }
           pieces.push([false, words]);
         }
         try {
           return fromSymbols(tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
-        } catch {
-          return null; // its "nothing to pronounce"
+        } catch (error) {
+          // Its way of saying that there is no phone at all. Anything else is a fault and must show.
+          if (error instanceof Error && error.message === "nothing to pronounce") return null;
+          throw error;
         }
       };
+      frontEnd.release = () => session.release();
+      return frontEnd;
     }
-    // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
+    // European Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
     case "espeak-es":
       return espeakFrontEnd(spanish, await loadEspeak(read, "es"));
     case "espeak-fr":

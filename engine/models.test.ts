@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ASSETS } from "../scripts/fetch-assets.ts";
+import { ASSETS, sha256 } from "../scripts/fetch-assets.ts";
 import {
   BUNDLED,
   checkIo,
@@ -94,13 +94,7 @@ describe("the list of models", () => {
 
 /** A model entry for `bytes`, and a server that answers with them in pieces. */
 async function fixture(bytes: Uint8Array<ArrayBuffer>, served = bytes) {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  const model: Model = {
-    ...BUNDLED,
-    id: "test",
-    size: bytes.length,
-    sha256: Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(""),
-  };
+  const model: Model = { ...BUNDLED, id: "test", size: bytes.length, sha256: sha256(bytes) };
   const get = vi.fn(async () => {
     const pieces = [served.subarray(0, 3), served.subarray(3)];
     return new Response(
@@ -155,6 +149,21 @@ describe("downloadModel", () => {
     await expect(downloadModel(model, undefined, undefined, offline)).rejects.toThrow(
       "Tiny Reader could not reach huggingface.co.",
     );
+    // The connection drops after the first piece.
+    let served = false;
+    const dropped = (async () =>
+      new Response(
+        new ReadableStream({
+          pull(stream) {
+            if (served) stream.error(new TypeError("NetworkError"));
+            else stream.enqueue(BYTES.subarray(0, 3));
+            served = true;
+          },
+        }),
+      )) as unknown as typeof fetch;
+    const failure = downloadModel(model, undefined, undefined, dropped);
+    await expect(failure).rejects.toThrow("The download from huggingface.co broke off.");
+    await expect(failure).rejects.toBeInstanceOf(ModelError);
   });
 });
 

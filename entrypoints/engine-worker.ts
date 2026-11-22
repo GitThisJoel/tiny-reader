@@ -3,12 +3,12 @@
 import * as ort from "onnxruntime-web/wasm";
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 import { createEngine, NothingToPronounce } from "@/engine/engine.ts";
-import { type FrontEnd, loadFrontEnd } from "@/engine/frontends.ts";
+import { keepLast, loadFrontEnd } from "@/engine/frontends.ts";
 import { JobQueue } from "@/engine/job-queue.ts";
 import { createLoader } from "@/engine/loader.ts";
 import { readModel } from "@/engine/model-store.ts";
-import { helperKey, type Model, readsOnly } from "@/engine/models.ts";
-import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
+import { helperKey, readsOnly } from "@/engine/models.ts";
+import { type EngineResponse, LIMITS, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
   const scope = self as unknown as {
@@ -29,27 +29,19 @@ export default defineUnlistedScript(() => {
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
-  // A front end is set up once and kept: switching between models of one language costs only the model.
-  const frontEnds = new Map<string, Promise<FrontEnd>>();
-  function frontEnd(model: Model) {
-    let loading = frontEnds.get(model.frontend);
-    if (!loading) {
-      loading = loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) });
-      frontEnds.set(model.frontend, loading);
-      loading.catch(() => frontEnds.delete(model.frontend));
-    }
-    return loading;
-  }
+  const frontEnd = keepLast((model) =>
+    loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) }),
+  );
 
   const load = createLoader({
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
     stored: readModel,
-    // The front end comes first: a model whose front end this build lacks is refused before its file is loaded.
-    create: async (file, model) =>
-      createEngine(ort, { frontEnd: await frontEnd(model), model: file, inputs: model.inputs }),
+    // The front end and the model load together. A model whose front end this build lacks is refused.
+    create: (file, model) => createEngine(ort, { frontEnd: frontEnd(model), model: file, inputs: model.inputs }),
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 
+  const within = (value: number, [least, most]: readonly [number, number]) => Math.min(most, Math.max(least, value));
   scope.onmessage = ({ data }) => {
     const request = parseRequest(data);
     if (!request) return;
@@ -66,8 +58,9 @@ export default defineUnlistedScript(() => {
         const tuned = {
           ...options,
           voice,
-          pitchShift: options.pitchShift + (model.tuning?.pitchShift ?? 0),
-          pitchRange: options.pitchRange * (model.tuning?.pitchRange ?? 1),
+          // Never past what the settings allow: the sliders' ends are the engine's ends.
+          pitchShift: within(options.pitchShift + (model.tuning?.pitchShift ?? 0), LIMITS.pitchShift),
+          pitchRange: within(options.pitchRange * (model.tuning?.pitchRange ?? 1), LIMITS.pitchRange),
         };
         const result = await engine.speak(text, tuned, signal).catch((error: unknown) => {
           // Said with the language of the model that tried: text in another one is the usual reason.

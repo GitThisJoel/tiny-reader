@@ -53,6 +53,26 @@ describe("a model other than the bundled one", () => {
     );
   });
 
+  it("is refused, and let go, when its text front end is one this build does not have", async () => {
+    const sessions: ort.InferenceSession[] = [];
+    const watched = {
+      ...ort,
+      InferenceSession: {
+        create: async (...given: Parameters<typeof ort.InferenceSession.create>) => {
+          const session = await ort.InferenceSession.create(...given);
+          sessions.push(session);
+          return session;
+        },
+      },
+    } as unknown as typeof ort;
+    const refused = createEngine(watched, { model: standInModel(), frontEnd: loadFrontEnd("dizione-xx", readAsset) });
+    await expect(refused).rejects.toBeInstanceOf(ModelError);
+    await expect(refused).rejects.toThrow(/needs the text front end "dizione-xx"/);
+    // A released session runs nothing more.
+    expect(sessions).toHaveLength(1);
+    await expect(sessions[0]?.run({})).rejects.toThrow();
+  });
+
   it("is refused when it is not a model at all", async () => {
     await expect(createEngine(ort, { model: Uint8Array.of(1, 2, 3), frontEnd })).rejects.toThrow();
   });

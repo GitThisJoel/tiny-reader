@@ -193,7 +193,7 @@ describe("extra voice models", () => {
       "Download",
       "Nothing was downloaded: Firefox was not allowed to reach 127.0.0.1.",
     ]);
-    expect([site.modelRequests.length, site.helperRequests]).toEqual([0, 0]);
+    expect([site.modelRequests.length, site.helperRequests.length]).toEqual([0, 0]);
   }, 30_000);
 
   it("stores nothing when the download is not the file the list pins", async () => {
@@ -206,7 +206,7 @@ describe("extra voice models", () => {
     expect(refused.models).toEqual(["tiny-voca (English)"]);
     // Its helper was fine and came first; without the model it is not kept either.
     expect(await storedIds()).toEqual([]);
-    expect([site.modelRequests.length, site.helperRequests]).toEqual([1, 1]);
+    expect([site.modelRequests.length, site.helperRequests.length]).toEqual([1, 1]);
   }, 30_000);
 
   it("downloads a model once access is given, sending nothing that tells who asks, and offers it", async () => {
@@ -217,10 +217,10 @@ describe("extra voice models", () => {
     expect(downloaded.models).toEqual(["tiny-voca (English)", "Stand-in (English)"]);
     expect(downloaded.model).toBe("tiny-voca"); // offered, not chosen for the user
     expect(await storedIds()).toEqual(["stand-in", "stand-in/helper"]);
-    // One request per download. No cookies, and no Origin header, which would carry the
-    // add-on's address: an id of this installation.
-    expect([site.modelRequests.length, site.helperRequests]).toEqual([2, 2]);
-    for (const headers of site.modelRequests)
+    // One request per file and download. No cookies, and no Origin header, which would carry the
+    // add-on's address: an id of this installation. The helper file's requests are held to the same.
+    expect([site.modelRequests.length, site.helperRequests.length]).toEqual([2, 2]);
+    for (const headers of [...site.modelRequests, ...site.helperRequests])
       expect([headers.cookie, headers.authorization, headers.origin, headers.referer]).toEqual([
         undefined,
         undefined,
@@ -258,6 +258,8 @@ describe("extra voice models", () => {
        });`,
     );
     const bar = await read(`bar.status === "playing" && bar.notice`);
+    // The bar was made for the stand-in's voices and now offers those of the model that reads.
+    expect(bar.voices).toEqual(["F2", "M2"]);
     expect(bar.notice).toBe(
       "The voice model Stand-in is not downloaded any more. Download it again in Tiny Reader's settings. This is read with the built-in tiny-voca voice.",
     );

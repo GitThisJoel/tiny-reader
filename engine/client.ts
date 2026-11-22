@@ -27,13 +27,16 @@ export class EngineClient {
 
   private readonly connect: () => PortLike;
   private readonly onStatus: (state: "loading" | "ready") => void;
-  private readonly onNotice: (notice: string) => void;
+  private readonly onNotice: (notice?: string) => void;
 
-  /** `onNotice` is told when the engine had to speak with another model than the one asked for. */
+  /**
+   * `onNotice` is told with every result: why the engine had to speak with another model than the
+   * one asked for, or nothing when the one asked for spoke.
+   */
   constructor(
     connect: () => PortLike,
     onStatus: (state: "loading" | "ready") => void = () => {},
-    onNotice: (notice: string) => void = () => {},
+    onNotice: (notice?: string) => void = () => {},
   ) {
     this.connect = connect;
     this.onStatus = onStatus;
@@ -130,7 +133,7 @@ export class EngineClient {
     this.pending.delete(message.id);
     if (message.type === "error") request.reject(new EngineError(message.code, message.message));
     else {
-      if (message.notice) this.onNotice(message.notice);
+      this.onNotice(message.notice);
       request.resolve({
         pcm: message.pcm,
         sampleRate: message.sampleRate,

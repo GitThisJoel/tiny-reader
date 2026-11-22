@@ -432,7 +432,7 @@ release files to another host the download will fail until the list is updated. 
 SHA-256 is what pins the file.
 
 **eSpeak NG.** Most community models were trained on phonemes from the eSpeak NG program. It is now part of the
-add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es`) and French
+add-on, as WebAssembly, and brought European Spanish (`marcosmaceo/tiny-voca-es`) and French
 (`DanielSuncost/tiny-voca-fr`).
 
 - **Licence.** eSpeak NG and its data are GPL-3.0-or-later, so Tiny Reader changed from Apache-2.0 to
@@ -441,7 +441,8 @@ add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es
 - **The build.** No npm package wraps a tagged eSpeak NG release verifiably, so
   [scripts/build-espeak.sh](../scripts/build-espeak.sh) builds tag 1.52.0 (commit `4870adf`) in an emscripten 4.0.10
   container pinned by digest, adapted from `stdevMac/tiny-voca`. It takes about a minute. Two builds on this machine
-  were identical byte for byte, and the script checks each build against those hashes. Shipped: 64 kB of loader
+  were identical byte for byte, and the script refuses to install a build that differs from the recorded hashes
+  (`scripts/espeak.sha256`; CI checks its cached copy against the same file). Shipped: 64 kB of loader
   (bundled into the Worker script), 362 kB of wasm, and 498 kB of data for Spanish, French and English.
 - **In the add-on.** The loader has no `eval`, and the wasm runs in the engine Worker under the extension CSP
   (`'wasm-unsafe-eval'`, already there for ONNX Runtime). `web-ext lint` reports nothing new. Verified in Firefox:
@@ -459,16 +460,23 @@ add-on, as WebAssembly, and brought Castilian Spanish (`marcosmaceo/tiny-voca-es
   For each piece of text between two marks, if eSpeak NG spoke as many words as the piece has between spaces, they
   are matched one for one; otherwise the piece is one span. In the reference sentences, which are heavy with
   numbers and dates, 79 % of the Spanish spoken words are matched to a word.
-- **Other scripts are not skipped.** eSpeak NG names the letters of text it cannot read, as it did when the models
-  were trained, so these two front ends never report "nothing to pronounce" for Japanese or Cyrillic text.
+- **Other scripts.** Measured with the Spanish voice: eSpeak NG names the letters of Cyrillic, Arabic and Japanese
+  text ("cirílico …", "árabe …", "japonés símbolo"), so these two front ends do not report "nothing to pronounce"
+  for it. Greek and Devanagari come out empty: eSpeak NG switches to Greek or Hindi for them, whose dictionaries
+  are not packed, so such words are skipped (a Greek word inside a Spanish sentence is left out, a Greek sentence
+  is "nothing to pronounce"). The same holds for every script eSpeak NG reads through a language of its own. A
+  full eSpeak NG, as the models were trained with, would read them in that language; packing every dictionary to
+  match is tens of megabytes for text these models never learned. **Unverified:** what the models do with either.
 - Size after Spanish and French: the package 48.7 MB, the Worker script 232 kB.
 
 **German** (`apptor/apptor-tiny-tts`) needs no eSpeak NG: its makers trained a letter-to-sound model on eSpeak
 NG's readings and wrote the front end in JavaScript.
 
 - **A second downloaded file.** That model is 12.4 MB, too much to bundle for one language, and it is data. A list
-  entry can therefore name a `helper`: pinned like the model, downloaded before it, stored beside it, deleted with
-  it. A download that fails after the helper leaves nothing behind.
+  entry can therefore name a `helper`: pinned like the model, downloaded before it, and stored and deleted with it
+  in one IndexedDB transaction each, so a download that fails or is interrupted leaves nothing behind. The Worker
+  keeps the front end of the model loaded last and lets another one go: the letter-to-sound model is not held in
+  memory beside a model that has no use for it.
 - **A second session in the Worker**, and an asynchronous front end. The engine cuts long text with a synchronous
   test, so a piece not phonemized yet counts as short enough, is phonemized after the pass, and the cutting is
   repeated until nothing is new.
@@ -508,10 +516,15 @@ here, which the first six languages did not need.
 - **Malayalam** (`Cyrax321/tui-voice-mini-ml`) has a front end of its makers' own. The model keeps the English
   model's 76 token slots and gives those Malayalam has no use for to Malayalam sounds;
   [engine/malayalam.ts](../engine/malayalam.ts) ports that mapping. It uses no stress, and its makers run it with
-  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`). The model has
-  two voice slots; its makers name data for one, and only that one is offered.
-- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 22
-  Malayalam sentences (the makers' own example prompts), from the same fixture run as Spanish and French.
+  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`; the sliders
+  work from there and stop at the engine's limits). The model has two voice slots; its makers name data for one,
+  and only that one is offered. Text is cleaned as their training text was (`normalize` of their `text.py`). Two
+  things go beyond their code, because they left sentences with digits or Latin letters out of the training and a
+  web page has both: a mark between two digits stays in its number, and eSpeak NG's "(en)" marks around a Latin
+  word are taken out. **Unverified:** how the model sounds on numbers and Latin words.
+- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 24
+  Malayalam sentences (the makers' 22 example prompts and two with the marks their clean-up rewrites), from the
+  same fixture run as Spanish and French.
 - **The published fingerprint checks the tables.** A model's `frontend_fingerprint` is a hash of its symbols and
   fallback table. The Turkish profile reproduces the model's. The Bengali one reproduces what tiny-swara's own
   `text.py` computes from its published tables, but **the model's description carries another fingerprint**: its

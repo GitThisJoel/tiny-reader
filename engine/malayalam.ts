@@ -1,7 +1,7 @@
 // Malayalam, for `Cyrax321/tui-voice-mini-ml`. Its makers did not use tiny-voca's text.py: their
 // model keeps the English model's 76 token slots and gives the ones Malayalam has no use for to
 // Malayalam sounds. This is a port of `tui_voice/phonemes.py` and `split_clauses` of
-// `tui_voice/text.py` in https://github.com/Cyrax321/tui-voice at 478761a (Apache-2.0, as its
+// `normalize` of `tui_voice/text.py` in https://github.com/Cyrax321/tui-voice at 478761a (Apache-2.0, as its
 // README says): eSpeak NG's Malayalam voice, then their table of which slot each sound takes.
 import upstream from "tiny-voca-config";
 import plan from "tui-voice/vocab_plan.json";
@@ -91,9 +91,16 @@ function nearest(phone: string): string {
 /** The slot of one token: a special token, a mark, or a sound. */
 const slot = (token: string): number => mapping.get(token) ?? slots.get(token) ?? slots.get(nearest(token)) ?? 4;
 
+/**
+ * eSpeak NG's marks for a word it read in another language: "(en)" before a Latin word, "(ml)" after it. The
+ * makers trained without Latin letters and never met them; left in, they would be taken for sounds.
+ */
+const LANGUAGE_TAG = /\([a-z]{2,3}(?:-[a-z0-9]+)*\)/g;
+
 /** eSpeak NG's output for a clause as words of phonemes, as this project reads it. */
 const wordsOf = (output: string): string[][] =>
   output
+    .replace(LANGUAGE_TAG, "")
     .split(/\s+/)
     .map((word) =>
       word
@@ -102,6 +109,31 @@ const wordsOf = (output: string): string[][] =>
         .filter(Boolean),
     )
     .filter((word) => word.length);
+
+/** Characters with no sound and no shape. The two joiners that pick a letter's form are kept. */
+const INVISIBLE = /[\u200b\u200e\u200f\u2060\ufeff]/g;
+/** Marks written in other ways, as the plain mark the model knows: an ellipsis and a danda end a sentence. */
+const PLAIN: Record<string, string> = {
+  "\u201c": '"',
+  "\u201d": '"',
+  "\u2018": "'",
+  "\u2019": "'",
+  "\u2026": ".",
+  "\u2013": "-",
+  "\u2014": "-",
+  "\u0964": ".",
+};
+/** `normalize` of `tui_voice/text.py`: what every text the model learned from went through. */
+const normalize = (text: string) =>
+  text
+    .normalize("NFC")
+    .replace(INVISIBLE, "")
+    .replace(/[\u201c\u201d\u2018\u2019\u2026\u2013\u2014\u0964]/g, (mark) => PLAIN[mark] ?? mark)
+    .replace(/["'()[\]{}<>*_/\\|~^`#@$%&+=-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+/** A digit, European or Malayalam. */
+const isDigit = (char: string | undefined) => char !== undefined && /[0-9\u0d66-\u0d6f]/.test(char);
 
 /**
  * The front end. `espeak` gives eSpeak NG's output for a piece of text with its Malayalam voice;
@@ -131,10 +163,14 @@ export function malayalamFrontEnd(espeak: (text: string) => string, named: (clau
       if (mark) tokens.push(mark);
       else if (spoken.length) tokens.push("<sp>");
     };
-    for (const char of text) {
-      if (PAUSE_MARKS.includes(char)) speak(char);
+    // The makers left sentences with digits out of the training, so their code cuts "3.5" in two. A page
+    // has numbers: a mark between two digits stays in its number, for eSpeak NG to read as one.
+    const chars = [...normalize(text)];
+    chars.forEach((char, index) => {
+      const inNumber = isDigit(chars[index - 1]) && isDigit(chars[index + 1]);
+      if (PAUSE_MARKS.includes(char) && !inNumber) speak(char);
       else clause += char;
-    }
+    });
     speak("");
     while (tokens.at(-1) === "<sp>") tokens.pop();
     tokens.push("<eos>");

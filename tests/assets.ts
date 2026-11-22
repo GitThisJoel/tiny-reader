@@ -22,7 +22,14 @@ export const readAsset = async (path: string) => (await read(`public${path}`)).b
 
 /** A front end that answers at once: every one but the German, which runs a model of its own. */
 export type SyncFrontEnd = (text: string) => Phonemes | null;
-export const loadSyncFrontEnd = async (name: string) => (await loadFrontEnd(name, readAsset)) as SyncFrontEnd;
+export async function loadSyncFrontEnd(name: string): Promise<SyncFrontEnd> {
+  const frontEnd = await loadFrontEnd(name, readAsset);
+  return (text) => {
+    const phonemes = frontEnd(text);
+    if (phonemes instanceof Promise) throw new Error(`the front end "${name}" does not answer at once`);
+    return phonemes;
+  };
+}
 
 /**
  * A file the add-on downloads (a model, or its helper), from `.cache/models/` or downloaded from

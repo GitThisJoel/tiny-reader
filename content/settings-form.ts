@@ -4,12 +4,12 @@ import { deleteModel, storedModels, storeModel } from "@/engine/model-store.ts";
 import {
   BUNDLED,
   downloadModel,
-  helperKey,
   languageName,
   MODELS,
   type Model,
   ModelError,
   modelById,
+  type PinnedFile,
 } from "@/engine/models.ts";
 import { LIMITS } from "@/engine/protocol.ts";
 import { sitePattern } from "./commands.ts";
@@ -133,8 +133,11 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
     describe();
   }
 
+  /** Whether it is known which models are downloaded. Until then the form cannot say that a chosen one is gone. */
+  let known = false;
   const read = (): Settings => ({
-    model: model.value,
+    // While storage has not been read, or cannot be, the model shown is not a choice the user made.
+    model: known || model.value !== BUNDLED.id ? model.value : shown.model,
     voice: Number(voice.value),
     speed: Number(speed.input.value),
     pitchShift: Number(pitchShift.input.value) * SEMITONE,
@@ -187,9 +190,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       if (download) return download.abort();
       if (downloaded.has(entry.id)) {
         try {
-          // The model first: without it the helper is only a file nothing asks for.
-          await deleteModel(entry.id);
-          if (entry.helper) await deleteModel(helperKey(entry.id));
+          await deleteModel(entry.id); // and its helper file
         } catch {
           return render("It could not be deleted.");
         }
@@ -207,46 +208,45 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
         ...new Set([sitePattern(entry.url), ...(entry.helper ? [sitePattern(entry.helper.url)] : [])]),
         ...(entry.alsoAllow ?? []),
       ];
-      const held = browser.permissions.contains({ origins });
+      const held = origins.map((origin) => browser.permissions.contains({ origins: [origin] }).catch(() => true));
       // No second prompt from a second click while the first is open.
       button.disabled = true;
       const allowed = await browser.permissions.request({ origins }).catch(() => false);
       button.disabled = false;
-      if (!allowed)
-        return render(`Nothing was downloaded: Firefox was not allowed to reach ${new URL(entry.url).hostname}.`);
+      if (!allowed) {
+        const hosts = origins.map((origin) => new URL(origin).hostname).join(" and ");
+        return render(`Nothing was downloaded: Firefox was not allowed to reach ${hosts}.`);
+      }
       download = new AbortController();
       const { signal } = download;
       progress.value = 0;
       render("Downloading…");
       try {
-        // The only requests: the files themselves, each verified against the list before it is
-        // returned. The model is stored last, so a model in storage has its helper there too.
-        const files = entry.helper ? [entry.helper, entry] : [entry];
-        let before = 0;
-        for (const file of files) {
-          const start = before;
-          const bytes = await downloadModel(
+        // The only requests: the files themselves, each verified against the list before it is returned.
+        const fetched = (file: PinnedFile, start: number) =>
+          downloadModel(
             file,
             (received) => {
               progress.value = start + received;
             },
             signal,
           );
-          await storeModel(file === entry ? entry.id : helperKey(entry.id), bytes);
-          before += file.size;
-        }
+        const helper = entry.helper && (await fetched(entry.helper, 0));
+        const bytes = await fetched(entry, entry.helper?.size ?? 0);
+        // Stored together, so a model in storage has its helper there too and a helper is never there alone.
+        await storeModel(entry.id, bytes, helper);
         downloaded.add(entry.id);
         download = null;
         offerModels();
         render();
       } catch (error) {
-        // A helper without its model is of no use to anyone.
-        if (entry.helper) await deleteModel(helperKey(entry.id)).catch(() => {});
         download = null;
         render(signal.aborted ? "" : error instanceof ModelError ? error.message : "The model could not be stored.");
       } finally {
-        // The access was for this download only.
-        if (!(await held.catch(() => true))) await browser.permissions.remove({ origins }).catch(() => {});
+        // The access was for this download only. A site the add-on could reach before stays reachable.
+        const before = await Promise.all(held);
+        const given = origins.filter((_, index) => !before[index]);
+        if (given.length) await browser.permissions.remove({ origins: given }).catch(() => {});
       }
     });
     render();
@@ -282,9 +282,15 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
   offerModels();
   // Never a moment with sliders at arbitrary places: the defaults, until the stored settings are read.
   show(DEFAULT_SETTINGS);
+  // Not to be used yet: a change now would save these defaults over the stored settings.
+  form.toggleAttribute("inert", true);
   // The settings are shown at once. Which models are downloaded takes a moment longer to find
   // out; storage that cannot be read offers the bundled model only.
   const models = storedModels()
+    .then((ids) => {
+      known = true;
+      return ids;
+    })
     .catch(() => [])
     .then((ids) => {
       for (const id of ids) downloaded.add(id);
@@ -292,5 +298,8 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       showModel();
       for (const { render } of rows) render();
     });
-  return Promise.all([loadSettings().then(show), models]);
+  const settings = loadSettings()
+    .then(show)
+    .finally(() => form.toggleAttribute("inert", false));
+  return Promise.all([settings, models]);
 }
