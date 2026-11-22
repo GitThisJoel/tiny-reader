@@ -473,7 +473,7 @@ NG's readings and wrote the front end in JavaScript.
   test, so a piece not phonemized yet counts as short enough, is phonemized after the pass, and the cutting is
   repeated until nothing is new.
 - **Checked against the Python front end** (`pnpm german-fixtures`, in a pinned Python container with onnxruntime
-  1.32.0): identical ids and stress for all 50 sentences in
+  1.32.0): identical ids and stress for all 60 sentences in
   [tests/parity/german-sentences.json](../tests/parity/german-sentences.json), though one side runs the
   letter-to-sound model natively and the other as wasm. Every spoken word is named, numbers included, because
   this front end reads word by word.
@@ -481,7 +481,22 @@ NG's readings and wrote the front end in JavaScript.
   "Hallo, der Zug fährt um 14:35 Uhr ab." came out as 2.8 s with all eight words timed.
 - **Not used: the Vocos sound filter.** The makers add a second stage (16.7 MB) that re-synthesises the audio and
   say that without it the voice is "noticeably buzzy". Tiny Reader plays the model's own output.
-- The Austrian model of the same makers has one more input (`accent`) and is not in the list.
+
+**Austrian German** (`apptor/apptor-tiny-tts-at`) is the German model with an accent, added after the others.
+
+- **Same table, same front end, same helper.** Its symbols are the German model's, the Python front end in its
+  repository is file for file the German one, and its letter-to-sound model has the same SHA-256.
+- **One more input.** The model takes `accent` (0 standard German, 1.0 Austrian, 1.6 the most its makers call
+  usable). The engine refuses a model with an input it does not feed, so a list entry can now name further inputs
+  and the value for each (`inputs`). Tiny Reader gives 1.0, the makers' default; there is no setting for it.
+- **Austrian readings.** The makers switch a short list of readings on when the accent is 0.5 or more ("Kaffee",
+  "Chemie", final "-ig", voiceless "s"); that is the front end `g2p-de-at`. It changes 40 of the 60 test sentences.
+  Both variants match the Python front end on all 60.
+- **Two voices, not three.** The model lists a third, "AT". It is the slot that holds the accent's style, and the
+  makers' own code leaves it out of the voices.
+- In Firefox: model and helper downloaded through the settings page, and both voices spoke a sentence with all
+  eight words timed. The makers call this version an early preview with a mild accent.
+- A user who has both German models stores the 12 MB helper twice, once beside each.
 
 **Turkish, Bengali and Malayalam** came with no JavaScript front end, only Python. Their front ends are ported
 here, which the first six languages did not need.

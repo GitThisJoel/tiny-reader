@@ -50,18 +50,19 @@ Hugging Face.
 - More voices and languages: the English tiny-voca model with its two voices is built in. Under **More voices** in the
   settings (**Get more voices…** in the popup leads there) you can download others made from it, about 21 MB each:
 
-  | Model                                                                  | Language             | By                        | Licence    |
-  | ---------------------------------------------------------------------- | -------------------- | ------------------------- | ---------- |
-  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)            | English              | PatnaikAshish             | Apache-2.0 |
-  | [fiato](https://huggingface.co/cfahlgren1/fiato)                       | English              | cfahlgren1                | Apache-2.0 |
-  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)       | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
-  | [vocina](https://github.com/OfficinePixel/vocina)                      | Italian              | OfficinePixel             | Apache-2.0 |
-  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)        | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
-  | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr)      | French               | DanielSuncost             | Apache-2.0 |
-  | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)       | German               | apptor                    | Apache-2.0 |
-  | [zerre-tts](https://huggingface.co/erkint/zerre-tts)                   | Turkish              | erkint                    | Apache-2.0 |
-  | [tiny-swara](https://huggingface.co/Xeven7/tiny-swara)                 | Bengali              | Xeven7                    | Apache-2.0 |
-  | [tui-voice-mini-ml](https://huggingface.co/Cyrax321/tui-voice-mini-ml) | Malayalam            | Cyrax321                  | Apache-2.0 |
+  | Model                                                                  | Language                       | By                        | Licence    |
+  | ---------------------------------------------------------------------- | ------------------------------ | ------------------------- | ---------- |
+  | [SobbieTTS](https://huggingface.co/PatnaikAshish/SobbieTTS)            | English                        | PatnaikAshish             | Apache-2.0 |
+  | [fiato](https://huggingface.co/cfahlgren1/fiato)                       | English                        | cfahlgren1                | Apache-2.0 |
+  | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)       | Brazilian Portuguese           | SemFence (Gustavo Toledo) | CC BY 4.0  |
+  | [vocina](https://github.com/OfficinePixel/vocina)                      | Italian                        | OfficinePixel             | Apache-2.0 |
+  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)        | Spanish (Spain)                | marcosmaceo               | Apache-2.0 |
+  | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr)      | French                         | DanielSuncost             | Apache-2.0 |
+  | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)       | German                         | apptor                    | Apache-2.0 |
+  | [apptor-tiny-tts-at](https://huggingface.co/apptor/apptor-tiny-tts-at) | German with an Austrian accent | apptor                    | Apache-2.0 |
+  | [zerre-tts](https://huggingface.co/erkint/zerre-tts)                   | Turkish                        | erkint                    | Apache-2.0 |
+  | [tiny-swara](https://huggingface.co/Xeven7/tiny-swara)                 | Bengali                        | Xeven7                    | Apache-2.0 |
+  | [tui-voice-mini-ml](https://huggingface.co/Cyrax321/tui-voice-mini-ml) | Malayalam                      | Cyrax321                  | Apache-2.0 |
 
   Press **Download** and accept Firefox's permission prompt; the file comes from the model's own page, is checked
   against a fingerprint Tiny Reader carries, and is kept on your computer until you press **Delete**. Then choose it
@@ -145,6 +146,9 @@ does not extend to such frames.
 - The German download is 34 MB: the voice and a second model that works out how words are pronounced. Its makers
   recommend a further 17 MB sound filter, which Tiny Reader does not use; without it they call the voice clear but
   noticeably buzzy.
+- The Austrian model is the German one with an accent, which its makers call mild and an early preview. Its
+  strength can be set from 0 to 1.6 in the model; Tiny Reader uses 1.0, the makers' own default, with no setting
+  for it. It is a 34 MB download of its own.
 - In Spanish, French, Turkish, Bengali and Malayalam, a number, date or amount is highlighted together with the words around it, up to the next
   comma or full stop, not word by word.
 - Firefox's Reader View and its PDF viewer cannot be read in place, nor can Firefox's own pages or

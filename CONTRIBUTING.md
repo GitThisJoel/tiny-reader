@@ -65,7 +65,7 @@ export default defineWebExtConfig({
 | `pnpm lint:ext`        | `web-ext lint` on the build (run `pnpm build` first)                                       |
 | `pnpm fetch-assets`    | Download and verify model and phonemizer assets                                            |
 | `pnpm build-espeak`    | Build eSpeak NG to WebAssembly in a container; `--fixtures` rewrites its parity references |
-| `pnpm german-fixtures` | Rewrite the German parity reference with apptor's Python front end, in a container         |
+| `pnpm german-fixtures` | Rewrite the German parity references with apptor's Python front end, in a container        |
 | `pnpm screenshots`     | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
 
 `pnpm lint:ext` reports no errors and four accepted warnings:
@@ -146,6 +146,9 @@ hundred.
 A front end may need a file of its own that is too large to bundle: the German one reads words with a 12 MB
 letter-to-sound model. Such a file is the list entry's `helper`: pinned like the model, downloaded and stored with
 it, deleted with it, and handed to `loadFrontEnd`. It has to be data; code is never downloaded.
+
+A model with an input besides the usual six names it in its list entry (`inputs`), with the value to give it: the
+Austrian model's `accent`. Without that the engine refuses the model, as it refuses any input it does not know.
 
 `pnpm test:smoke` speaks a sentence with every downloadable model that has a front end of its own. It downloads
 each one once (about 21 MB) into `.cache/models/`, verified like in the add-on. The German parity test uses the
