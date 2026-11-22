@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { frontEnd } from "./engine.ts";
 import { createLoader } from "./loader.ts";
 import { BUNDLED } from "./models.ts";
@@ -110,14 +110,20 @@ describe("createLoader", () => {
     expect(made).toEqual(["tiny-voca"]);
   });
 
-  it("falls back when storage itself cannot be read", async () => {
+  it("falls back when storage itself cannot be read, and tries storage again the next time", async () => {
+    const stored = vi
+      .fn<(id: string) => Promise<Uint8Array | null>>()
+      .mockRejectedValueOnce(new Error("the database is gone"))
+      .mockResolvedValue(Uint8Array.of(1));
     const load = createLoader({
       bundled: async () => BUNDLED_FILE,
-      stored: () => Promise.reject(new Error("the database is gone")),
+      stored,
       create: async () => ({ release: async () => {} }),
       status: () => {},
     });
     expect((await load("sobbie")).notice).toMatch(/could not be used: the database is gone\./);
+    const again = await load("sobbie");
+    expect([again.model.id, again.notice]).toEqual(["sobbie", undefined]);
   });
 
   it("reads with the bundled model for an id that is not in the list", async () => {

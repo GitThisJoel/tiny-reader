@@ -31,7 +31,7 @@ export interface LoaderDeps<E> {
  */
 export function createLoader<E extends Releasable>(deps: LoaderDeps<E>) {
   let current: { id: string; loading: Promise<E> } | null = null;
-  /** Stored models that failed to load, and why. Not tried again while this Worker lives. */
+  /** Stored models the engine could not use, and why. Not tried again while this Worker lives. */
   const broken = new Map<string, string>();
 
   /** Makes the engine for `id` the loaded one. The engine loaded before is released first. */
@@ -62,17 +62,28 @@ export function createLoader<E extends Releasable>(deps: LoaderDeps<E>) {
   return async function load(id: string): Promise<Loaded<E>> {
     const model = modelById(id) ?? BUNDLED;
     if (model === BUNDLED) return { engine: await swap(BUNDLED, deps.bundled), model };
-    if (!broken.has(id))
+    const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+    let failed = broken.get(id);
+    if (failed === undefined)
       try {
         // Looked up before the loaded engine is given up: a missing file must not cost a reload.
         const bytes = current?.id === id ? null : await deps.stored(id);
-        if (current?.id === id || bytes) return { engine: await swap(model, async () => bytes as Uint8Array), model };
+        if (current?.id === id || bytes)
+          return {
+            engine: await swap(model, async () => bytes as Uint8Array).catch((error: unknown) => {
+              broken.set(id, message(error));
+              throw error;
+            }),
+            model,
+          };
       } catch (error) {
-        broken.set(id, error instanceof Error ? error.message : String(error));
+        // Storage that cannot be read now may be readable for the next request, so that is not remembered.
+        failed = message(error);
       }
-    const why = broken.has(id)
-      ? `The voice model ${model.name} could not be used: ${broken.get(id)}.`
-      : `The voice model ${model.name} is not downloaded any more. Download it again in Tiny Reader's settings.`;
+    const why =
+      failed !== undefined
+        ? `The voice model ${model.name} could not be used: ${failed}.`
+        : `The voice model ${model.name} is not downloaded any more. Download it again in Tiny Reader's settings.`;
     return {
       engine: await swap(BUNDLED, deps.bundled),
       model: BUNDLED,
