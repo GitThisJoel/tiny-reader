@@ -60,8 +60,8 @@ export async function startSite(): Promise<{
   strictUrl: string;
   /** The headers of every request for the stand-in model. */
   modelRequests: IncomingHttpHeaders[];
-  /** How often the stand-in model's helper file was asked for. */
-  helperRequests: number;
+  /** The headers of every request for the stand-in model's helper file. */
+  helperRequests: IncomingHttpHeaders[];
   /** While true, the stand-in model is served with one byte changed. */
   tamper: boolean;
   close(): void;
@@ -69,7 +69,7 @@ export async function startSite(): Promise<{
   const modelRequests: IncomingHttpHeaders[] = [];
   const server: Server = createServer((request, response) => {
     if (request.url === "/stand-in-helper.bin") {
-      site.helperRequests += 1;
+      site.helperRequests.push(request.headers);
       response
         .writeHead(200, { "content-type": "application/octet-stream", "access-control-allow-origin": "*" })
         .end(STAND_IN_HELPER);
@@ -112,7 +112,7 @@ export async function startSite(): Promise<{
     url: `http://127.0.0.1:${port}/`,
     strictUrl: `http://127.0.0.1:${port}/strict`,
     modelRequests,
-    helperRequests: 0,
+    helperRequests: [] as IncomingHttpHeaders[],
     tamper: false,
     close: () => server.close(),
   };
