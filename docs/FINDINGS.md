@@ -473,8 +473,10 @@ add-on, as WebAssembly, and brought European Spanish (`marcosmaceo/tiny-voca-es`
 NG's readings and wrote the front end in JavaScript.
 
 - **A second downloaded file.** That model is 12.4 MB, too much to bundle for one language, and it is data. A list
-  entry can therefore name a `helper`: pinned like the model, downloaded before it, stored beside it, deleted with
-  it. A download that fails after the helper leaves nothing behind.
+  entry can therefore name a `helper`: pinned like the model, downloaded before it, and stored and deleted with it
+  in one IndexedDB transaction each, so a download that fails or is interrupted leaves nothing behind. The Worker
+  keeps the front end of the model loaded last and lets another one go: the letter-to-sound model is not held in
+  memory beside a model that has no use for it.
 - **A second session in the Worker**, and an asynchronous front end. The engine cuts long text with a synchronous
   test, so a piece not phonemized yet counts as short enough, is phonemized after the pass, and the cutting is
   repeated until nothing is new.
