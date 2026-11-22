@@ -196,13 +196,15 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       // request carries no Origin header, which would name this installation of the add-on; without
       // it nothing is downloaded. Access the user gave before (for a PDF there) is left as it was.
       const origins = [sitePattern(entry.url), ...(entry.alsoAllow ?? [])];
-      const held = browser.permissions.contains({ origins });
+      const held = origins.map((origin) => browser.permissions.contains({ origins: [origin] }).catch(() => true));
       // No second prompt from a second click while the first is open.
       button.disabled = true;
       const allowed = await browser.permissions.request({ origins }).catch(() => false);
       button.disabled = false;
-      if (!allowed)
-        return render(`Nothing was downloaded: Firefox was not allowed to reach ${new URL(entry.url).hostname}.`);
+      if (!allowed) {
+        const hosts = origins.map((origin) => new URL(origin).hostname).join(" and ");
+        return render(`Nothing was downloaded: Firefox was not allowed to reach ${hosts}.`);
+      }
       download = new AbortController();
       const { signal } = download;
       progress.value = 0;
@@ -225,8 +227,10 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
         download = null;
         render(signal.aborted ? "" : error instanceof ModelError ? error.message : "The model could not be stored.");
       } finally {
-        // The access was for this download only.
-        if (!(await held.catch(() => true))) await browser.permissions.remove({ origins }).catch(() => {});
+        // The access was for this download only. A site the add-on could reach before stays reachable.
+        const before = await Promise.all(held);
+        const given = origins.filter((_, index) => !before[index]);
+        if (given.length) await browser.permissions.remove({ origins: given }).catch(() => {});
       }
     });
     render();
