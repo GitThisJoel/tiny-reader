@@ -40,6 +40,19 @@ describe("a model other than the bundled one", () => {
     await expect(refused).rejects.toThrow(/its inputs are \(.*speaker: int64.*\), not \(.*voice: int64.*\)/);
   });
 
+  it("is given a further input when its list entry names one, and refused when it does not", async () => {
+    const withAccent = standInModel("voice", ["accent"]);
+    const engine = await createEngine(ort, { model: withAccent, frontEnd, inputs: { accent: 1 } });
+    const result = await engine.speak("Hello there.", DEFAULT_OPTIONS);
+    expect(result?.pcm.length).toBeGreaterThan(0);
+    expect(result?.pcm.every(Number.isFinite)).toBe(true);
+    await engine.release();
+    await expect(createEngine(ort, { model: withAccent, frontEnd })).rejects.toThrow(/accent: float32/);
+    await expect(createEngine(ort, { model: standInModel(), frontEnd, inputs: { accent: 1 } })).rejects.toBeInstanceOf(
+      ModelError,
+    );
+  });
+
   it("is refused when it is not a model at all", async () => {
     await expect(createEngine(ort, { model: Uint8Array.of(1, 2, 3), frontEnd })).rejects.toThrow();
   });

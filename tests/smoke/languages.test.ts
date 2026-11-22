@@ -32,6 +32,11 @@ describe.each([
   ["tiny-swara", "আমি ভাত খাই। আপনার order টি আসবে।", ["আমি", "ভাত", "খাই", "আপনার", "order", "টি", "আসবে"]],
   ["tui-voice-ml", "ഹലോ, സുഖമാണോ? എവിടെയാണ് ഇപ്പോൾ?", ["ഹലോ", "സുഖമാണോ", "എവിടെയാണ്", "ഇപ്പോൾ"]],
   [
+    "apptor-de-at",
+    "Servus, im Kaffeehaus kostet der Kaffee 3 Euro.",
+    ["Servus", "im", "Kaffeehaus", "kostet", "der", "Kaffee", "3", "Euro"],
+  ],
+  [
     "tiny-voca-fr",
     "Bonjour, comment allez-vous ? Cela coûte 15 euros.",
     ["Bonjour", "comment", "allez-vous", "Cela", "coûte", "15", "euros"],
@@ -45,6 +50,7 @@ describe.each([
     engine = await createEngine(ort, {
       model: await cached(model, `${id}.onnx`),
       frontEnd: await loadFrontEnd(model.frontend, readAsset, { ort, helper: async () => helper ?? null }),
+      inputs: model.inputs,
     });
   }, 120_000);
 

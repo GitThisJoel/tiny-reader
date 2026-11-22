@@ -16,6 +16,7 @@
       "!tests/parity/espeak-bn.json",
       "!tests/parity/espeak-ml.json",
       "!tests/parity/german.json",
+      "!tests/parity/german-at.json",
       "!.claude/skills"
     ]
   },

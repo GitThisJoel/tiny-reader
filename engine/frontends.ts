@@ -158,17 +158,22 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       // The last eight symbols of its table are reserved and never produced.
       return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
     }
-    // German: apptor's front end. Words are read by a letter-to-sound model, downloaded with the voice.
-    case "g2p-de": {
-      const [model, tables, exceptions, meta] = await Promise.all([
+    // German and Austrian German: apptor's front end. Words are read by a letter-to-sound model,
+    // downloaded with the voice. With the accent on (its makers: from 0.5 up), a short list of
+    // words is read the Austrian way: "Kaffee", "Chemie", final "-ig" and a few more.
+    case "g2p-de":
+    case "g2p-de-at": {
+      const austrian = name === "g2p-de-at";
+      const [model, tables, exceptions, meta, austrianReadings] = await Promise.all([
         needs.helper?.(),
         text("/assets/g2p-de/frontend-de.json").then(JSON.parse),
         text("/assets/g2p-de/exceptions-de.json").then(JSON.parse),
         text("/assets/g2p-de/apptor-g2p-de.json").then(JSON.parse),
+        text("/assets/g2p-de/austrian-de.json").then(JSON.parse),
       ]);
       if (!needs.ort || !model) throw new ModelError("its letter-to-sound model is not downloaded");
       const session = await needs.ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
-      const g2p = new G2P(needs.ort, session, meta, exceptions);
+      const g2p = new G2P(needs.ort, session, meta, exceptions, austrianReadings);
       const [prepare, normalizeGerman, chunks, tokenize] = [
         makePrepare,
         makeNormalizeGerman,
@@ -192,7 +197,7 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
           }
           const words = [];
           for (const word of piece.split(" ").filter(Boolean)) {
-            const units = await g2p.word(word);
+            const units = await g2p.word(word, austrian);
             if (!units.length) continue;
             words.push(units);
             names.push(...spacedWords(word), ...(spacedWords(word).length ? [] : [""]));

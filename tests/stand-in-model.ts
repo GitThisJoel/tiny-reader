@@ -50,9 +50,9 @@ const node = (op: string, inputs: string[], output: string, to?: number) => [
 
 /**
  * The model file. `voiceInput` renames the `voice` input, which makes a model the engine must
- * refuse.
+ * refuse. `more` names further inputs, each one number, as the Austrian model has one.
  */
-export function standInModel(voiceInput = "voice"): Uint8Array<ArrayBuffer> {
+export function standInModel(voiceInput = "voice", more: string[] = []): Uint8Array<ArrayBuffer> {
   const graph = [
     // Every input is used, so that none is optimized away: their sum, times zero.
     node("Cast", ["tokens"], "t", FLOAT),
@@ -63,7 +63,8 @@ export function standInModel(voiceInput = "voice"): Uint8Array<ArrayBuffer> {
     node("Add", ["a2", "speed"], "a3"),
     node("Add", ["a3", "pitch_shift"], "a4"),
     node("Add", ["a4", "pitch_range"], "a5"),
-    node("Mul", ["a5", "zero"], "silence"),
+    ...more.map((name, index) => node("Add", [index ? `m${index - 1}` : "a5", name], `m${index}`)),
+    node("Mul", [more.length ? `m${more.length - 1}` : "a5", "zero"], "silence"),
     // audio: [1, tokens] at a constant level, repeated to 8 frames of 256 samples per token.
     node("Add", ["silence", "level"], "tone"),
     node("Tile", ["tone", "repeats"], "audio"),
@@ -84,6 +85,7 @@ export function standInModel(voiceInput = "voice"): Uint8Array<ArrayBuffer> {
     value("speed", FLOAT, [1]),
     value("pitch_shift", FLOAT, [1]),
     value("pitch_range", FLOAT, [1]),
+    ...more.map((name) => value(name, FLOAT, [1])),
   ].flatMap((each) => bytes(11, each));
   const outputs = [value("audio", FLOAT, [1, "samples"]), value("durations", INT64, [1, "tokens"])].flatMap((each) =>
     bytes(12, each),

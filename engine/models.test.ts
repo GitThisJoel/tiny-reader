@@ -34,6 +34,7 @@ describe("the list of models", () => {
       ["zerre-tts", "tr", "espeak-tr"],
       ["tiny-swara", "bn", "espeak-bn"],
       ["tui-voice-ml", "ml", "espeak-ml"],
+      ["apptor-de-at", "de-AT", "g2p-de-at"],
     ]);
   });
 
@@ -84,6 +85,7 @@ describe("the list of models", () => {
       "Turkish",
       "Bangla",
       "Malayalam",
+      "Austrian German",
     ]);
     expect(readsOnly(BUNDLED)).toBe("tiny-voca only reads English");
     expect(readsOnly(MODELS[4] ?? BUNDLED)).toBe("vocina only reads Italian");
@@ -171,6 +173,21 @@ describe("checkIo", () => {
   it("accepts the inputs and outputs of a tiny-voca model, in any order", () => {
     expect(() => checkIo({ inputMetadata: inputs, outputMetadata: outputs })).not.toThrow();
     expect(() => checkIo({ inputMetadata: inputs.toReversed(), outputMetadata: outputs.toReversed() })).not.toThrow();
+  });
+
+  it("accepts a further input only for a model whose list entry names it", () => {
+    const withAccent = { inputMetadata: [...inputs, tensor("accent", "float32")], outputMetadata: outputs };
+    expect(() => checkIo(withAccent, ["accent"])).not.toThrow();
+    expect(() => checkIo(withAccent)).toThrow(/accent: float32/);
+    // Named but not there, or there with another type: refused too.
+    expect(() => checkIo({ inputMetadata: inputs, outputMetadata: outputs }, ["accent"])).toThrow(ModelError);
+    expect(() =>
+      checkIo({ inputMetadata: [...inputs, tensor("accent", "int64")], outputMetadata: outputs }, ["accent"]),
+    ).toThrow(ModelError);
+    // The Austrian model is the one entry with such an input.
+    expect(MODELS.filter((model) => model.inputs).map((model) => [model.id, model.inputs])).toEqual([
+      ["apptor-de-at", { accent: 1 }],
+    ]);
   });
 
   it("refuses a missing, extra, renamed or retyped input or output", () => {

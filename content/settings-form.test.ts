@@ -135,6 +135,13 @@ describe("mountSettingsForm", () => {
         "Download tui-voice-mini-ml",
         true,
       ],
+      [
+        "apptor-de-at",
+        "apptor-tiny-tts-at · by apptor · Austrian German · voices F2, M2 · Apache-2.0 · 34 MB",
+        "https://huggingface.co/apptor/apptor-tiny-tts-at",
+        "Download apptor-tiny-tts-at",
+        true,
+      ],
     ]);
   });
 

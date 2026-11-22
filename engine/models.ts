@@ -37,6 +37,11 @@ export interface Model extends PinnedFile {
    */
   helper?: PinnedFile;
   /**
+   * Inputs the model has besides the six every model has, each one number, with the value it is
+   * given. The Austrian model's `accent` is one: how strong the accent is.
+   */
+  inputs?: Readonly<Record<string, number>>;
+  /**
    * What the model's makers set where Tiny Reader's settings are neutral: added to the pitch,
    * and multiplied into the pitch range.
    */
@@ -211,6 +216,27 @@ export const MODELS: readonly Model[] = [
     // Their own defaults, "to keep the voice female".
     tuning: { pitchShift: 0.15, pitchRange: 0.85 },
   },
+  {
+    id: "apptor-de-at",
+    name: "apptor-tiny-tts-at",
+    author: "apptor",
+    language: "de-AT",
+    frontend: "g2p-de-at",
+    // The model's third slot, "AT", holds the accent's style and is no voice.
+    voices: ["F2", "M2"],
+    licence: "Apache-2.0",
+    ...huggingFace("apptor/apptor-tiny-tts-at", "e28eb444250b4d06162e6ba8e5090c4284345913", "apptor-tiny-tts-at.onnx"),
+    size: 21_382_102,
+    sha256: "a478c9827965aceadd03d812a74ecdaed856296fc2a577e1e1625e339299d568",
+    // The same letter-to-sound model as the German one, from this model's own repository.
+    helper: {
+      url: "https://huggingface.co/apptor/apptor-tiny-tts-at/resolve/e28eb444250b4d06162e6ba8e5090c4284345913/apptor-g2p-de.onnx",
+      size: 12_364_141,
+      sha256: "d981694e7a03030b2169be46b2094775dde4ec5a3e9406c92a3fc8f1ed8bbec3",
+    },
+    // 0 is standard German, 1 Austrian, 1.6 the most its makers call usable.
+    inputs: { accent: 1 },
+  },
   ...(standIn ? [JSON.parse(standIn) as Model] : []),
 ];
 
@@ -289,8 +315,11 @@ export interface ModelIo {
   outputMetadata: readonly { name: string; isTensor: boolean; type?: string }[];
 }
 
-/** Throws unless the model has exactly the inputs and outputs the engine works with. */
-export function checkIo(session: ModelIo) {
+/**
+ * Throws unless the model has exactly the inputs and outputs the engine works with. `more` names
+ * the further inputs its list entry says it has; each is one number.
+ */
+export function checkIo(session: ModelIo, more: readonly string[] = []) {
   const describe = (values: ModelIo["inputMetadata"]) =>
     values
       .map((value) => `${value.name}: ${value.isTensor ? value.type : "not a tensor"}`)
@@ -299,7 +328,11 @@ export function checkIo(session: ModelIo) {
   const expect = (names: Record<string, string>) =>
     describe(Object.entries(names).map(([name, type]) => ({ name, type, isTensor: true })));
   for (const [kind, actual, expected] of [
-    ["inputs", describe(session.inputMetadata), expect(INPUTS)],
+    [
+      "inputs",
+      describe(session.inputMetadata),
+      expect({ ...INPUTS, ...Object.fromEntries(more.map((name) => [name, "float32"])) }),
+    ],
     ["outputs", describe(session.outputMetadata), expect(OUTPUTS)],
   ] as const)
     if (actual !== expected) throw new ModelError(`its ${kind} are (${actual}), not (${expected})`);

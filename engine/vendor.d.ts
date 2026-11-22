@@ -124,10 +124,19 @@ declare module "apptor/apptor-tts.js" {
   /** The tables in frontend-de.json. */
   export type Tables = Record<string, unknown>;
   export class G2P {
-    /** `session` is the letter-to-sound model; `meta` its description; `exceptions` words read from a table. */
-    constructor(ort: unknown, session: unknown, meta: unknown, exceptions?: Record<string, string>);
-    /** One written word to its phones. Empty for a word with nothing to say. */
-    word(word: string): Promise<Units>;
+    /**
+     * `session` is the letter-to-sound model; `meta` its description; `exceptions` words read from
+     * a table; `austrian` the words read otherwise with the Austrian accent on.
+     */
+    constructor(
+      ort: unknown,
+      session: unknown,
+      meta: unknown,
+      exceptions?: Record<string, string>,
+      austrian?: Record<string, string>,
+    );
+    /** One written word to its phones, with the Austrian readings or without. Empty for a word with nothing to say. */
+    word(word: string, austrian?: boolean): Promise<Units>;
   }
   export function normalizeText(text: string): string;
   export function makePrepare(tables: Tables): (text: string) => string;

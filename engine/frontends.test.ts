@@ -114,6 +114,21 @@ describe("the German front end", () => {
   });
 });
 
+describe("the Austrian German front end", () => {
+  it("is the German one with a short list of words read the Austrian way", async () => {
+    const [german, austrian] = await Promise.all(
+      ["g2p-de", "g2p-de-at"].map((name) => loadFrontEnd(name, readAsset, fakeNeeds)),
+    );
+    // "Kaffee" is in the Austrian list, stressed on its last syllable: k a f eː. Without the
+    // list the word goes to the letter-to-sound model, which is a stand-in here.
+    const [standard, accented] = await Promise.all([german?.("Kaffee."), austrian?.("Kaffee.")]);
+    expect(accented?.ids).toEqual([1, 21, 52, 23, 51, 6, 2]);
+    expect(accented?.stress).toEqual([0, 0, 0, 0, 1, 0, 0]);
+    expect(standard?.ids).not.toEqual(accented?.ids);
+    expect(accented?.words.map((word) => word.text)).toEqual(["Kaffee"]);
+  });
+});
+
 describe("a front end fed by eSpeak NG", () => {
   it("leaves the words of a piece nameless when eSpeak NG spoke another number of them", async () => {
     const frontEnd = await loadSyncFrontEnd("espeak-es");

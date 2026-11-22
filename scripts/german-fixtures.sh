@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Rewrites tests/parity/german.json: what apptor's own Python front end makes of the sentences in
-# tests/parity/german-sentences.json. The parity test compares the JavaScript front end with it.
+# Rewrites tests/parity/german.json and german-at.json: what apptor's own Python front end makes of
+# the sentences in tests/parity/german-sentences.json, as standard German and with its Austrian
+# readings. The parity test compares the JavaScript front end with them.
 # Needs Docker; nothing is installed on the host.
 #
 #   pnpm german-fixtures
@@ -36,15 +37,18 @@ sys.path.insert(0, "/work")
 from tinyvoca.g2p_de import phonemize
 from tinyvoca import text as T
 
-out = []
-for sentence in json.load(open("/build/sentences.json", encoding="utf-8")):
-    try:
-        p = phonemize(sentence)
-        out.append({"text": sentence, "ids": list(p.ids), "stress": list(p.stress)})
-    except Exception as error:
-        out.append({"text": sentence, "error": type(error).__name__})
-json.dump({"symbols": list(T.SYMBOLS), "sentences": out}, open("/work/out/german.json", "w", encoding="utf-8"),
-          ensure_ascii=False, indent=0)
+sentences = json.load(open("/build/sentences.json", encoding="utf-8"))
+# german.json: standard German. german-at.json: with the readings used when the Austrian model's accent is on.
+for name, austrian in (("german.json", False), ("german-at.json", True)):
+    out = []
+    for sentence in sentences:
+        try:
+            p = phonemize(sentence, austrian=austrian)
+            out.append({"text": sentence, "ids": list(p.ids), "stress": list(p.stress)})
+        except Exception as error:
+            out.append({"text": sentence, "error": type(error).__name__})
+    json.dump({"symbols": list(T.SYMBOLS), "sentences": out}, open("/work/out/" + name, "w", encoding="utf-8"),
+              ensure_ascii=False, indent=0)
 EOF
 
 UID_GID="$(id -u):$(id -g)"
@@ -55,5 +59,5 @@ docker run --rm -v "${WORK}:/build:ro" -v "${WORK}/out:/work/out" "${IMAGE}" bas
   python /build/reference.py
   chown -R ${UID_GID} /work/out"
 
-cp "${WORK}/out/german.json" "${ROOT}/tests/parity/german.json"
-echo "wrote:" && ls -l "${ROOT}/tests/parity/german.json"
+cp "${WORK}/out/german.json" "${WORK}/out/german-at.json" "${ROOT}/tests/parity/"
+echo "wrote:" && ls -l "${ROOT}/tests/parity/german.json" "${ROOT}/tests/parity/german-at.json"

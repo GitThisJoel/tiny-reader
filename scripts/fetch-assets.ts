@@ -213,6 +213,18 @@ export const ASSETS: Asset[] = [
     "82759d03b9ff4ae01112a470bb4b34960b3471187a3dd6060292c4fc232fd6d5",
   ),
   from(
+    APPTOR,
+    "web/austrian-de.json",
+    "public/assets/g2p-de/austrian-de.json",
+    "8a05f0ec8a9f317e842a1e8402f37d5743385f3a6d7a6f69c1e05b07f4c1b40d",
+  ),
+  from(
+    APPTOR,
+    "apptor-tiny-tts-at.json",
+    "vendor/apptor/model-at.json",
+    "d5f41153ab87dfc8ecf151294b168cda82e7179739cb7c95d2e5d4bf39c02f12",
+  ), // tests only
+  from(
     APPTOR_DE,
     "apptor-tiny-tts-de.json",
     "vendor/apptor/model.json",

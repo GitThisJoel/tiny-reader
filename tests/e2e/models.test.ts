@@ -179,6 +179,7 @@ describe("extra voice models", () => {
         "zerre-tts": ["Download", ""],
         "tiny-swara": ["Download", ""],
         "tui-voice-ml": ["Download", ""],
+        "apptor-de-at": ["Download", ""],
         "stand-in": ["Download", ""],
       },
     });

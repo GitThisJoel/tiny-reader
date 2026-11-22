@@ -1,5 +1,5 @@
-// The German front end against apptor's own Python front end: tests/parity/german.json, written
-// by `pnpm german-fixtures`. Both read words with the same letter-to-sound model, which this
+// The German front end against apptor's own Python front end: tests/parity/german.json and
+// german-at.json, written by `pnpm german-fixtures`. Both read words with the same letter-to-sound model, which this
 // test downloads once (12 MB, verified) into `.cache/models/`.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,7 +9,11 @@ import { type FrontEnd, loadFrontEnd } from "../../engine/frontends.ts";
 import { MODELS } from "../../engine/models.ts";
 import { cached, readAsset } from "../assets.ts";
 
-describe("German (apptor)", () => {
+describe.each([
+  ["German", "g2p-de", "german.json", "model.json"],
+  // The same front end with the readings its makers switch on with the Austrian model's accent.
+  ["Austrian German", "g2p-de-at", "german-at.json", "model-at.json"],
+])("%s (apptor)", (_, name, fixture, descriptor) => {
   let frontEnd: FrontEnd;
   let reference: { symbols: string[]; sentences: { text: string; ids: number[]; stress: number[] }[] };
   let model: { symbols: string[] };
@@ -18,9 +22,9 @@ describe("German (apptor)", () => {
     const german = MODELS.find((entry) => entry.id === "apptor-de");
     if (!german?.helper) throw new Error("the German model has no helper in the list");
     const helper = await cached(german.helper, "apptor-de.helper.onnx");
-    frontEnd = await loadFrontEnd("g2p-de", readAsset, { ort, helper: async () => helper });
-    reference = JSON.parse(await readFile(join(import.meta.dirname, "german.json"), "utf8"));
-    model = JSON.parse(await readFile(join(import.meta.dirname, "../../vendor/apptor/model.json"), "utf8"));
+    frontEnd = await loadFrontEnd(name, readAsset, { ort, helper: async () => helper });
+    reference = JSON.parse(await readFile(join(import.meta.dirname, fixture), "utf8"));
+    model = JSON.parse(await readFile(join(import.meta.dirname, "../../vendor/apptor", descriptor), "utf8"));
   }, 120_000);
 
   it("gives the ids and stress of the Python front end", async () => {

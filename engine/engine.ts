@@ -33,13 +33,21 @@ export interface Engine {
 type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
 
 /**
- * `frontEnd` is the text front end the model was trained with (engine/frontends.ts).
- * Rejects with a ModelError when the file's inputs and outputs are not a tiny-voca model's.
+ * `frontEnd` is the text front end the model was trained with (engine/frontends.ts). `inputs` are
+ * the inputs the model has besides the usual six, with the value to give each.
+ * Rejects with a ModelError when the file's inputs and outputs are not what that makes a model's.
  */
-export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; frontEnd: FrontEnd }): Promise<Engine> {
+export async function createEngine(
+  ort: OrtModule,
+  assets: { model: Uint8Array; frontEnd: FrontEnd; inputs?: Readonly<Record<string, number>> },
+): Promise<Engine> {
   const session = await ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] });
+  const more = Object.entries(assets.inputs ?? {});
   try {
-    checkIo(session);
+    checkIo(
+      session,
+      more.map(([name]) => name),
+    );
   } catch (error) {
     await session.release();
     throw error;
@@ -55,6 +63,7 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
       speed: float(options.speed),
       pitch_shift: float(options.pitchShift),
       pitch_range: float(options.pitchRange),
+      ...Object.fromEntries(more.map(([name, value]) => [name, float(value)])),
     });
     const pcm = output.audio?.data;
     const durations = output.durations?.data;
