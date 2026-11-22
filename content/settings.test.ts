@@ -12,6 +12,7 @@ describe("parseSettings", () => {
 
   it("keeps valid values", () => {
     const settings = {
+      model: "fiato",
       voice: 1,
       speed: 1.5,
       pitchShift: 2 * SEMITONE,
@@ -19,6 +20,11 @@ describe("parseSettings", () => {
       prefetch: 4,
     };
     expect(parseSettings(settings)).toEqual(settings);
+  });
+
+  it("falls back to the bundled model for one that is not in the list", () => {
+    for (const model of ["gone", 3, null])
+      expect(parseSettings({ model, voice: 1 })).toMatchObject({ model: "tiny-voca", voice: 1 });
   });
 
   it("clamps numbers and rejects everything else, field by field", () => {
@@ -31,6 +37,7 @@ describe("parseSettings", () => {
         prefetch: 2.6,
       }),
     ).toEqual({
+      model: "tiny-voca",
       voice: 0,
       speed: 2,
       pitchShift: -0.5,

@@ -1,4 +1,5 @@
 import type { WordTiming } from "./align.ts";
+import { BUNDLED, modelById } from "./models.ts";
 
 export type { WordTiming };
 
@@ -10,10 +11,11 @@ export const PORT_NAME = "engine";
 export const SAMPLE_RATE = 24000;
 /** Samples per duration frame. */
 export const HOP = 256;
-export const VOICES = ["F2", "M2"] as const;
 
 export interface SynthOptions {
-  /** Index into VOICES. */
+  /** The id of a model in engine/models.ts. One that is not in storage is replaced by the bundled model. */
+  model: string;
+  /** Index into that model's voices. */
   voice: number;
   /** 1 = as predicted, 2 = twice as fast. */
   speed: number;
@@ -24,6 +26,7 @@ export interface SynthOptions {
 }
 
 export const DEFAULT_OPTIONS: SynthOptions = {
+  model: BUNDLED.id,
   voice: 0,
   speed: 1,
   pitchShift: 0,
@@ -56,7 +59,8 @@ export interface Utterance {
 }
 
 export type EngineResponse =
-  | ({ type: "result"; id: string } & Utterance)
+  /** `notice`: the model asked for could not be used and another one spoke. Why, for the user. */
+  | ({ type: "result"; id: string; notice?: string } & Utterance)
   | { type: "error"; id: string; code: EngineErrorCode; message: string }
   /** Sent while the model is being loaded for the first request, and when it is ready. */
   | { type: "status"; state: "loading" | "ready" };
@@ -69,10 +73,12 @@ const inRange = (value: unknown, [low, high]: readonly [number, number]): value 
 function parseOptions(value: unknown): SynthOptions | null {
   if (!isObject(value)) return null;
   const { voice, speed, pitchShift, pitchRange } = value;
-  if (typeof voice !== "number" || !Number.isInteger(voice) || voice < 0 || voice >= VOICES.length) return null;
+  const model = modelById(value.model);
+  if (!model) return null;
+  if (typeof voice !== "number" || !Number.isInteger(voice) || voice < 0 || voice >= model.voices.length) return null;
   if (!inRange(speed, LIMITS.speed)) return null;
   if (!inRange(pitchShift, LIMITS.pitchShift) || !inRange(pitchRange, LIMITS.pitchRange)) return null;
-  return { voice, speed, pitchShift, pitchRange };
+  return { model: model.id, voice, speed, pitchShift, pitchRange };
 }
 
 /** Validates an incoming message. Anything malformed or out of range gives null. */

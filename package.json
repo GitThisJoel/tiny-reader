@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Firefox add-on that reads web page text aloud with tiny-voca, fully offline",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "packageManager": "pnpm@12.21.0",
   "engines": {
@@ -14,6 +14,8 @@
     "build": "wxt build",
     "zip": "wxt zip",
     "fetch-assets": "tsx scripts/fetch-assets.ts",
+    "build-espeak": "bash scripts/build-espeak.sh",
+    "german-fixtures": "bash scripts/german-fixtures.sh",
     "lint": "biome check .",
     "format": "biome check --write .",
     "typecheck": "wxt prepare && tsc --noEmit",

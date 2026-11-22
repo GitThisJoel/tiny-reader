@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MODELS } from "@/engine/models.ts";
 import { languageWarning } from "./language.ts";
 
 const detected = (isReliable: boolean, ...languages: [string, number][]) => ({
@@ -27,6 +28,16 @@ describe("languageWarning", () => {
       "This looks like French. tiny-voca only reads English, so it will sound wrong.",
     );
     expect(languageWarning(detected(true, ["de", 97]))).toContain("German");
+  });
+
+  it("goes by the language of the model that reads", () => {
+    const portuguese = MODELS.find((model) => model.language === "pt-BR");
+    // The detector says "pt" for a page the Brazilian model reads.
+    expect(languageWarning(detected(true, ["pt", 96]), portuguese)).toBeNull();
+    expect(languageWarning(detected(true, ["pt-PT", 96]), portuguese)).toBeNull();
+    expect(languageWarning(detected(true, ["en", 96]), portuguese)).toBe(
+      "This looks like English. tiny-voca-ptbr only reads Brazilian Portuguese, so it will sound wrong.",
+    );
   });
 
   it("falls back to the code for a language without a name", () => {

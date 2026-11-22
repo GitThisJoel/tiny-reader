@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser";
-import { DEFAULT_OPTIONS, LIMITS, type SynthOptions, VOICES } from "@/engine/protocol.ts";
+import { BUNDLED, modelById } from "@/engine/models.ts";
+import { DEFAULT_OPTIONS, LIMITS, type SynthOptions } from "@/engine/protocol.ts";
 
 export interface Settings extends SynthOptions {
   /** Sentences synthesized ahead of the one playing. */
@@ -20,9 +21,12 @@ const clamp = (value: unknown, [low, high]: readonly [number, number], fallback:
 export function parseSettings(value: unknown): Settings {
   const stored = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
   const voice = stored.voice;
+  // A model that has left the list. Whether a listed one is still in storage is the engine's concern.
+  const model = modelById(stored.model) ?? BUNDLED;
   return {
+    model: model.id,
     voice:
-      typeof voice === "number" && Number.isInteger(voice) && voice >= 0 && voice < VOICES.length
+      typeof voice === "number" && Number.isInteger(voice) && voice >= 0 && voice < model.voices.length
         ? voice
         : DEFAULT_SETTINGS.voice,
     speed: clamp(stored.speed, LIMITS.speed, DEFAULT_SETTINGS.speed),

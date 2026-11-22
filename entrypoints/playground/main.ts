@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { EngineClient } from "@/engine/client.ts";
-import { DEFAULT_OPTIONS, PORT_NAME, VOICES } from "@/engine/protocol.ts";
+import { BUNDLED } from "@/engine/models.ts";
+import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const text = byId<HTMLTextAreaElement>("text");
@@ -11,7 +12,7 @@ const say = (message: string) => {
   status.textContent = message;
 };
 
-for (const [index, name] of VOICES.entries()) voice.add(new Option(name, String(index)));
+for (const [index, name] of BUNDLED.voices.entries()) voice.add(new Option(name, String(index)));
 
 const client = new EngineClient(
   () => browser.runtime.connect({ name: PORT_NAME }),

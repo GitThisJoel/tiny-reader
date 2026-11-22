@@ -24,15 +24,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The pinned revisions and hashes live in the script, so its hash is the cache key.
+      # The pinned revisions and hashes live in the two scripts and in the list of models (whose
+      # downloadable ones the smoke tests fetch), so their hash is the cache key.
       - uses: actions/cache@v6
         with:
           path: |
             public/assets
             vendor
-          key: assets-${{ hashFiles('scripts/fetch-assets.ts') }}
+            .cache/models
+          key: assets-${{ hashFiles('scripts/fetch-assets.ts', 'scripts/build-espeak.sh', 'scripts/espeak.sha256', 'engine/models.ts') }}
       # Always runs: on a cache hit it only re-verifies the SHA-256 of every file.
       - run: pnpm fetch-assets
+      # eSpeak NG as wasm, built from source in a container: about a minute, only when the cache
+      # does not hold exactly the recorded build. The build itself fails if it comes out different.
+      - run: sha256sum --check --quiet scripts/espeak.sha256 || pnpm build-espeak
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignWords, type TimedWord, wordAt } from "./align.ts";
+import { alignWords, isWord, sourceWords, type TimedWord, wordAt } from "./align.ts";
 
 /** Spoken words, one second each. */
 const said = (...words: string[]): TimedWord[] => words.map((text, index) => ({ text, start: index, end: index + 1 }));
@@ -114,5 +114,20 @@ describe("wordAt", () => {
   it("stays on a word through the pause after it", () => {
     expect(wordAt(timings, 0.75)?.charStart).toBe(0);
     expect(wordAt(timings, 5)?.charStart).toBe(4);
+  });
+});
+
+describe("isWord", () => {
+  it("takes a segment with a letter or a digit for a word, whatever the segmenter says of it", () => {
+    // Firefox reports isWordLike false for words that end in a vowel sign.
+    expect(isWord({ segment: "আমি", isWordLike: false })).toBe(true);
+    expect(isWord({ segment: "സുഖമാണോ", isWordLike: false })).toBe(true);
+    expect(isWord({ segment: "14", isWordLike: true })).toBe(true);
+    for (const segment of [" ", "।", ",", "—", "…"]) expect(isWord({ segment, isWordLike: false })).toBe(false);
+  });
+
+  it("finds every word of Bengali and Malayalam text", () => {
+    expect(sourceWords("আমি ভাত খাই। টি আসবে।").map((word) => word.text)).toEqual(["আমি", "ভাত", "খাই", "টি", "আসবে"]);
+    expect(sourceWords("ഹലോ, സുഖമാണോ?").map((word) => word.text)).toEqual(["ഹലോ", "സുഖമാണോ"]);
   });
 });

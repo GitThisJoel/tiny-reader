@@ -24,12 +24,20 @@ interface SourceWord {
 }
 
 const segmenter = new Intl.Segmenter("en", { granularity: "word" });
-const fold = (word: string) => word.toLowerCase().replace(/[’ʼ]/g, "'");
+// Accents composed, so that "café" matches however the page or the PDF stored its accent.
+const fold = (word: string) => word.normalize("NFC").toLowerCase().replace(/[’ʼ]/g, "'");
+
+/**
+ * Whether a segment of the word segmenter is a word. Its own `isWordLike` is not enough: Firefox
+ * says no for a word that ends in a combining mark, as most Bengali and Malayalam words do.
+ */
+export const isWord = (part: { segment: string; isWordLike?: boolean }) =>
+  Boolean(part.isWordLike) || /[\p{L}\p{N}]/u.test(part.segment);
 
 export function sourceWords(text: string): SourceWord[] {
   const words: SourceWord[] = [];
   for (const { segment, index, isWordLike } of segmenter.segment(text))
-    if (isWordLike)
+    if (isWord({ segment, isWordLike }))
       words.push({
         text: fold(segment),
         start: index,

@@ -1,3 +1,5 @@
+import { BUNDLED, type Model, readsOnly } from "@/engine/models.ts";
+
 /** What i18n.detectLanguage resolves to. */
 export interface Detection {
   isReliable: boolean;
@@ -8,19 +10,21 @@ export interface Detection {
 export const SAMPLE_LENGTH = 4000;
 
 /**
- * A warning for text that is clearly not English, or null. The model and its phonemizer are
- * English only: other languages in Latin script are read with English sounds, which is wrong
- * but not silent, so the user is told rather than stopped.
+ * A warning for text that is clearly not in the model's language, or null. A model and its text
+ * front end know one language: another one in the same script is read with the wrong sounds,
+ * which is wrong but not silent, so the user is told rather than stopped.
  */
-export function languageWarning(detection: Detection): string | null {
+export function languageWarning(detection: Detection, model: Model = BUNDLED): string | null {
   if (!detection.isReliable) return null;
   const [top] = detection.languages.toSorted((a, b) => b.percentage - a.percentage);
-  if (!top || top.language === "und" || top.language.toLowerCase().startsWith("en")) return null;
+  // Compared by language alone: "pt" is what the detector says for a page a "pt-BR" model reads.
+  const language = (tag: string) => tag.toLowerCase().split("-")[0];
+  if (!top || top.language === "und" || language(top.language) === language(model.language)) return null;
   let name = top.language;
   try {
     name = new Intl.DisplayNames(["en"], { type: "language" }).of(top.language) ?? name;
   } catch {
     // Not a code Intl knows: show it as it is.
   }
-  return `This looks like ${name}. tiny-voca only reads English, so it will sound wrong.`;
+  return `This looks like ${name}. ${readsOnly(model)}, so it will sound wrong.`;
 }

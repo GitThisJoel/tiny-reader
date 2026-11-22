@@ -27,8 +27,8 @@ flowchart LR
 
   subgraph worker["Engine Worker"]
     direction TB
-    phonemizer["Phonemizer<br/>dizione"]
-    model["tiny-voca<br/>ONNX Runtime Web, wasm"]
+    phonemizer["Text front end<br/>one per language"]
+    model["tiny-voca, or a downloaded model<br/>ONNX Runtime Web, wasm"]
     align["Word alignment"]
     phonemizer --> model --> align
   end
@@ -66,6 +66,20 @@ flowchart LR
 - **Engine Worker** ([entrypoints/engine-worker.ts](../entrypoints/engine-worker.ts), [engine/](../engine/)): one request is
   one sentence; the reply is 24 kHz PCM plus a time span for every source word. Firefox unloads it 30 seconds after
   reading stops.
+- **Front ends** ([engine/frontends.ts](../engine/frontends.ts)): text to phoneme tokens, one per language: English
+  (dizione), Brazilian Portuguese (dizione-ptbr), Italian (vocina's `g2p_it`), German (apptor's, with a
+  letter-to-sound model that is downloaded with the voice, and with its Austrian readings for a model that is
+  given an accent), and five that work from eSpeak NG, which runs as
+  WebAssembly ([engine/espeak.ts](../engine/espeak.ts)): Spanish and French with each model's own code, Turkish,
+  Bengali and Malayalam with ports of theirs ([engine/espeak-text.ts](../engine/espeak-text.ts),
+  [engine/malayalam.ts](../engine/malayalam.ts)). Their
+  code is in the package; each model names the one it needs, and a front end is set up the first time a model asks
+  for it.
+- **Models** ([engine/models.ts](../engine/models.ts), [engine/model-store.ts](../engine/model-store.ts),
+  [engine/loader.ts](../engine/loader.ts)): the list of models the add-on can use. The first ships in the package;
+  the others are downloaded from the settings page, verified against the list and kept in IndexedDB, where the
+  Worker finds them. Each request names its model, and the Worker falls back to the bundled one, with a notice for
+  the control bar, when a downloaded model is missing or unusable.
 - **Protocol** ([engine/protocol.ts](../engine/protocol.ts)): typed messages with request ids. Cancelling drops queued
   work and discards the result of work in progress.
 

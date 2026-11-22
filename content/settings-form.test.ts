@@ -28,13 +28,128 @@ describe("mountSettingsForm", () => {
     await mountSettingsForm(form);
     expect(
       Object.fromEntries(
-        ["voice", "speed", "pitchShift", "pitchRange", "prefetch"].map((name) => [name, field(name).value]),
+        ["model", "voice", "speed", "pitchShift", "pitchRange", "prefetch"].map((name) => [name, field(name).value]),
       ),
-    ).toEqual({ voice: "1", speed: "1.5", pitchShift: "-2", pitchRange: "1", prefetch: "4" });
+    ).toEqual({ model: "tiny-voca", voice: "1", speed: "1.5", pitchShift: "-2", pitchRange: "1", prefetch: "4" });
     expect((form.querySelector('output[for="pitchShift"]') as HTMLOutputElement).value).toBe("-2 st");
     expect((form.querySelector('output[for="speed"]') as HTMLOutputElement).value).toBe("1.50×");
     for (const control of form.querySelectorAll<HTMLInputElement>("select, input"))
       expect(control.labels?.length, control.id).toBe(1);
+  });
+
+  // jsdom has no IndexedDB, as a profile whose storage cannot be read: no model is downloaded.
+  it("offers only the bundled model and its voices when nothing is downloaded", async () => {
+    // A model chosen earlier whose file is gone: the engine falls back to the bundled one, and so does the form.
+    await saveSettings({ model: "fiato", voice: 1 });
+    await mountSettingsForm(form);
+    const texts = (name: string) =>
+      [...(field(name) as unknown as HTMLSelectElement).options].map((option) => option.text);
+    expect(texts("model")).toEqual(["tiny-voca (English)"]);
+    expect(texts("voice")).toEqual(["F2", "M2"]);
+    expect([field("model").value, field("voice").value]).toEqual(["tiny-voca", "1"]);
+    // The popup has no downloads, only the way to them.
+    expect(form.querySelector("#models")).toBeNull();
+    expect(form.querySelector("#more-voices")?.textContent).toBe("Get more voices…");
+  });
+
+  it("lists the models that can be downloaded, with what they are and where they come from", async () => {
+    await mountSettingsForm(form, { downloads: true });
+    expect(form.querySelector("#more-voices")).toBeNull();
+    expect(
+      [...form.querySelectorAll<HTMLElement>("#models .model")].map((row) => [
+        row.dataset.model,
+        row.querySelector("span")?.textContent,
+        row.querySelector("a")?.href,
+        row.querySelector("button")?.getAttribute("aria-label"),
+        row.querySelector("progress")?.hidden,
+      ]),
+    ).toEqual([
+      [
+        "sobbie",
+        "SobbieTTS · by PatnaikAshish · English · voices F, M · Apache-2.0 · 21 MB",
+        "https://huggingface.co/PatnaikAshish/SobbieTTS",
+        "Download SobbieTTS",
+        true,
+      ],
+      [
+        "fiato",
+        "fiato · by cfahlgren1 · English · voices F1, M1 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/cfahlgren1/fiato",
+        "Download fiato",
+        true,
+      ],
+      [
+        "tiny-voca-ptbr",
+        "tiny-voca-ptbr · by SemFence (Gustavo Toledo) · Brazilian Portuguese · voices F_s4, M_sm4 · CC-BY-4.0 · 21 MB",
+        "https://huggingface.co/semfence/tiny-voca-ptbr",
+        "Download tiny-voca-ptbr",
+        true,
+      ],
+      [
+        "vocina",
+        "vocina · by OfficinePixel · Italian · voices I1, I2 · Apache-2.0 · 21 MB",
+        "https://github.com/OfficinePixel/vocina",
+        "Download vocina",
+        true,
+      ],
+      [
+        "tiny-voca-es",
+        "tiny-voca-es · by marcosmaceo · European Spanish · voices F2, M2 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/marcosmaceo/tiny-voca-es",
+        "Download tiny-voca-es",
+        true,
+      ],
+      [
+        "tiny-voca-fr",
+        "tiny-voca-fr · by DanielSuncost · French · voices FR_F1, FR_M1 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/DanielSuncost/tiny-voca-fr",
+        "Download tiny-voca-fr",
+        true,
+      ],
+      [
+        "apptor-de",
+        // The voice and the letter-to-sound model its front end needs, together.
+        "apptor-tiny-tts · by apptor · German · voices F2, M2 · Apache-2.0 · 34 MB",
+        "https://huggingface.co/apptor/apptor-tiny-tts",
+        "Download apptor-tiny-tts",
+        true,
+      ],
+      [
+        "zerre-tts",
+        "zerre-tts · by erkint · Turkish · voices MK, NK · Apache-2.0 · 21 MB",
+        "https://huggingface.co/erkint/zerre-tts",
+        "Download zerre-tts",
+        true,
+      ],
+      [
+        "tiny-swara",
+        "tiny-swara · by Xeven7 · Bangla · voices BF, BM · Apache-2.0 · 21 MB",
+        "https://huggingface.co/Xeven7/tiny-swara",
+        "Download tiny-swara",
+        true,
+      ],
+      [
+        "tui-voice-ml",
+        "tui-voice-mini-ml · by Cyrax321 · Malayalam · voices F2 · Apache-2.0 · 21 MB",
+        "https://huggingface.co/Cyrax321/tui-voice-mini-ml",
+        "Download tui-voice-mini-ml",
+        true,
+      ],
+      [
+        "apptor-de-at",
+        "apptor-tiny-tts-at · by apptor · Austrian German · voices F2, M2 · Apache-2.0 · 34 MB",
+        "https://huggingface.co/apptor/apptor-tiny-tts-at",
+        "Download apptor-tiny-tts-at",
+        true,
+      ],
+    ]);
+  });
+
+  it("keeps a chosen model it cannot offer while it does not know what is downloaded", async () => {
+    await saveSettings({ model: "fiato", voice: 1 });
+    await mountSettingsForm(form);
+    await change("speed", "1.3");
+    expect(await loadSettings()).toMatchObject({ model: "fiato", voice: 1, speed: 1.3 });
   });
 
   it("saves a change at once", async () => {

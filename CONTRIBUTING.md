@@ -9,18 +9,27 @@ How to build, run and test Tiny Reader, and the conventions the repository follo
 - Node.js 22.18 or newer
 - [pnpm](https://pnpm.io/installation) 12 (the exact version is pinned in `package.json`)
 - Firefox 140 or newer, desktop
+- Docker, for `pnpm build-espeak` (once, and again only when that script changes)
 
 ## Setup
 
 ```bash
 pnpm install
 pnpm fetch-assets
+pnpm build-espeak
 ```
 
 `pnpm fetch-assets` downloads the model, the phonemizer data and upstream's JavaScript
 phonemizer (about 30 MB) into `public/assets/` and `vendor/`. Every file is pinned to a commit
 and checked against a SHA-256 in [scripts/fetch-assets.ts](scripts/fetch-assets.ts). These files
 are never committed. Running it again only re-verifies what is on disk.
+
+`pnpm build-espeak` builds eSpeak NG 1.52.0 from source to WebAssembly, inside a pinned emscripten container, and
+puts its loader in `vendor/espeak/` and its binary and data in `public/assets/espeak/`
+([scripts/build-espeak.sh](scripts/build-espeak.sh)). The Spanish and French models need it. The build is
+reproducible: the files it makes are on record in [scripts/espeak.sha256](scripts/espeak.sha256), and a build
+that comes out different fails and installs nothing (`--allow-different` installs it anyway, for trying a change
+out). Without it the add-on does not build.
 
 ## Development
 
@@ -45,18 +54,20 @@ export default defineWebExtConfig({
 
 ## Scripts
 
-| Command             | What it does                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm dev`          | Watch build and launch Firefox with the add-on                                            |
-| `pnpm build`        | Production build into `.output/firefox-mv3/`                                              |
-| `pnpm zip`          | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO |
-| `pnpm lint`         | Biome lint and format check                                                               |
-| `pnpm format`       | Biome, applying fixes                                                                     |
-| `pnpm typecheck`    | `tsc --noEmit` in strict mode                                                             |
-| `pnpm test`         | Vitest unit tests                                                                         |
-| `pnpm lint:ext`     | `web-ext lint` on the build (run `pnpm build` first)                                      |
-| `pnpm fetch-assets` | Download and verify model and phonemizer assets                                           |
-| `pnpm screenshots`  | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)  |
+| Command                | What it does                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm dev`             | Watch build and launch Firefox with the add-on                                             |
+| `pnpm build`           | Production build into `.output/firefox-mv3/`                                               |
+| `pnpm zip`             | Build and package `.output/tiny-reader-<version>-firefox.zip`, plus a sources zip for AMO  |
+| `pnpm lint`            | Biome lint and format check                                                                |
+| `pnpm format`          | Biome, applying fixes                                                                      |
+| `pnpm typecheck`       | `tsc --noEmit` in strict mode                                                              |
+| `pnpm test`            | Vitest unit tests                                                                          |
+| `pnpm lint:ext`        | `web-ext lint` on the build (run `pnpm build` first)                                       |
+| `pnpm fetch-assets`    | Download and verify model and phonemizer assets                                            |
+| `pnpm build-espeak`    | Build eSpeak NG to WebAssembly in a container; `--fixtures` rewrites its parity references |
+| `pnpm german-fixtures` | Rewrite the German parity references with apptor's Python front end, in a container        |
+| `pnpm screenshots`     | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
 
 `pnpm lint:ext` reports no errors and four accepted warnings:
 
@@ -98,6 +109,55 @@ imperative, lower case, on one line.
 Scopes in use: `engine`, `content`, `highlight`, `options`, `e2e`, `parity`, `assets`, `scripts`, `deps`, `dependabot`.
 Examples: `feat(engine): align spoken words to source text`, `test(e2e): add reading tests on strict-CSP pages`,
 `docs: document the pre-commit hook`.
+
+## Voice models
+
+The models the add-on can use are listed in [engine/models.ts](engine/models.ts); nothing else can be downloaded.
+To add one:
+
+1. Check that it qualifies: the ONNX file has the inputs and outputs in [docs/FINDINGS.md](docs/FINDINGS.md) §1 at
+   24 kHz, and its token table is the one a front end in [engine/frontends.ts](engine/frontends.ts) produces (for an
+   English model: the bundled model's table; extra tokens the phonemizer never emits are fine). Do not go by a
+   fingerprint in the model's own files. The entry names that front end (`frontend`).
+2. Take the commit, size and SHA-256 from `https://huggingface.co/api/models/<repo>?blobs=true` (`sha`, and the
+   file's `size` and `lfs.sha256`). Pin the commit, never a branch. A model hosted elsewhere needs an address that
+   is as fixed as can be (a release tag), and in `alsoAllow` the sites it redirects to without CORS headers.
+3. Add it to [tests/smoke/languages.test.ts](tests/smoke/languages.test.ts), listen to it, and check its licence
+   allows passing it on.
+
+A new language needs its text front end first. Its code has to ship in the add-on, so it is fetched at a pinned
+commit by [scripts/fetch-assets.ts](scripts/fetch-assets.ts) like the English one, typed in
+[engine/vendor.d.ts](engine/vendor.d.ts) and given a case in `loadFrontEnd`. It must be plain JavaScript or
+TypeScript with no dependencies and no `eval`, under a licence the add-on can carry; add its credit to
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and a comparison with its own reference outputs to
+[tests/parity/frontends.test.ts](tests/parity/frontends.test.ts). [docs/FINDINGS.md](docs/FINDINGS.md) §14 lists
+which community models were looked at and why most cannot be added yet.
+
+A language whose model was trained on eSpeak NG's output needs three things: its dictionary in `LANGS` in
+[scripts/build-espeak.sh](scripts/build-espeak.sh), tiny-voca's `text.py` for that language, and a reference. For
+`text.py`, take the model's own JavaScript port where there is one (fetched and given to `espeakFrontEnd`);
+otherwise write a profile for this repository's port, [engine/espeak-text.ts](engine/espeak-text.ts), from the
+project's tables, and test that it reproduces the fingerprint the model publishes. For the reference: add its Python front end to `REFERENCES` in that script
+and sentences to [tests/parity/espeak-sentences.json](tests/parity/espeak-sentences.json), then run
+`pnpm build-espeak --fixtures`. That runs the Python front end with a native eSpeak NG from the same source and
+writes `tests/parity/espeak-<language>.json`, which `pnpm test:parity` compares the JavaScript side with. Check
+which eSpeak NG version the model was trained with: output differs between versions for about one text in a
+hundred.
+
+A front end may need a file of its own that is too large to bundle: the German one reads words with a 12 MB
+letter-to-sound model. Such a file is the list entry's `helper`: pinned like the model, downloaded and stored with
+it, deleted with it, and handed to `loadFrontEnd`. It has to be data; code is never downloaded.
+
+A model with an input besides the usual six names it in its list entry (`inputs`), with the value to give it: the
+Austrian model's `accent`. Without that the engine refuses the model, as it refuses any input it does not know.
+
+`pnpm test:smoke` speaks a sentence with every downloadable model that has a front end of its own. It downloads
+each one once (about 21 MB) into `.cache/models/`, verified like in the add-on. The German parity test uses the
+same folder for the letter-to-sound model.
+
+`pnpm test:e2e` makes a second build in `.output/firefox-mv3-e2e` for
+[tests/e2e/models.test.ts](tests/e2e/models.test.ts): the production build with a stand-in model added to the list
+through the `VITE_E2E_MODEL` variable. Nothing else sets that variable.
 
 ## Phonemizer parity
 

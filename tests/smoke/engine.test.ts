@@ -3,15 +3,17 @@
 import * as ort from "onnxruntime-web";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createEngine, type Engine, MAX_TOKENS, NothingToPronounce } from "../../engine/engine.ts";
-import { DEFAULT_OPTIONS, HOP, SAMPLE_RATE, VOICES } from "../../engine/protocol.ts";
-import { readConfig, readGguf, readModel } from "../assets.ts";
+import { loadFrontEnd } from "../../engine/frontends.ts";
+import { BUNDLED } from "../../engine/models.ts";
+import { DEFAULT_OPTIONS, HOP, SAMPLE_RATE } from "../../engine/protocol.ts";
+import { readAsset, readConfig, readModel } from "../assets.ts";
 
 let engine: Engine;
 beforeAll(async () => {
   ort.env.wasm.numThreads = 1;
   engine = await createEngine(ort, {
     model: await readModel(),
-    gguf: await readGguf(),
+    frontEnd: await loadFrontEnd(BUNDLED.frontend, readAsset),
   });
 }, 60_000);
 
@@ -22,7 +24,7 @@ describe("engine", () => {
     const config = await readConfig();
     expect(config.sample_rate).toBe(SAMPLE_RATE);
     expect(config.hop).toBe(HOP);
-    expect(config.voices).toEqual([...VOICES]);
+    expect(config.voices).toEqual([...BUNDLED.voices]);
     expect(config.model.max_tokens).toBeGreaterThanOrEqual(MAX_TOKENS);
   });
 

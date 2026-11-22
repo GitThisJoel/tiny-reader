@@ -12,6 +12,15 @@ import { dirname, join } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 const HF = "https://huggingface.co/n4ze3m/tiny-voca/resolve/1e73262226dbf4ef02e9df277e81aaa1db5ce16c";
 const GH = "https://raw.githubusercontent.com/n4ze3m/tiny-voca/0eea2be213b53ec0b1949c169b80e611544718e1";
+// Text front ends for other languages: code that must ship in the add-on, and its data.
+const PTBR = "https://raw.githubusercontent.com/SemFence/dizione-ptbr-js/8fbb77e579fe684f3afd9cb2a801d0adce8c89cf";
+const VOCINA = "https://raw.githubusercontent.com/OfficinePixel/vocina/8dd17b31b0b6e40ce132105f5d0ea9eb7da98f34";
+// German: apptor's front end, in the repository of its Austrian model, and the German model's description.
+const APPTOR = "https://huggingface.co/apptor/apptor-tiny-tts-at/resolve/e28eb444250b4d06162e6ba8e5090c4284345913";
+const APPTOR_DE = "https://huggingface.co/apptor/apptor-tiny-tts/resolve/0b6962273a1d6618f250cdbd621b56ba04b62cef";
+// Front ends that work from eSpeak NG's output. eSpeak NG itself is built by scripts/build-espeak.sh.
+const SPANISH = "https://raw.githubusercontent.com/stdevMac/tiny-voca/a4bf2bd979fc40b1bd7e34e13c0164db627d14ec";
+const FRENCH = "https://raw.githubusercontent.com/DanielSuncost/tiny-voca-fr/4cc26ab23d934e3d33796eb06bf11f23f4c9ab34";
 
 export interface Asset {
   url: string;
@@ -28,6 +37,12 @@ const hf = (file: string, path: string, sha256: string): Asset => ({
 const js = (file: string, sha256: string): Asset => ({
   url: `${GH}/js/${file}`,
   path: `vendor/tiny-voca/js/${file}`,
+  sha256,
+});
+
+const from = (base: string, file: string, path: string, sha256: string): Asset => ({
+  url: `${base}/${file}`,
+  path,
   sha256,
 });
 
@@ -56,7 +71,7 @@ export const ASSETS: Asset[] = [
     "public/assets/licenses/homograph-data.LICENSE.txt",
     "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
   ),
-  // Build- and test-time only.
+  // Build- and test-time, and bundled for its token table, which the Malayalam front end builds on.
   hf("config.json", "vendor/tiny-voca/config.json", "27bcbf322fc428581f0e959be1c141dd7751c61f4fed5eded326e779b215f69c"),
   // Upstream's JS port of the dizione phonemizer, plus the GGUF reader in tiny-voca.js.
   js("tiny-voca.js", "a5d3df367d6af3e97efa837869c2f15d9605e92938f8d7e3a85b6eb4bdb32e8f"),
@@ -72,6 +87,213 @@ export const ASSETS: Asset[] = [
   js("dizione/sentence.js", "aec4bc6114bc888b99f0d09901ce08613935b9e92202e151898727c606b2e02c"),
   js("dizione/symbols.js", "85a45593e4519295262f44ca88fbcb4790c9f992267f90f9cbddfb2776c66dc6"),
   js("dizione/tables.js", "4d4aa615e86ed234df0187a059b36bb9c933f769774af5b426670020b8c2a624"),
+  // Brazilian Portuguese: dizione-ptbr in TypeScript (Apache-2.0) and its lexicon (CC BY 4.0).
+  from(
+    PTBR,
+    "src/engine.ts",
+    "vendor/dizione-ptbr/src/engine.ts",
+    "6424ce6eeb215f90dc7835f37c251aff225a97be8fbe3e1ef5f4a7540d55d9cd",
+  ),
+  from(
+    PTBR,
+    "src/g2p.ts",
+    "vendor/dizione-ptbr/src/g2p.ts",
+    "83fed6dc7414a158b96f323c0be3d6f0cdfa4b838eac35728df431f9f1f9c295",
+  ),
+  from(
+    PTBR,
+    "src/normalize.ts",
+    "vendor/dizione-ptbr/src/normalize.ts",
+    "bcb8b91b5ee3e3232b41387141bc5cbb1a5de01b05f2da359cb7482042444f93",
+  ),
+  from(
+    PTBR,
+    "src/symbols.ts",
+    "vendor/dizione-ptbr/src/symbols.ts",
+    "5189a73aabf3b860fdb9fb89581f701177be771fcca3bfc422a300bdb158d19e",
+  ),
+  from(
+    PTBR,
+    "data/lexicon.tsv",
+    "public/assets/dizione-ptbr/lexicon.tsv",
+    "0bc25b54898d67c07a73567f4bff5438480a24256388b02c6fa8b7c4c8408e80",
+  ),
+  from(
+    PTBR,
+    "data/open_table.json",
+    "public/assets/dizione-ptbr/open_table.json",
+    "a0e71c7d2f4e59c7affa1aebb5241c574f9c7ec0282e81326397a54da46bd9cb",
+  ),
+  from(
+    PTBR,
+    "NOTICE",
+    "public/assets/licenses/dizione-ptbr.NOTICE.txt",
+    "deb714a8b5cb980aac2b88415fc8e49b75d65bc89b3f3f58466872b59a2fd491",
+  ),
+  from(
+    PTBR,
+    "data/LICENSE.mfa-dictionary.md",
+    "public/assets/licenses/dizione-ptbr-lexicon.LICENSE.md",
+    "dc781911ac85edede519a742e56c104199f2b6027ce51b77304e61b1a3ad2517",
+  ),
+  from(
+    PTBR,
+    "test/golden.sample.json",
+    "vendor/dizione-ptbr/test/golden.sample.json",
+    "2519484848ad029cccfc2f9d3149f8ca478908210907cc15d1cb06a2cc294ebc",
+  ), // tests only
+  // Italian: vocina's own converter (Apache-2.0), its data, and its Wiktionary lexicon (CC BY-SA 4.0).
+  from(
+    VOCINA,
+    "g2p_it/g2p_it.js",
+    "vendor/vocina/g2p_it.js",
+    "9a0a5bdd9feddd45d1ed32db2cad2a431a7b3f70b0f5a33bd45d24e934b4c825",
+  ),
+  from(
+    VOCINA,
+    "g2p_it/dati.json",
+    "public/assets/g2p-it/dati.json",
+    "a55faf08a98001f62db30780f593a2bd00cb9acf4cb6fb73a9bd06a4723d0ced",
+  ),
+  from(
+    VOCINA,
+    "g2p_it/lessico_wikizionario.json",
+    "public/assets/g2p-it/lessico_wikizionario.json",
+    "2ac11cdd7d6ad2b001d1719e504f80807cb0b517ab506154744111257d987f39",
+  ),
+  from(
+    VOCINA,
+    "NOTICE",
+    "public/assets/licenses/vocina.NOTICE.txt",
+    "2c3a05a6d628550a27875dad22463ceedfab25e547cd3740d40dc7c195565520",
+  ),
+  from(
+    VOCINA,
+    "g2p_it/vettori.json",
+    "vendor/vocina/vettori.json",
+    "72a09515c2d6ce3cefabc58a887f740725f2d124317d28b714cfa46290be972c",
+  ), // tests only
+  // Spanish and French: each model's own JavaScript front end (Apache-2.0), fed by eSpeak NG.
+  from(
+    SPANISH,
+    "site/frontend.js",
+    "vendor/tiny-voca-es/frontend.js",
+    "ba9b1ff1608e096d91c8ad2eee39e70a00559f629c29a945a4d01989c4b34c0a",
+  ),
+  from(
+    FRENCH,
+    "web/public/frontend-fr.js",
+    "vendor/tiny-voca-fr/frontend-fr.js",
+    "fb429d3e1fabc9dc1256427dbf8c9a0c597c1e61779bf5217134bfc2f860bf02",
+  ),
+  // German: apptor's JavaScript front end (Apache-2.0) and its tables. Its letter-to-sound model
+  // is downloaded with the German voice (engine/models.ts), not bundled.
+  from(
+    APPTOR,
+    "web/apptor-tts.js",
+    "vendor/apptor/apptor-tts.js",
+    "35e5570304efb3c86a5e2ee5c22c5629f768cdcde6b643b263959a91e5e02bba",
+  ),
+  from(
+    APPTOR,
+    "web/frontend-de.json",
+    "public/assets/g2p-de/frontend-de.json",
+    "d02f049df4da463bff99b6dd0d626d8a792aaef380e97595c137b2a67cb10300",
+  ),
+  from(
+    APPTOR,
+    "web/exceptions-de.json",
+    "public/assets/g2p-de/exceptions-de.json",
+    "3c954207d913c749f9a970b5aed9310968ea96225782ed6e2c66c11df4bc0994",
+  ),
+  from(
+    APPTOR,
+    "apptor-g2p-de.json",
+    "public/assets/g2p-de/apptor-g2p-de.json",
+    "82759d03b9ff4ae01112a470bb4b34960b3471187a3dd6060292c4fc232fd6d5",
+  ),
+  from(
+    APPTOR,
+    "web/austrian-de.json",
+    "public/assets/g2p-de/austrian-de.json",
+    "8a05f0ec8a9f317e842a1e8402f37d5743385f3a6d7a6f69c1e05b07f4c1b40d",
+  ),
+  from(
+    APPTOR,
+    "apptor-tiny-tts-at.json",
+    "vendor/apptor/model-at.json",
+    "d5f41153ab87dfc8ecf151294b168cda82e7179739cb7c95d2e5d4bf39c02f12",
+  ), // tests only
+  from(
+    APPTOR_DE,
+    "apptor-tiny-tts-de.json",
+    "vendor/apptor/model.json",
+    "50835666366dafb41e8d865deba76405e76523623df85cf24329e5e7fb9401c8",
+  ), // tests only
+  // Bengali: the tables of tiny-swara's front end (Apache-2.0). The code that uses them is this
+  // repository's port of tiny-voca's text.py (engine/espeak-text.ts).
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "inventory.json",
+    "vendor/tiny-swara/inventory.json",
+    "ac19dcd4fbd16daa9d6a446ebc99ee560c554072cf4d6f124479da12beb2f34e",
+  ),
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "lexicon.json",
+    "vendor/tiny-swara/lexicon.json",
+    "68f02681f0515d645a4443ca2e79953428e9084f28df3fae7e945c2668e86e1b",
+  ),
+  from(
+    "https://huggingface.co/Xeven7/tiny-swara/resolve/9432a340c46249c8acae4ff4b062d46b9cbd1991",
+    "config.json",
+    "vendor/tiny-swara/model.json",
+    "874e6125e316306b8d6cd45ad2829bbdb1f2f0db16159b0f93f3881353bd1835",
+  ),
+  // Malayalam: the model's table of which token slot each sound takes (Apache-2.0).
+  from(
+    "https://huggingface.co/Cyrax321/tui-voice-mini-ml/resolve/9c2fee75373d81bbd62fbe2d683b1bad3c4415ea",
+    "vocab_plan.json",
+    "vendor/tui-voice/vocab_plan.json",
+    "9d196209759785e7b6f904091601bbd1442ae8985163bbb266c4bd7379e3e302",
+  ),
+  from(
+    "https://huggingface.co/Cyrax321/tui-voice-mini-ml/resolve/9c2fee75373d81bbd62fbe2d683b1bad3c4415ea",
+    "config.json",
+    "vendor/tui-voice/model.json",
+    "d7f53c54b50b810cfe539e77b4ee5ef9b5e638888943f6f99259c68b359e8ab9",
+  ),
+  // Each model's own description, to test that its symbol table is its front end's.
+  from(
+    "https://huggingface.co/semfence/tiny-voca-ptbr/resolve/f231cbe318c9f972e27fd8dad5d8ebcfb40a672f",
+    "onnx/model.json",
+    "vendor/dizione-ptbr/test/model.json",
+    "0cef74c03aa5b4d705c8ea9810ec71b053da9b33a40925dbdf880ed471120060",
+  ),
+  from(
+    "https://huggingface.co/marcosmaceo/tiny-voca-es/resolve/9898eaef9b245d7a5240156eed919ee1bd2a9b84",
+    "tiny-voca-es.json",
+    "vendor/tiny-voca-es/model.json",
+    "bec46d85ccf80f746f7052c8532c9e74d04c00763831620c47f5442b52afc05f",
+  ),
+  from(
+    "https://huggingface.co/DanielSuncost/tiny-voca-fr/resolve/73f7700f514e70eef3b459aedcc49829d41945d4",
+    "onnx/model.json",
+    "vendor/tiny-voca-fr/model.json",
+    "b36144a5aeefc07a1ed94d40d20f9bf8514d962236ffd3dee39f0be8a6d9c459",
+  ),
+  from(
+    "https://huggingface.co/erkint/zerre-tts/resolve/55753a04ae624998cba86f7c17625616e318124e",
+    "onnx/model.json",
+    "vendor/zerre-tts/model.json",
+    "5a9a96dd4f58cd79e3a0d5f3663885e31465689a05f03ede4ce7c8710b1caa78",
+  ),
+  from(
+    "https://github.com/OfficinePixel/vocina/releases/download/v1.0",
+    "vocina.json",
+    "vendor/vocina/model.json",
+    "2f07dbe350d2fdc891126d4847fe251e7ab48d04c3d87836123030d5a3e1a3f8",
+  ),
 ];
 
 export const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");

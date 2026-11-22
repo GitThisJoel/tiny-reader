@@ -5,7 +5,8 @@ tested with code unless marked **(unverified)**. It explains choices that look o
 the background page, why PDFs get a page of their own, why Firefox 140.
 
 Checked 2026-11-19 to 2026-11-21 with Node 22.22.1, Firefox 158.0.1 (Linux x86-64, headless), onnxruntime-web 1.31.1
-and pdf.js 6.5.438. Nothing in the automated runs was listened to.
+and pdf.js 6.5.438. Nothing in the automated runs was listened to. On 2026-11-22 the project's owner
+listened to every downloadable model of §13 and §14 in the add-on and found each to sound and work well.
 
 Pinned sources:
 
@@ -275,3 +276,283 @@ size becomes a goal, upstream's block-scaled Q8 weights are the better route and
   shortcut's `<key>` element, which fails unless that exact shortcut is registered.
 - `web-ext lint`: no errors, four accepted warnings. One is that `strict_min_version` 140 predates Firefox for
   Android 142 (the add-on is desktop only); three are inside ONNX Runtime and pdf.js.
+
+## 13. Extra voices
+
+Other models of the tiny-voca family can be downloaded from a list kept in the add-on
+([engine/models.ts](../engine/models.ts)). The bundled model stays in every release.
+
+**Which models**
+
+- A model can be listed only if it works with the engine and the bundled English phonemizer unchanged: the same
+  token table, the inputs and outputs of §1, 24 kHz. Text-to-phoneme code for another language would have to ship
+  inside the add-on; it cannot be downloaded, because that would be remote code.
+- A check on 2026-11-21 of the 34 community models linked from the tiny-voca README found two that qualify, both
+  Apache-2.0 and both a 21 MB float32 ONNX file. Through `createEngine` under Node each gave finite audio and 14 word
+  timings for a test sentence.
+
+  | Model                     | Voices | Hugging Face revision                      | `onnx/model.onnx`                     |
+  | ------------------------- | ------ | ------------------------------------------ | ------------------------------------- |
+  | `PatnaikAshish/SobbieTTS` | F, M   | `6b6132c6d34b5fc163d8f5553580678a60532ac3` | 21,386,372 bytes, SHA-256 `eafb38b7…` |
+  | `cfahlgren1/fiato`        | F1, M1 | `967de50b6a9ab673ef7de9f8f276fa93a8c0db81` | 21,388,682 bytes, SHA-256 `179df2e1…` |
+
+- SobbieTTS has the original's token table. fiato has the same 76 tokens at the same ids plus three more (sigh,
+  exhale, gasp) that the phonemizer never emits, so those sounds are not used.
+- **`phonemizer.fingerprint` in a model's `config.json` cannot be trusted**: one model claimed the original's
+  fingerprint with a different token table. Models are admitted by comparing the table itself.
+- **Each list entry names the text front end it needs** (`frontend`), and the list in this repository is the
+  authority for it, for the reason above. The engine sets up the front end by that name and refuses a model whose
+  front end it does not have, before loading the file; the bundled model then reads, with the notice described
+  below. The front ends there are, and the languages they brought, are in §14.
+- What that leaves open for another language: a front end's **code** must ship in the add-on (no remote code), so a
+  new language is a new release with its front end and list entries that name it. A front end's **data**, such as a
+  pronunciation dictionary, is data like model weights and could be downloaded the same way. That is not built:
+  the lexicons of §14 are in the package.
+- The sizes and SHA-256 values are the ones Hugging Face publishes for the files
+  (`https://huggingface.co/api/models/<repo>?blobs=true`); a download of SobbieTTS from Firefox hashed to the same.
+
+**Is a download allowed?** Mozilla's Add-on Policies (last updated 2026-10-20) and the revision announced for
+2026-12-01 say the same in "Development Practices": "Add-ons must be self-contained and not load remote code for
+execution", and "Add-ons must use encryption when transporting data remotely." About other files: "If external
+resources are used in combination with add-on code, the functionality of the code must not be obscured." Nothing
+forbids fetching data. Model weights are data: ONNX Runtime, which is in the package, reads them, and no script or
+wasm is fetched. The policy does not define "remote code", so a reviewer has the last word **(unverified: not
+submitted yet)**. The request is `https`, started by a click, and described in the README.
+
+**The request**
+
+- `https://huggingface.co/<repo>/resolve/<revision>/onnx/model.onnx` answers `302` to a signed address on
+  `us.aws.cdn.hf.co`. Both answers carry CORS headers, so **the download works from an add-on page with no host
+  permission at all** (21 MB in 1.5 s on the test connection).
+- **The permission is asked for anyway, because of one header.** Measured with a local server: without host access
+  Firefox sends `Origin: moz-extension://<uuid>` on the first request, and that uuid is made up per installation,
+  so it would tell one user's downloads apart. With host access to the first host there is no `Origin` header; the
+  redirected request carries `Origin: null` either way. `credentials: "omit"` keeps cookies out. An end-to-end test
+  checks that the request has no `Cookie`, `Authorization`, `Origin` or `Referer`.
+- The access is requested in the click on Download and removed when that download ends, unless it was held before
+  (granted earlier for a PDF on that site). Firefox's prompt reads "Access your data for sites in huggingface.co
+  domains". Verified by clicking through the real prompt: accepted and refused in the settings page opened in a
+  tab, and accepted where it is embedded in `about:addons`, with a real download from Hugging Face.
+- **Not in the toolbar popup.** A popup closes when it loses focus, which a permission prompt causes, and a
+  download would die with it. The popup offers the downloaded models and a link to the settings.
+
+**Verifying and storing**
+
+- A download is kept in memory, never more than the size the list pins, and stored only if its length and SHA-256
+  match. Tested end to end with a file that has one byte changed: nothing is stored.
+- **Storage: IndexedDB.** Tried with a throwaway add-on, writing 21 MB in a page and reading it elsewhere:
+
+  | Storage                                 | Add-on page | Background page | Worker started by it |
+  | --------------------------------------- | ----------- | --------------- | -------------------- |
+  | IndexedDB, as a `Blob`                  | works       | works           | works, read in 36 ms |
+  | IndexedDB, as an `ArrayBuffer`          | works       | works           | works                |
+  | OPFS (`navigator.storage.getDirectory`) | works       | works           | works                |
+
+  Both would do. IndexedDB was taken: the same few lines in the page and in the Worker, and a `Blob` is kept as a
+  file by Firefox. `storage.local` is not meant for 21 MB values.
+- `navigator.storage.persisted()` is false, so Firefox may evict the models when the disk is short. `unlimitedStorage`
+  would prevent that and was not added: it is one more permission, and a model that is gone is handled.
+
+**Using a model**
+
+- The model's id travels with every request (`SynthOptions.model`). The Worker has no `browser.storage`, and this
+  way a change of model needs no other message.
+- Before a model is used, its inputs and outputs are compared with §1, by name and type
+  (`InferenceSession.inputMetadata`). A stand-in model with one input renamed is refused.
+- **Fallback.** A model that is not in storage, cannot be loaded, or needs a front end the build lacks is replaced by
+  the bundled one, and every
+  result made that way carries a notice that the control bar shows. A missing file is looked for again with each
+  sentence (cheap), so a model downloaded again is used at once; a file that failed to load is not tried again
+  until the Worker restarts. The settings form offers only models that are in storage, and deleting the chosen
+  model chooses the bundled one.
+- One model is in memory at a time; switching releases the session first. In Firefox, the test sentence came out as
+  2.57 s of audio with SobbieTTS and 2.94 s with fiato, 9 word timings each.
+
+**Testing.** No test file can pass for a listed model, since each is pinned to a hash. The end-to-end test
+([tests/e2e/models.test.ts](../tests/e2e/models.test.ts)) therefore makes a second production build with one more
+list entry, given in `VITE_E2E_MODEL`: a 687-byte ONNX file with the right inputs and outputs, written out by hand
+([tests/stand-in-model.ts](../tests/stand-in-model.ts)) and served by the local test site. The normal build has no
+trace of it.
+
+## 14. Other languages
+
+**Survey.** The 32 non-English models linked from the tiny-voca README (2026-11-21) were looked at: page, files,
+licence, and where there is an ONNX file, its interface.
+
+- **The models fit.** 19 ONNX files were run through the engine's input and output check and one synthesis: 17 have
+  exactly the interface of §1, at 24 kHz, with `sum(durations) * 256 === samples`. The exceptions are an Austrian
+  German model with an extra `accent` input and a Sanskrit one with `weight` in place of `stress`.
+- **The front ends mostly do not.** A front end's code has to ship in the add-on, as dependency-free JavaScript with
+  no `eval`. Most projects use the eSpeak NG program (GPL-3.0, natively or as wasm), Python under Pyodide, or a
+  large helper model. Some have no licence, weights under a non-commercial licence, no ONNX file, or no published
+  front end.
+- Two had what is needed as they were and were added first; two more followed with eSpeak NG (below).
+
+| Language             | Model                                   | Front end                                           | Its data in the package                                  |
+| -------------------- | --------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| Brazilian Portuguese | `semfence/tiny-voca-ptbr`, CC BY 4.0    | `SemFence/dizione-ptbr-js` at `8fbb77e`, Apache-2.0 | lexicon 0.9 MB (CC BY 4.0, from the MFA dictionary)      |
+| Italian              | `OfficinePixel/vocina` v1.0, Apache-2.0 | vocina's `g2p_it.js` at `8dd17b3`, Apache-2.0       | 32 kB of rules, Wiktionary lexicon 0.5 MB (CC BY-SA 4.0) |
+
+**What was checked for the two**
+
+- **Against each project's own reference.** Italian: all of vocina's test vectors without optional readings give
+  the Python reference's ids and stress, and the released model's symbol table gives the same ids. Portuguese: 333
+  of the 341 sample sentences and edge cases agree, four of them texts with nothing to say. Seven that differ
+  contain loanwords or spelled-out acronyms, whose pronunciation the port's last commit changed after the sample
+  was recorded; one has accents stored as separate marks (below).
+- **Through the engine**, with the real models under Node and in Firefox after a download through the settings
+  page: finite audio (6.2 s for "Oi, tudo bem? Paguei R$ 15,50 às 10h30.", 3.1 s for "L'amico arriva alle 14:35,
+  poi parte."), every source word timed, "R$ 15,50" and "14:35" as one span over their expansion.
+- **Accents as separate marks.** Text from a PDF often stores "ã" as "a" and a combining mark. The Portuguese
+  reference then reads "mãe" as "mai". The engine composes the text (NFC) before these two front ends, and the word
+  alignment compares composed words.
+
+**How a front end fits in**
+
+- A front end is a function from text to token ids, stress and the token range of each spoken word
+  (`loadFrontEnd` in [engine/frontends.ts](../engine/frontends.ts)). The Worker sets one up the first time a model
+  names it and keeps it.
+- **Word timing without help from the front end.** Neither new front end says which tokens belong to which word.
+  Both put a pause token or a mark between words, so each run of phones is one spoken word. The words' texts are
+  the words of the front end's own rewritten text ("15,50" already "quinze reais e cinquenta centavos"). When the
+  two counts differ the words are dropped, and only the sentence is highlighted; over 95 % of the reference
+  sentences get their words.
+- The TypeScript front end is reached through an alias given to Vite alone, with hand-written types: `tsc` would
+  otherwise check its sources against this repository's stricter settings.
+- The reader follows the model's language: the bar's warning compares the detected language with the model's, and
+  "only reads English" became "only reads" the model's language. Sentence splitting still uses the English
+  abbreviation list for every language.
+- Size: the package grew from 46.2 MB to 47.8 MB, almost all of it the two lexicons; the Worker script from 148 kB to
+  175 kB.
+
+**The Italian model is on GitHub Releases**, which sends no CORS headers on either hop. The download therefore
+needs host access to `github.com` and to `release-assets.githubusercontent.com`, where it redirects; both are
+requested in the one prompt and given back after the download, like `huggingface.co` (§13). If GitHub moves its
+release files to another host the download will fail until the list is updated. A release tag can be moved, so the
+SHA-256 is what pins the file.
+
+**eSpeak NG.** Most community models were trained on phonemes from the eSpeak NG program. It is now part of the
+add-on, as WebAssembly, and brought European Spanish (`marcosmaceo/tiny-voca-es`) and French
+(`DanielSuncost/tiny-voca-fr`).
+
+- **Licence.** eSpeak NG and its data are GPL-3.0-or-later, so Tiny Reader changed from Apache-2.0 to
+  GPL-3.0-or-later before its first release. Everything else in the package can be carried under it (Apache-2.0,
+  MIT, BSD; the two lexicons are data files under their own Creative Commons licences).
+- **The build.** No npm package wraps a tagged eSpeak NG release verifiably, so
+  [scripts/build-espeak.sh](../scripts/build-espeak.sh) builds tag 1.52.0 (commit `4870adf`) in an emscripten 4.0.10
+  container pinned by digest, adapted from `stdevMac/tiny-voca`. It takes about a minute. Two builds on this machine
+  were identical byte for byte, and the script refuses to install a build that differs from the recorded hashes
+  (`scripts/espeak.sha256`; CI checks its cached copy against the same file). Shipped: 64 kB of loader
+  (bundled into the Worker script), 362 kB of wasm, and 498 kB of data for Spanish, French and English.
+- **In the add-on.** The loader has no `eval`, and the wasm runs in the engine Worker under the extension CSP
+  (`'wasm-unsafe-eval'`, already there for ONNX Runtime). `web-ext lint` reports nothing new. Verified in Firefox:
+  both models downloaded through the settings page and spoke.
+- **Each language has its own code around eSpeak NG**: the model's own JavaScript port of tiny-voca's `text.py`
+  (normalising, cutting at punctuation, mapping eSpeak's IPA to the model's tokens), fetched at a pinned commit.
+- **Checked against each project's Python front end**, run with a native eSpeak NG built from the same source:
+  identical ids and stress for all 50 Spanish and all 50 French sentences in
+  [tests/parity/espeak-sentences.json](../tests/parity/espeak-sentences.json), and the models' symbol tables match.
+- **The eSpeak NG version matters.** The Spanish model was trained with 1.52.0, the version built here. **The
+  French model's version is not stated anywhere** in its repository; other projects measured 0.5 to 1.2 % of texts
+  differing between 1.51 and 1.52. If it was 1.51, a few words are said with other phonemes than the model
+  learned **(unverified)**.
+- **Word timing.** eSpeak NG gives phonemes, not the words it read ("15" comes back as the sounds of "quince").
+  For each piece of text between two marks, if eSpeak NG spoke as many words as the piece has between spaces, they
+  are matched one for one; otherwise the piece is one span. In the reference sentences, which are heavy with
+  numbers and dates, 79 % of the Spanish spoken words are matched to a word.
+- **Other scripts.** Measured with the Spanish voice: eSpeak NG names the letters of Cyrillic, Arabic and Japanese
+  text ("cirílico …", "árabe …", "japonés símbolo"), so these two front ends do not report "nothing to pronounce"
+  for it. Greek and Devanagari come out empty: eSpeak NG switches to Greek or Hindi for them, whose dictionaries
+  are not packed, so such words are skipped (a Greek word inside a Spanish sentence is left out, a Greek sentence
+  is "nothing to pronounce"). The same holds for every script eSpeak NG reads through a language of its own. A
+  full eSpeak NG, as the models were trained with, would read them in that language; packing every dictionary to
+  match is tens of megabytes for text these models never learned. **Unverified:** what the models do with either.
+- Size after Spanish and French: the package 48.7 MB, the Worker script 232 kB.
+
+**German** (`apptor/apptor-tiny-tts`) needs no eSpeak NG: its makers trained a letter-to-sound model on eSpeak
+NG's readings and wrote the front end in JavaScript.
+
+- **A second downloaded file.** That model is 12.4 MB, too much to bundle for one language, and it is data. A list
+  entry can therefore name a `helper`: pinned like the model, downloaded before it, and stored and deleted with it
+  in one IndexedDB transaction each, so a download that fails or is interrupted leaves nothing behind. The Worker
+  keeps the front end of the model loaded last and lets another one go: the letter-to-sound model is not held in
+  memory beside a model that has no use for it.
+- **A second session in the Worker**, and an asynchronous front end. The engine cuts long text with a synchronous
+  test, so a piece not phonemized yet counts as short enough, is phonemized after the pass, and the cutting is
+  repeated until nothing is new.
+- **Checked against the Python front end** (`pnpm german-fixtures`, in a pinned Python container with onnxruntime
+  1.32.0): identical ids and stress for all 60 sentences in
+  [tests/parity/german-sentences.json](../tests/parity/german-sentences.json), though one side runs the
+  letter-to-sound model natively and the other as wasm. Every spoken word is named, numbers included, because
+  this front end reads word by word.
+- In Firefox: both files downloaded through the settings page (stored as `apptor-de` and `apptor-de/helper`; the
+  helper's key has changed since, see the Austrian model below), and
+  "Hallo, der Zug fährt um 14:35 Uhr ab." came out as 2.8 s with all eight words timed.
+- **Used: the makers' tail trim.** Their page runs every piece of audio through `trimTail`: the Austrian style
+  learned a breathy noise after the last sound from its recordings (after a final "p" it sounds like an "f"), so
+  the audio is cut 40 ms after the last 10 ms frame within 30 dB of the loudest, with a fade. The function is in
+  the front end file that is bundled anyway; the Austrian entry asks for it (`trimTail`), and a word's time never
+  ends after the audio does. The standard German model's own repository has no such step and is left as it was.
+- **Not used: the Vocos sound filter.** The makers add a second stage (16.7 MB) that re-synthesises the audio and
+  say that without it the voice is "noticeably buzzy". Tiny Reader plays the model's own output.
+
+**Austrian German** (`apptor/apptor-tiny-tts-at`) is the German model with an accent, added after the others.
+
+- **Same table, same front end, same helper.** Its symbols are the German model's, the Python front end in its
+  repository is file for file the German one, and its letter-to-sound model has the same SHA-256.
+- **One more input.** The model takes `accent` (0 standard German, 1.0 Austrian, 1.6 the most its makers call
+  usable). The engine refuses a model with an input it does not feed, so a list entry can now name further inputs
+  and the value for each (`inputs`). Tiny Reader gives 1.0, the makers' default; there is no setting for it.
+- **Austrian readings.** The makers switch a short list of readings on when the accent is 0.5 or more ("Kaffee",
+  "Chemie", final "-ig", voiceless "s"). The German front end does the same from the `accent` its model is given,
+  so the readings and the accent have one source. It changes 40 of the 60 test sentences.
+  Both variants match the Python front end on all 60.
+- **Two voices, not three.** The model lists a third, "AT". It is the slot that holds the accent's style, and the
+  makers' own code leaves it out of the voices.
+- In Firefox: model and helper downloaded through the settings page, and both voices spoke a sentence with all
+  eight words timed. The makers call this version an early preview with a mild accent.
+- **One copy of the helper.** The file is stored under its SHA-256 (`helper/<hash>`), not under a model's id, so
+  a user who has both German models keeps the 12 MB once. Deleting a model deletes the helper only when no other
+  model in storage needs it, in the same transaction. Each download still fetches the file, so that it is
+  verified and never trusted from storage; the second one writes the same bytes over the first.
+
+**Turkish, Bengali and Malayalam** came with no JavaScript front end, only Python. Their front ends are ported
+here, which the first six languages did not need.
+
+- **Turkish** (`erkint/zerre-tts`) and **Bengali** (`Xeven7/tiny-swara`) use tiny-voca's own `text.py` with other
+  tables. [engine/espeak-text.ts](../engine/espeak-text.ts) is one port of it, with a profile per language. Bengali
+  adds a word list: an English word it knows is read from its Bengali spelling, any other by eSpeak NG's American
+  English voice, so that front end runs two voices.
+- **Malayalam** (`Cyrax321/tui-voice-mini-ml`) has a front end of its makers' own. The model keeps the English
+  model's 76 token slots and gives those Malayalam has no use for to Malayalam sounds;
+  [engine/malayalam.ts](../engine/malayalam.ts) ports that mapping. It uses no stress, and its makers run it with
+  the pitch raised by 0.15 and the pitch range at 0.85, which a list entry can now carry (`tuning`; the sliders
+  work from there and stop at the engine's limits). The model has two voice slots; its makers name data for one,
+  and only that one is offered. Text is cleaned as their training text was (`normalize` of their `text.py`). Two
+  things go beyond their code, because they left sentences with digits or Latin letters out of the training and a
+  web page has both: a mark between two digits stays in its number, and eSpeak NG's "(en)" marks around a Latin
+  word are taken out. **Unverified:** how the model sounds on numbers and Latin words.
+- **A port is held to the Python it came from**: identical ids and stress for 50 Turkish, 50 Bengali and 24
+  Malayalam sentences (the makers' 22 example prompts and two with the marks their clean-up rewrites), from the
+  same fixture run as Spanish and French.
+- **The published fingerprint checks the tables.** A model's `frontend_fingerprint` is a hash of its symbols and
+  fallback table. The Turkish profile reproduces the model's. The Bengali one reproduces what tiny-swara's own
+  `text.py` computes from its published tables, but **the model's description carries another fingerprint**: its
+  fallback table for foreign sounds changed after the release. The symbols agree.
+- **eSpeak NG versions.** zerre-tts's tables mention 1.52; tiny-swara says "1.5x"; tui-voice says nothing. None is
+  pinned, so the caution about French applies to all three **(unverified)**.
+- **Firefox's word segmenter says `isWordLike: false` for a word that ends in a combining mark**, which is most
+  Bengali and Malayalam words (Node says true). Word timing lost those words in Firefox only. A segment now counts
+  as a word when it has a letter or a digit.
+- The Malayalam project is inconsistent in places: its API example calls functions its code does not have. What is
+  ported is the path its training script and `speak.py` take. Its makers call the model experimental. Its GitHub
+  repository states Apache-2.0 in the README but has no licence file.
+- The Bengali voice came out quiet in the checks (peak 0.2 to 0.3 where the others reach 0.8).
+- In Firefox: all three downloaded through the settings page and spoke, every word of the test sentences timed.
+- eSpeak NG's data pack is now 569 kB (Spanish, French, Turkish, Bengali, Malayalam, English); the package is
+  48.9 MB, the Worker script 266 kB.
+
+**What is left of the survey.** A second Italian and a second Brazilian Portuguese model were trained on eSpeak NG
+1.51, not the version built, and their languages are covered. Russian, Polish, Japanese, Arabic, Hebrew, Korean,
+Urdu, Greek, Hindi, Swahili, Kurdish and Sanskrit stay out for the reasons at the top of this section: licences of
+the models themselves, missing ONNX files, missing front ends, or input the reader cannot supply.

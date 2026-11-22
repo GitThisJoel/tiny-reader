@@ -1,6 +1,9 @@
+import { trimTail } from "apptor/apptor-tts.js";
 import type * as Ort from "onnxruntime-web";
 import { alignWords } from "./align.ts";
-import { loadPhonemizer, type Phonemes, phonemize } from "./phonemizer.ts";
+import type { FrontEnd } from "./frontends.ts";
+import { checkIo } from "./models.ts";
+import type { Phonemes } from "./phonemizer.ts";
 import { HOP, SAMPLE_RATE, type SynthOptions, type Utterance, type WordTiming } from "./protocol.ts";
 import { finished, normalize, splitLong } from "./text.ts";
 
@@ -13,8 +16,9 @@ export const MAX_TOKENS = 200;
 const PEAK = 0.99;
 
 export class NothingToPronounce extends Error {
-  constructor() {
-    super("Nothing to pronounce. tiny-voca only reads English.");
+  /** `why`: which language the model reads, for the user. */
+  constructor(why = "") {
+    super(`Nothing to pronounce.${why && ` ${why}.`}`);
   }
 }
 
@@ -22,20 +26,47 @@ export type { Utterance };
 
 export interface Engine {
   /** Resolves to null when `signal` aborts before the audio is complete. */
-  speak(text: string, options: SynthOptions, signal?: AbortSignal): Promise<Utterance | null>;
+  speak(text: string, options: Omit<SynthOptions, "model">, signal?: AbortSignal): Promise<Utterance | null>;
+  /** Frees the model's memory. The engine cannot be used afterwards. */
+  release(): Promise<void>;
 }
 
 type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
 
-export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; gguf: ArrayBuffer }): Promise<Engine> {
-  const [session, phonemizer] = await Promise.all([
-    ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] }),
-    loadPhonemizer(assets.gguf),
-  ]);
+/**
+ * `frontEnd` is the text front end the model was trained with (engine/frontends.ts). `inputs` are
+ * the inputs the model has besides the usual six, with the value to give each.
+ * Rejects with a ModelError when the file's inputs and outputs are not what that makes a model's.
+ */
+export async function createEngine(
+  ort: OrtModule,
+  assets: {
+    model: Uint8Array;
+    frontEnd: FrontEnd | Promise<FrontEnd>;
+    inputs?: Readonly<Record<string, number>>;
+    trimTail?: boolean;
+  },
+): Promise<Engine> {
+  // A front end still being set up is waited for while the model loads. If either cannot be used, the model is let go.
+  const loading = Promise.resolve(assets.frontEnd);
+  loading.catch(() => {}); // reported below
+  const session = await ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] });
+  const more = Object.entries(assets.inputs ?? {});
+  let frontEnd: FrontEnd;
+  try {
+    checkIo(
+      session,
+      more.map(([name]) => name),
+    );
+    frontEnd = await loading;
+  } catch (error) {
+    await session.release();
+    throw error;
+  }
   const int64 = (values: number[]) => new ort.Tensor("int64", BigInt64Array.from(values, BigInt), [1, values.length]);
   const float = (value: number) => new ort.Tensor("float32", Float32Array.of(value), [1]);
 
-  async function synthesize(phonemes: Phonemes, options: SynthOptions) {
+  async function synthesize(phonemes: Phonemes, options: Omit<SynthOptions, "model">) {
     const output = await session.run({
       tokens: int64(phonemes.ids),
       stress: int64(phonemes.stress),
@@ -43,6 +74,7 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
       speed: float(options.speed),
       pitch_shift: float(options.pitchShift),
       pitch_range: float(options.pitchRange),
+      ...Object.fromEntries(more.map(([name, value]) => [name, float(value)])),
     });
     const pcm = output.audio?.data;
     const durations = output.durations?.data;
@@ -59,11 +91,23 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
     async speak(text, options, signal) {
       // Phonemizing each candidate piece once: the result is reused for synthesis.
       const cache = new Map<string, Phonemes | null>();
-      const phonemesOf = (piece: string) => {
-        if (!cache.has(piece)) cache.set(piece, phonemize(phonemizer, finished(piece)));
-        return cache.get(piece) ?? null;
-      };
-      const pieces = splitLong(normalize(text), (piece) => (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS);
+      const phonemesOf = (piece: string) => cache.get(piece) ?? null;
+      // A front end may take its time (the German one runs a model of its own), and the cutting
+      // is synchronous. So a piece not phonemized yet is taken as short enough, phonemized after
+      // the pass, and the cutting is done again until it meets nothing new.
+      let pieces: ReturnType<typeof splitLong>;
+      for (;;) {
+        const unknown = new Set<string>();
+        pieces = splitLong(normalize(text), (piece) => {
+          if (!cache.has(piece)) unknown.add(piece);
+          return (phonemesOf(piece)?.ids.length ?? 0) > MAX_TOKENS;
+        });
+        if (!unknown.size) break;
+        for (const piece of unknown) {
+          if (signal?.aborted) return null;
+          cache.set(piece, await frontEnd(finished(piece)));
+        }
+      }
 
       const chunks: Float32Array[] = [];
       const words: WordTiming[] = [];
@@ -72,13 +116,15 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
         const phonemes = phonemesOf(piece.text);
         if (!phonemes) continue;
         if (signal?.aborted) return null;
-        const { pcm, durations } = await synthesize(phonemes, options);
+        const { pcm: said, durations } = await synthesize(phonemes, options);
+        // What is cut is after the last sound; a word's time is never past the end of what is left.
+        const pcm = assets.trimTail ? trimTail(said, SAMPLE_RATE) : said;
         // Token start times: cumulative frames, HOP samples each.
         const starts = new Float64Array(durations.length + 1);
         durations.forEach((frames, i) => {
           starts[i + 1] = (starts[i] ?? 0) + Number(frames);
         });
-        const seconds = (token: number) => (samples + (starts[token] ?? 0) * HOP) / SAMPLE_RATE;
+        const seconds = (token: number) => (samples + Math.min((starts[token] ?? 0) * HOP, pcm.length)) / SAMPLE_RATE;
         const spoken = phonemes.words.map((word) => ({
           text: word.text,
           start: seconds(word.tokenStart),
@@ -109,5 +155,6 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
       }
       return { pcm, sampleRate: SAMPLE_RATE, words };
     },
+    release: () => session.release(),
   };
 }
