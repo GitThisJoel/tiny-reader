@@ -1,11 +1,24 @@
 # Tiny Reader
 
-Firefox add-on (Manifest V3, TypeScript, WXT) that reads pages and PDFs aloud. Commands and conventions are in
-CONTRIBUTING.md, the design in docs/ARCHITECTURE.md, the reasons behind it in docs/FINDINGS.md.
+Firefox add-on (Manifest V3, TypeScript, WXT) that reads pages and PDFs aloud: in English with the model it ships,
+and in eight more languages with models the user downloads. Commands and conventions are in CONTRIBUTING.md, the
+design in docs/ARCHITECTURE.md, the reasons behind it in docs/FINDINGS.md.
 
 - Where `pnpm` is not installed, run it as `npx -y pnpm@12.21.0 <command>`.
+- Setup: `pnpm install`, `pnpm fetch-assets`, then `pnpm build-espeak`, which needs Docker and is needed again only
+  when `scripts/build-espeak.sh` changes.
 - Before committing: `pnpm lint`, `pnpm typecheck` and `pnpm test`. For anything that runs in the browser, also
-  `pnpm build` and then `pnpm test:e2e`.
+  `pnpm build` and then `pnpm test:e2e`. For a text front end or the list of models, also `pnpm test:parity` and
+  `pnpm test:smoke`.
 - Work on a branch, never on `main`. Commit messages are `type(scope): subject`.
-- These must hold: no remote code, no new network requests, no new permissions, and nothing added to a web page but
-  the control bar's one host element.
+- The licence is GPL-3.0-or-later, because eSpeak NG is part of the add-on. Anything added has to be compatible with
+  it and credited in THIRD-PARTY-NOTICES.md.
+- These must hold:
+  - No remote code. Everything that runs is in the package. What is downloaded is data: voice models, and a file a
+    model's front end needs. Only files listed in `engine/models.ts`, each pinned to a SHA-256 and stored only if
+    it matches.
+  - No network request but the two kinds the user starts: a PDF from the web, and a model from that list. No new
+    kind.
+  - No new permission at install. Access to a site is asked for in the click that needs it; for a model download it
+    is given back when the download ends.
+  - Nothing added to a web page but the control bar's one host element.
