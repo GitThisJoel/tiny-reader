@@ -57,8 +57,8 @@ pnpm test:e2e
 pnpm lint:ext
 ```
 
-`pnpm build-espeak` must end with "identical to the recorded build". If it says the build differs, stop and report
-it: the reviewer's rebuild would differ too.
+`pnpm build-espeak` fails when what it built is not the recorded build (`scripts/espeak.sha256`). If it does, stop
+and report it: the reviewer's rebuild would differ too. Never pass `--allow-different` for a release.
 
 `pnpm lint:ext` must report 0 errors. Four warnings are known and accepted (they are listed in CONTRIBUTING.md); a
 new one needs explaining to the reviewer.
@@ -120,6 +120,7 @@ Tell the user:
 - the release notes, to paste into the form;
 - anything a reviewer will ask about that is new in this version: a new permission, a new bundled library, a new
   linter warning, a new model or host in the list of downloads;
+- that the reviewer needs Docker to rebuild the add-on, for `pnpm build-espeak`: say so in the notes to the reviewer;
 - the choices on the form that stay the same: Firefox for desktop only, licence GPL-3.0-or-later, no data collected;
 - the link to the GitHub release;
 - for the first release: once Mozilla has listed the add-on, the README's "Trying it" still says it is not on
