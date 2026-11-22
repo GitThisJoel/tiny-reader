@@ -30,14 +30,15 @@ export default defineUnlistedScript(() => {
   ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
   const frontEnd = keepLast((model) =>
-    loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)) }),
+    loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)), inputs: model.inputs }),
   );
 
   const load = createLoader({
     bundled: async () => new Uint8Array(await asset("/assets/model.onnx")),
     stored: readModel,
     // The front end and the model load together. A model whose front end this build lacks is refused.
-    create: (file, model) => createEngine(ort, { frontEnd: frontEnd(model), model: file, inputs: model.inputs }),
+    create: (file, model) =>
+      createEngine(ort, { frontEnd: frontEnd(model), model: file, inputs: model.inputs, trimTail: model.trimTail }),
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 

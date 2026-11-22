@@ -1,3 +1,4 @@
+import { trimTail } from "apptor/apptor-tts.js";
 import type * as Ort from "onnxruntime-web";
 import { alignWords } from "./align.ts";
 import type { FrontEnd } from "./frontends.ts";
@@ -39,7 +40,12 @@ type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
  */
 export async function createEngine(
   ort: OrtModule,
-  assets: { model: Uint8Array; frontEnd: FrontEnd | Promise<FrontEnd>; inputs?: Readonly<Record<string, number>> },
+  assets: {
+    model: Uint8Array;
+    frontEnd: FrontEnd | Promise<FrontEnd>;
+    inputs?: Readonly<Record<string, number>>;
+    trimTail?: boolean;
+  },
 ): Promise<Engine> {
   // A front end still being set up is waited for while the model loads. If either cannot be used, the model is let go.
   const loading = Promise.resolve(assets.frontEnd);
@@ -110,13 +116,15 @@ export async function createEngine(
         const phonemes = phonemesOf(piece.text);
         if (!phonemes) continue;
         if (signal?.aborted) return null;
-        const { pcm, durations } = await synthesize(phonemes, options);
+        const { pcm: said, durations } = await synthesize(phonemes, options);
+        // What is cut is after the last sound; a word's time is never past the end of what is left.
+        const pcm = assets.trimTail ? trimTail(said, SAMPLE_RATE) : said;
         // Token start times: cumulative frames, HOP samples each.
         const starts = new Float64Array(durations.length + 1);
         durations.forEach((frames, i) => {
           starts[i + 1] = (starts[i] ?? 0) + Number(frames);
         });
-        const seconds = (token: number) => (samples + (starts[token] ?? 0) * HOP) / SAMPLE_RATE;
+        const seconds = (token: number) => (samples + Math.min((starts[token] ?? 0) * HOP, pcm.length)) / SAMPLE_RATE;
         const spoken = phonemes.words.map((word) => ({
           text: word.text,
           start: seconds(word.tokenStart),

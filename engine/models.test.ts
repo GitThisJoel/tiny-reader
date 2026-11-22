@@ -34,7 +34,7 @@ describe("the list of models", () => {
       ["zerre-tts", "tr", "espeak-tr"],
       ["tiny-swara", "bn", "espeak-bn"],
       ["tui-voice-ml", "ml", "espeak-ml"],
-      ["apptor-de-at", "de-AT", "g2p-de-at"],
+      ["apptor-de-at", "de-AT", "g2p-de"],
     ]);
   });
 
@@ -193,6 +193,11 @@ describe("checkIo", () => {
     expect(() =>
       checkIo({ inputMetadata: [...inputs, tensor("accent", "int64")], outputMetadata: outputs }, ["accent"]),
     ).toThrow(ModelError);
+    // Never one of the six every model has: it would take the place of the user's setting.
+    for (const name of ["speed", "pitch_range", "voice"])
+      expect(() => checkIo({ inputMetadata: inputs, outputMetadata: outputs }, [name])).toThrow(
+        `its list entry gives a value for "${name}", which is not a further input`,
+      );
     // The Austrian model is the one entry with such an input.
     expect(MODELS.filter((model) => model.inputs).map((model) => [model.id, model.inputs])).toEqual([
       ["apptor-de-at", { accent: 1 }],

@@ -33,6 +33,8 @@ export interface FrontEndNeeds {
   };
   /** The model's helper file from storage (engine/models.ts), or null when it is not there. */
   helper?: () => Promise<Uint8Array | null>;
+  /** The further inputs the model is given (engine/models.ts). The German front end reads the accent from them. */
+  inputs?: Readonly<Record<string, number>>;
 }
 
 /** Reads a file of the add-on package, by its path from the package root. */
@@ -144,8 +146,8 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
 export function keepLast(load: (model: Model) => Promise<FrontEnd>) {
   let kept: { key: string; loading: Promise<FrontEnd> } | undefined;
   return (model: Model): Promise<FrontEnd> => {
-    // The same front end fed another helper file is another front end.
-    const key = `${model.frontend} ${model.helper?.sha256 ?? ""}`;
+    // The same front end fed another helper file, or set up for other inputs, is another front end.
+    const key = `${model.frontend} ${model.helper?.sha256 ?? ""} ${JSON.stringify(model.inputs ?? {})}`;
     if (kept?.key === key) return kept.loading;
     kept?.loading.then(
       (old) => old.release?.(),
@@ -201,17 +203,17 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       };
     }
     // German and Austrian German: apptor's front end. Words are read by a letter-to-sound model,
-    // downloaded with the voice. With the accent on (its makers: from 0.5 up), a short list of
-    // words is read the Austrian way: "Kaffee", "Chemie", final "-ig" and a few more.
-    case "g2p-de":
-    case "g2p-de-at": {
-      const austrian = name === "g2p-de-at";
+    // downloaded with the voice. With the accent on (its makers' rule: from 0.5 up), a short list
+    // of words is read the Austrian way: "Kaffee", "Chemie", final "-ig" and a few more. The accent
+    // is the value the model itself is given, so the two cannot disagree.
+    case "g2p-de": {
+      const austrian = (needs.inputs?.accent ?? 0) >= 0.5;
       const [model, tables, exceptions, meta, austrianReadings] = await Promise.all([
         needs.helper?.(),
         text("/assets/g2p-de/frontend-de.json").then(JSON.parse),
         text("/assets/g2p-de/exceptions-de.json").then(JSON.parse),
         text("/assets/g2p-de/apptor-g2p-de.json").then(JSON.parse),
-        text("/assets/g2p-de/austrian-de.json").then(JSON.parse),
+        austrian ? text("/assets/g2p-de/austrian-de.json").then(JSON.parse) : {},
       ]);
       if (!needs.ort || !model) throw new ModelError("its letter-to-sound model is not downloaded");
       const session = await needs.ort.InferenceSession.create(model, { executionProviders: ["wasm"] });

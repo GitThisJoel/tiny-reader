@@ -142,6 +142,11 @@ declare module "apptor/apptor-tts.js" {
     /** One written word to its phones, with the Austrian readings or without. Empty for a word with nothing to say. */
     word(word: string, austrian?: boolean): Promise<Units>;
   }
+  /**
+   * Cuts the breathy noise after the last sound, which the Austrian style learned from its recordings: the audio
+   * up to the last 10 ms frame within 30 dB of the loudest one, and 40 ms after it that fade out.
+   */
+  export function trimTail(audio: Float32Array, sampleRate: number): Float32Array;
   export function normalizeText(text: string): string;
   export function makePrepare(tables: Tables): (text: string) => string;
   export function makeNormalizeGerman(tables: Tables): (text: string) => string;

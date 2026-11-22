@@ -49,8 +49,13 @@ describe.each([
     const helper = model.helper && (await cached(model.helper, `${id}.helper.onnx`));
     engine = await createEngine(ort, {
       model: await cached(model, `${id}.onnx`),
-      frontEnd: await loadFrontEnd(model.frontend, readAsset, { ort, helper: async () => helper ?? null }),
+      frontEnd: await loadFrontEnd(model.frontend, readAsset, {
+        ort,
+        helper: async () => helper ?? null,
+        inputs: model.inputs,
+      }),
       inputs: model.inputs,
+      trimTail: model.trimTail,
     });
   }, 120_000);
 
@@ -58,8 +63,10 @@ describe.each([
     const result = await engine.speak(text, { ...DEFAULT_OPTIONS, voice });
     if (!result) throw new Error("no result");
     expect(result.pcm.every(Number.isFinite)).toBe(true);
-    expect(result.pcm.length % HOP).toBe(0);
     const seconds = result.pcm.length / result.sampleRate;
+    // Whole frames, unless the end is trimmed: then it stops within 40 ms of a 10 ms step.
+    if (!model.trimTail) expect(result.pcm.length % HOP).toBe(0);
+    expect(result.words.at(-1)?.end).toBeLessThanOrEqual(seconds);
     expect(seconds).toBeGreaterThan(2);
     expect(seconds).toBeLessThan(12);
     const peak = result.pcm.reduce((top, sample) => Math.max(top, Math.abs(sample)), 0);

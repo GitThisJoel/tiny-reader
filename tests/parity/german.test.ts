@@ -10,10 +10,10 @@ import { MODELS } from "../../engine/models.ts";
 import { cached, readAsset } from "../assets.ts";
 
 describe.each([
-  ["German", "g2p-de", "german.json", "model.json"],
+  ["German", "apptor-de", "german.json", "model.json"],
   // The same front end with the readings its makers switch on with the Austrian model's accent.
-  ["Austrian German", "g2p-de-at", "german-at.json", "model-at.json"],
-])("%s (apptor)", (_, name, fixture, descriptor) => {
+  ["Austrian German", "apptor-de-at", "german-at.json", "model-at.json"],
+])("%s (apptor)", (_, id, fixture, descriptor) => {
   let frontEnd: FrontEnd;
   let reference: { symbols: string[]; sentences: { text: string; ids: number[]; stress: number[] }[] };
   let model: { symbols: string[] };
@@ -22,7 +22,10 @@ describe.each([
     const german = MODELS.find((entry) => entry.id === "apptor-de");
     if (!german?.helper) throw new Error("the German model has no helper in the list");
     const helper = await cached(german.helper, "apptor-de.helper.onnx");
-    frontEnd = await loadFrontEnd(name, readAsset, { ort, helper: async () => helper });
+    // Set up as the Worker does it: by the list entry's front end and inputs.
+    const entry = MODELS.find((model) => model.id === id);
+    if (!entry) throw new Error(`${id} is not in the list`);
+    frontEnd = await loadFrontEnd(entry.frontend, readAsset, { ort, helper: async () => helper, inputs: entry.inputs });
     reference = JSON.parse(await readFile(join(import.meta.dirname, fixture), "utf8"));
     model = JSON.parse(await readFile(join(import.meta.dirname, "../../vendor/apptor", descriptor), "utf8"));
   }, 120_000);

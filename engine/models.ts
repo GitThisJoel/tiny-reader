@@ -41,6 +41,8 @@ export interface Model extends PinnedFile {
    * given. The Austrian model's `accent` is one: how strong the accent is.
    */
   inputs?: Readonly<Record<string, number>>;
+  /** Whether the end of what the model says is trimmed as its makers do (apptor's `trimTail`). */
+  trimTail?: boolean;
   /**
    * What the model's makers set where Tiny Reader's settings are neutral: added to the pitch,
    * and multiplied into the pitch range.
@@ -221,7 +223,8 @@ export const MODELS: readonly Model[] = [
     name: "apptor-tiny-tts-at",
     author: "apptor",
     language: "de-AT",
-    frontend: "g2p-de-at",
+    // The German front end. From an accent of 0.5 up it reads a short list of words the Austrian way.
+    frontend: "g2p-de",
     // The model's third slot, "AT", holds the accent's style and is no voice.
     voices: ["F2", "M2"],
     licence: "Apache-2.0",
@@ -236,6 +239,8 @@ export const MODELS: readonly Model[] = [
     },
     // 0 is standard German, 1 Austrian, 1.6 the most its makers call usable.
     inputs: { accent: 1 },
+    // Its makers cut the breath the Austrian style leaves after the last sound.
+    trimTail: true,
   },
   ...(standIn ? [JSON.parse(standIn) as Model] : []),
 ];
@@ -325,6 +330,9 @@ export interface ModelIo {
  * the further inputs its list entry says it has; each is one number.
  */
 export function checkIo(session: ModelIo, more: readonly string[] = []) {
+  // A further input is never one of the six: its value would silently take the place of the user's setting.
+  const taken = more.find((name) => name in INPUTS);
+  if (taken) throw new ModelError(`its list entry gives a value for "${taken}", which is not a further input`);
   const describe = (values: ModelIo["inputMetadata"]) =>
     values
       .map((value) => `${value.name}: ${value.isTensor ? value.type : "not a tensor"}`)

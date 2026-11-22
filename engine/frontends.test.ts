@@ -154,7 +154,8 @@ describe("the German front end", () => {
 describe("the Austrian German front end", () => {
   it("is the German one with a short list of words read the Austrian way", async () => {
     const [german, austrian] = await Promise.all(
-      ["g2p-de", "g2p-de-at"].map((name) => loadFrontEnd(name, readAsset, fakeNeeds)),
+      // Its makers' rule: the Austrian readings from an accent of 0.5 up.
+      [0.4, 0.5].map((accent) => loadFrontEnd("g2p-de", readAsset, { ...fakeNeeds, inputs: { accent } })),
     );
     // "Kaffee" is in the Austrian list, stressed on its last syllable: k a f eː. Without the
     // list the word goes to the letter-to-sound model, which is a stand-in here.
