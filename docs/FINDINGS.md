@@ -487,6 +487,11 @@ NG's readings and wrote the front end in JavaScript.
   this front end reads word by word.
 - In Firefox: both files downloaded through the settings page (stored as `apptor-de` and `apptor-de/helper`), and
   "Hallo, der Zug fährt um 14:35 Uhr ab." came out as 2.8 s with all eight words timed.
+- **Used: the makers' tail trim.** Their page runs every piece of audio through `trimTail`: the Austrian style
+  learned a breathy noise after the last sound from its recordings (after a final "p" it sounds like an "f"), so
+  the audio is cut 40 ms after the last 10 ms frame within 30 dB of the loudest, with a fade. The function is in
+  the front end file that is bundled anyway; the Austrian entry asks for it (`trimTail`), and a word's time never
+  ends after the audio does. The standard German model's own repository has no such step and is left as it was.
 - **Not used: the Vocos sound filter.** The makers add a second stage (16.7 MB) that re-synthesises the audio and
   say that without it the voice is "noticeably buzzy". Tiny Reader plays the model's own output.
 
@@ -498,7 +503,8 @@ NG's readings and wrote the front end in JavaScript.
   usable). The engine refuses a model with an input it does not feed, so a list entry can now name further inputs
   and the value for each (`inputs`). Tiny Reader gives 1.0, the makers' default; there is no setting for it.
 - **Austrian readings.** The makers switch a short list of readings on when the accent is 0.5 or more ("Kaffee",
-  "Chemie", final "-ig", voiceless "s"); that is the front end `g2p-de-at`. It changes 40 of the 60 test sentences.
+  "Chemie", final "-ig", voiceless "s"). The German front end does the same from the `accent` its model is given,
+  so the readings and the accent have one source. It changes 40 of the 60 test sentences.
   Both variants match the Python front end on all 60.
 - **Two voices, not three.** The model lists a third, "AT". It is the slot that holds the accent's style, and the
   makers' own code leaves it out of the voices.

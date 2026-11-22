@@ -68,7 +68,8 @@ flowchart LR
   reading stops.
 - **Front ends** ([engine/frontends.ts](../engine/frontends.ts)): text to phoneme tokens, one per language: English
   (dizione), Brazilian Portuguese (dizione-ptbr), Italian (vocina's `g2p_it`), German (apptor's, with a
-  letter-to-sound model that is downloaded with the voice, and the same with its Austrian readings), and five that work from eSpeak NG, which runs as
+  letter-to-sound model that is downloaded with the voice, and with its Austrian readings for a model that is
+  given an accent), and five that work from eSpeak NG, which runs as
   WebAssembly ([engine/espeak.ts](../engine/espeak.ts)): Spanish and French with each model's own code, Turkish,
   Bengali and Malayalam with ports of theirs ([engine/espeak-text.ts](../engine/espeak-text.ts),
   [engine/malayalam.ts](../engine/malayalam.ts)). Their
