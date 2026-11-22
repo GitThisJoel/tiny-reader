@@ -72,6 +72,8 @@ export class Reader {
   private blocked = false;
   private stopped = true;
   private error: string | null = null;
+  /** What the engine said about the last sentence it found nothing to pronounce in. */
+  private why = "";
 
   constructor(deps: ReaderDeps, options: SynthOptions) {
     this.deps = deps;
@@ -217,7 +219,7 @@ export class Reader {
       );
     }
     if (this.current >= total && this.skipped.size === total && total > 0)
-      this.error = `Nothing here could be read. ${readsOnly(modelById(this.options.model) ?? BUNDLED)}.`;
+      this.error = `Nothing here could be read. ${this.why || readsOnly(modelById(this.options.model) ?? BUNDLED)}.`;
     this.emit();
   }
 
@@ -252,7 +254,8 @@ export class Reader {
         this.requests.delete(index);
         const code = codeOf(error);
         if (code === "nothing-to-pronounce") {
-          // Another script, or signs only.
+          // Another script, or signs only. The engine says which model tried: not the chosen one after a fallback.
+          if (error instanceof Error) this.why = error.message;
           this.skipped.add(index);
           this.ready.set(index, "skip");
         } else {

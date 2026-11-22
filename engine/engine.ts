@@ -36,10 +36,18 @@ type OrtModule = Pick<typeof Ort, "InferenceSession" | "Tensor">;
  * `frontEnd` is the text front end the model was trained with (engine/frontends.ts).
  * Rejects with a ModelError when the file's inputs and outputs are not a tiny-voca model's.
  */
-export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; frontEnd: FrontEnd }): Promise<Engine> {
+export async function createEngine(
+  ort: OrtModule,
+  assets: { model: Uint8Array; frontEnd: FrontEnd | Promise<FrontEnd> },
+): Promise<Engine> {
+  // A front end still being set up is waited for while the model loads. If either cannot be used, the model is let go.
+  const loading = Promise.resolve(assets.frontEnd);
+  loading.catch(() => {}); // reported below
   const session = await ort.InferenceSession.create(assets.model, { executionProviders: ["wasm"] });
+  let frontEnd: FrontEnd;
   try {
     checkIo(session);
+    frontEnd = await loading;
   } catch (error) {
     await session.release();
     throw error;
@@ -85,7 +93,7 @@ export async function createEngine(ort: OrtModule, assets: { model: Uint8Array; 
         if (!unknown.length) break;
         for (const piece of unknown) {
           if (signal?.aborted) return null;
-          cache.set(piece, await assets.frontEnd(finished(piece)));
+          cache.set(piece, await frontEnd(finished(piece)));
         }
       }
 

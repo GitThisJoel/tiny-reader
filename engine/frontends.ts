@@ -107,7 +107,10 @@ function espeakFrontEnd(parts: EspeakParts, espeak: (text: string) => string): F
         if (isPunctuation) return [true, piece];
         const spoken = parts.parseEspeak(espeak(piece));
         const written = spacedWords(piece);
-        names.push(...(written.length === spoken.length ? written : spoken.map(() => "")));
+        // Digits in groups ("1 000 000") are several written words and fewer spoken ones. Beside a number said in
+        // more words ("100 %") the counts could agree by accident and shift every name, so such a piece has none.
+        const countable = written.length === spoken.length && !/\d\s+\d/.test(piece);
+        names.push(...(countable ? written : spoken.map(() => "")));
         return [false, spoken];
       });
       return fromSymbols(parts.tokenize(pieces), names, (id) => id >= firstPhone || id === 4);
@@ -137,7 +140,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
         text("/assets/dizione-ptbr/open_table.json"),
       ]);
       const dizione = new Dizione(lexicon, JSON.parse(table));
-      return (input) => fromSymbols(dizione.phonemize(composed(input)), normalizePortuguese(composed(input)));
+      return (input) => {
+        // Rewritten once, and phonemized as it is. An apostrophe ends a word for this front end ("d'água" is two).
+        const rewritten = normalizePortuguese(composed(input));
+        return fromSymbols(dizione.phonemize(rewritten, true, false), rewritten.replace(/['’]/g, " "));
+      };
     }
     // Italian: vocina's own converter, with the Wiktionary lexicon it was trained with.
     case "g2p-it": {
@@ -147,7 +154,11 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
       ]);
       const g2p = creaG2P({ ...JSON.parse(data), wikizionario: JSON.parse(lexicon).voci });
       // The last eight symbols of its table are reserved and never produced.
-      return (input) => fromSymbols(g2p.fonemi(composed(input)), g2p.normalizza(composed(input)));
+      // ponytail: `fonemi` rewrites the text itself and cannot be told not to, so it is rewritten twice.
+      return (input) => {
+        const text = composed(input);
+        return fromSymbols(g2p.fonemi(text), g2p.normalizza(text));
+      };
     }
     // German: apptor's front end. Words are read by a letter-to-sound model, downloaded with the voice.
     case "g2p-de": {
@@ -197,7 +208,7 @@ export async function loadFrontEnd(name: string, read: ReadAsset, needs: FrontEn
         }
       };
     }
-    // Castilian Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
+    // European Spanish and French: the models' own front ends, fed by eSpeak NG as wasm.
     case "espeak-es":
       return espeakFrontEnd(spanish, await loadEspeak(read, "es"));
     case "espeak-fr":

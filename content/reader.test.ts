@@ -286,11 +286,12 @@ describe("Reader", () => {
   it("says so when nothing at all could be read", async () => {
     const { reader, settle } = setup(["s0", "s1"]);
     reader.read(["s0", "s1"]);
-    await settle("s0", engineError("nothing-to-pronounce"));
-    await settle("s1", engineError("nothing-to-pronounce"));
+    // The engine says which model tried, which after a fallback is not the chosen one.
+    await settle("s0", engineError("nothing-to-pronounce", "vocina only reads Italian"));
+    await settle("s1", engineError("nothing-to-pronounce", "tiny-voca only reads English"));
     expect(reader.state).toMatchObject({
       status: "error",
-      message: expect.stringContaining("English"),
+      message: "Nothing here could be read. tiny-voca only reads English.",
     });
   });
 

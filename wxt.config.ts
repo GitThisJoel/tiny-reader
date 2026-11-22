@@ -4,6 +4,12 @@ import { defineConfig } from "wxt";
 
 const require = createRequire(import.meta.url);
 
+/**
+ * TypeScript sources fetched by `pnpm fetch-assets`. Aliased for Vite only (and for Vitest, in vitest.config.ts),
+ * so that tsc checks engine/vendor.d.ts and not code written for other compiler settings.
+ */
+export const VITE_ALIAS = { "dizione-ptbr": resolve(import.meta.dirname, "vendor/dizione-ptbr/src") };
+
 export default defineConfig({
   browser: "firefox",
   manifestVersion: 3,
@@ -25,15 +31,17 @@ export default defineConfig({
   zip: { excludeSources: ["public/assets/**", "vendor/**", "tmp/**", "docs/screenshots/**", "AGENTS.md"] },
   vite: () => ({
     resolve: {
-      // TypeScript sources fetched like the above. Aliased for Vite only, so that tsc checks
-      // engine/vendor.d.ts and not code written for other compiler settings.
-      alias: { "dizione-ptbr": resolve(import.meta.dirname, "vendor/dizione-ptbr/src") },
+      alias: VITE_ALIAS,
       // Selects onnxruntime-web's build that loads its wasm from a URL. The default build
       // would inline the 15 MB binary into the worker script as base64.
       conditions: ["onnxruntime-web-use-extern-wasm", "module", "browser", "development|production"],
     },
   }),
   hooks: {
+    // A package to publish never carries the tests' stand-in model, whatever the shell has exported.
+    "zip:start"() {
+      if (process.env.VITE_E2E_MODEL) throw new Error("VITE_E2E_MODEL is set: unset it before packaging.");
+    },
     // ONNX Runtime's wasm binary and its loader ship inside the add-on, unmodified.
     "build:publicAssets"(_, files) {
       for (const name of ["ort-wasm-simd-threaded.wasm", "ort-wasm-simd-threaded.mjs"])
@@ -54,8 +62,8 @@ export default defineConfig({
     // Each permission is justified in the README.
     permissions: ["activeTab", "scripting", "menus", "storage"],
     // Never granted at install. Asked for one site at a time: when the user opens a PDF from that
-    // site in the add-on's document page, so that the add-on can download it, and for
-    // huggingface.co while a voice model is downloaded from the settings page.
+    // site in the add-on's document page, so that the add-on can download it, and for the site a
+    // voice model comes from (the hosts in engine/models.ts) while it is downloaded from the settings page.
     optional_host_permissions: ["*://*/*"],
     // Defaults only; every key can be changed in Firefox's "Manage Extension Shortcuts".
     commands: {

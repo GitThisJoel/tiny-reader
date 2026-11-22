@@ -254,6 +254,8 @@ describe("extra voice models", () => {
        });`,
     );
     const bar = await read(`bar.status === "playing" && bar.notice`);
+    // The bar was made for the stand-in's voices and now offers those of the model that reads.
+    expect(bar.voices).toEqual(["F2", "M2"]);
     expect(bar.notice).toBe(
       "The voice model Stand-in is not downloaded any more. Download it again in Tiny Reader's settings. This is read with the built-in tiny-voca voice.",
     );

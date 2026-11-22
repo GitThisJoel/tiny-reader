@@ -5,7 +5,7 @@ import { createBar } from "@/content/bar.ts";
 import type { Command } from "@/content/commands.ts";
 import { rangeFrom } from "@/content/from-here.ts";
 import { highlightSentence, highlightWord } from "@/content/highlight.ts";
-import { languageWarning, SAMPLE_LENGTH } from "@/content/language.ts";
+import { type Detection, languageWarning, SAMPLE_LENGTH } from "@/content/language.ts";
 import { Reader } from "@/content/reader.ts";
 import { segment } from "@/content/segment.ts";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/content/settings.ts";
@@ -13,7 +13,7 @@ import { WebAudioSink } from "@/content/sink.ts";
 import { mapRange, type TextMap } from "@/content/text-map.ts";
 import { WordTracker } from "@/content/word-tracker.ts";
 import { EngineClient } from "@/engine/client.ts";
-import { modelById } from "@/engine/models.ts";
+import { BUNDLED, type Model, modelById } from "@/engine/models.ts";
 import { DEFAULT_OPTIONS, PORT_NAME } from "@/engine/protocol.ts";
 
 /** What a document can be told to do: by the background (menu, shortcut, popup) or by its own page. */
@@ -87,11 +87,26 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     // The selection would paint over the highlight, so it is dropped.
     getSelection()?.removeAllRanges();
 
+    // Which model reads is known with the first sentence spoken, and the language soon after the start.
+    // The warning is about the model that reads, which after a fallback is not the chosen one.
+    let reading: Model | undefined;
+    let detected: Detection | undefined;
+    function warn() {
+      const warning = reading && detected && languageWarning(detected, reading);
+      if (warning && !ended) bar.notify(warning);
+    }
     const client = new EngineClient(
       () => browser.runtime.connect({ name: PORT_NAME }),
       undefined,
-      // A downloaded model that is gone or broken: the built-in one spoke, and the bar says so.
-      (notice) => bar.notify(notice),
+      (notice) => {
+        // A downloaded model that is gone or broken: the built-in one spoke. The bar says so and offers its voices.
+        if (notice) {
+          bar.notify(notice);
+          bar.offerVoices(BUNDLED.voices);
+        }
+        reading = notice ? BUNDLED : (modelById(options.model) ?? BUNDLED);
+        warn();
+      },
     );
     const sink = new WebAudioSink();
     // A highlight that jumps from word to word is motion; with reduced motion only the
@@ -172,8 +187,8 @@ export function createController({ textOf = mapRange, onSentence }: ControllerOp
     // Firefox's built-in detector, run locally. One language only is a limit of each model.
     browser.i18n.detectLanguage(map.text.slice(0, SAMPLE_LENGTH)).then(
       (detection) => {
-        const warning = languageWarning(detection, modelById(options.model));
-        if (warning && !ended) bar.notify(warning);
+        detected = detection;
+        warn();
       },
       () => {},
     );

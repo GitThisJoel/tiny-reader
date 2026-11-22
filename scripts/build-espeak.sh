@@ -3,8 +3,9 @@
 # through it. eSpeak NG turns text into phonemes for the models that were trained on its output
 # (engine/frontends.ts). Needs Docker; nothing else is installed on the host.
 #
-#   pnpm build-espeak              # writes vendor/espeak/ and public/assets/espeak/
-#   pnpm build-espeak --fixtures   # instead rewrites tests/parity/espeak-*.json (see below)
+#   pnpm build-espeak                     # writes vendor/espeak/ and public/assets/espeak/
+#   pnpm build-espeak --fixtures          # instead rewrites tests/parity/espeak-*.json (see below)
+#   pnpm build-espeak --allow-different   # installs a build that is not the recorded one (see the end)
 #
 # Everything runs inside a pinned emscripten/emsdk image:
 #   1. clone espeak-ng at tag 1.52.0 and check the commit hash;
@@ -45,7 +46,14 @@ esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES=""
-[ "${1:-}" = "--fixtures" ] && FIXTURES=1
+DIFFERENT=""
+for argument in "$@"; do
+  case "${argument}" in
+    --fixtures) FIXTURES=1 ;;
+    --allow-different) DIFFERENT=1 ;;
+    *) echo "unknown argument: ${argument}" >&2; exit 2 ;;
+  esac
+done
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/espeak-wasm.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
 mkdir -p "${WORK}/out"
@@ -53,8 +61,9 @@ mkdir -p "${WORK}/out"
 # ---------------------------------------------------------------- driver (C)
 cat > "${WORK}/tr_espeak.c" <<'EOF'
 /* Replays espeak-ng.c main() for: -q --ipa --sep=_ -v <voice> --stdin
- * Initialisation happens once (tr_init); every tr_phonemize call is one
- * "process run": the input bytes are what the program would read from stdin. */
+ * Initialisation happens once (tr_init), tr_voice does what -v does, and every
+ * tr_phonemize call is one "process run": the input bytes are what the program
+ * would read from stdin. One instance serves every voice. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,9 +92,8 @@ static int set_voice(void)
 	return result == ENS_OK ? 0 : (int)result;
 }
 
-EMSCRIPTEN_KEEPALIVE int tr_init(const char *data_path, const char *voice)
+EMSCRIPTEN_KEEPALIVE int tr_init(const char *data_path)
 {
-	snprintf(voice_name, sizeof(voice_name), "%s", voice);
 	espeak_ng_InitializePath(data_path);
 	espeak_ng_ERROR_CONTEXT context = NULL;
 	espeak_ng_STATUS result = espeak_ng_Initialize(&context);
@@ -100,6 +108,13 @@ EMSCRIPTEN_KEEPALIVE int tr_init(const char *data_path, const char *voice)
 		return (int)result;
 	}
 	espeak_SetSynthCallback(synth_callback);
+	return 0;
+}
+
+/* The voice that speaks from now on. 0, or eSpeak NG's status when there is no such voice. */
+EMSCRIPTEN_KEEPALIVE int tr_voice(const char *voice)
+{
+	snprintf(voice_name, sizeof(voice_name), "%s", voice);
 	return set_voice();
 }
 
@@ -110,7 +125,9 @@ EMSCRIPTEN_KEEPALIVE const char *tr_version(void)
 
 /* input: the bytes the program would read from stdin (not NUL terminated).
  * Returns a malloc'd NUL-terminated copy of what it would print to stdout;
- * the caller frees it. *out_len receives its length. */
+ * the caller frees it. *out_len receives its length. NULL when eSpeak NG
+ * reports an error or memory runs out: no output is not the same as nothing
+ * to say. */
 EMSCRIPTEN_KEEPALIVE char *tr_phonemize(const char *input, int input_len, int *out_len)
 {
 	char *out = NULL;
@@ -126,14 +143,17 @@ EMSCRIPTEN_KEEPALIVE char *tr_phonemize(const char *input, int input_len, int *o
 	/* espeak-ng.c "bulk input on stdin": read every byte, then overwrite the
 	 * last one with NUL and synthesise with size ix+1. */
 	int ix = input_len;
+	int failed = 0;
 	if (ix > 0) {
 		char *p_text = (char *)malloc((size_t)ix + 1);
-		if (p_text != NULL) {
+		if (p_text == NULL) {
+			failed = 1;
+		} else {
 			memcpy(p_text, input, (size_t)ix);
 			p_text[ix] = 0;
 			p_text[ix-1] = 0;
 			int synth_flags = espeakCHARS_AUTO | espeakPHONEMES | espeakENDPAUSE;
-			espeak_Synth(p_text, (size_t)ix + 1, 0, POS_CHARACTER, 0, synth_flags, NULL, NULL);
+			failed = espeak_Synth(p_text, (size_t)ix + 1, 0, POS_CHARACTER, 0, synth_flags, NULL, NULL) != EE_OK;
 			free(p_text);
 		}
 	}
@@ -141,6 +161,10 @@ EMSCRIPTEN_KEEPALIVE char *tr_phonemize(const char *input, int input_len, int *o
 
 	espeak_SetPhonemeTrace(0, stderr);
 	fclose(f_phonemes_out);
+	if (failed) {
+		free(out);
+		return NULL;
+	}
 	*out_len = (int)size;
 	return out;
 }
@@ -177,9 +201,14 @@ UID_GID="$(id -u):$(id -g)"
 cat > "${WORK}/build.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+# What the build writes belongs to root. It is handed to the caller however the build ends, or a
+# failed one would leave files the caller cannot remove.
+trap 'chown -R "${UID_GID}" /work/out' EXIT
 export DEBIAN_FRONTEND=noninteractive
+# The versions the image's release (Ubuntu 22.04) has: a mirror that offers others stops the build
+# rather than changing what it makes.
 apt-get update -qq >/dev/null
-apt-get install -y -qq --no-install-recommends autoconf automake libtool >/dev/null
+apt-get install -y -qq --no-install-recommends autoconf=2.71-2 automake=1:1.16.5-1.3 libtool=2.4.6-15build2 >/dev/null
 
 git clone -q --depth 1 --branch "${ESPEAK_TAG}" "${ESPEAK_REPO}" /work/src
 got="\$(git -C /work/src rev-parse HEAD)"
@@ -216,7 +245,6 @@ if [ -n "${FIXTURES}" ]; then
     TINY_VOCA_LANGUAGE="\${language}" TINY_VOCA_FRONTEND=espeak python3 /build/reference.py \\
       /build/sentences.json "/work/out/espeak-\${language}.json" "\${language}" "/work/reference-\${language}/src/tiny_voca"
   done
-  chown -R "${UID_GID}" /work/out
   exit 0
 fi
 
@@ -240,7 +268,7 @@ nice -n 10 emcc -O2 -I src/include /build/tr_espeak.c src/.libs/libespeak-ng.a \
   -sENVIRONMENT=web,worker,node \\
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=16MB \\
   -sFORCE_FILESYSTEM=1 -sINVOKE_RUN=0 -sEXIT_RUNTIME=0 \\
-  -sEXPORTED_FUNCTIONS=_tr_init,_tr_phonemize,_tr_version,_malloc,_free \\
+  -sEXPORTED_FUNCTIONS=_tr_init,_tr_voice,_tr_phonemize,_tr_version,_malloc,_free \\
   -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,stringToUTF8,lengthBytesUTF8,HEAPU8,HEAP32
 
 # Pack the data of LANGS: one gzip stream of
@@ -257,7 +285,6 @@ with open("/work/out/espeak-ng-data.pack", "wb") as out:
     out.write(gzip.compress(raw, compresslevel=9, mtime=0))
 PY
 cp /work/src/COPYING /work/out/espeak-ng.COPYING.txt
-chown -R "${UID_GID}" /work/out
 EOF
 
 # The container says a great deal while it works: compiler warnings in eSpeak NG's own code, its
@@ -282,20 +309,28 @@ if [ -n "${FIXTURES}" ]; then
   exit 0
 fi
 
+echo "built:"
+( cd "${WORK}/out" && wc -c espeak-ng-core.mjs espeak-ng-core.wasm espeak-ng-data.pack )
+# The build has come out the same, byte for byte, every time so far (x86-64). The recorded build
+# is in scripts/espeak.sha256, which CI also checks its cached copy against. A build that differs
+# is not installed: it may be a toolchain that drifted, or a change that still has to be recorded.
+if sed 's|  .*/|  |' "${ROOT}/scripts/espeak.sha256" | ( cd "${WORK}/out" && sha256sum --check --quiet - ); then
+  echo "identical to the recorded build"
+elif [ -n "${DIFFERENT}" ]; then
+  echo "NOTE: this build differs from the recorded one. Installed because of --allow-different." >&2
+else
+  {
+    echo "This build differs from the recorded one, so nothing was installed. It has:"
+    ( cd "${WORK}/out" && sha256sum espeak-ng-core.mjs espeak-ng-core.wasm espeak-ng-data.pack )
+    echo "If this script or one of its pins was changed on purpose, record these in scripts/espeak.sha256."
+    echo "To install a build that differs without recording it, pass --allow-different."
+  } >&2
+  exit 1
+fi
+
 # The glue is code: it is bundled into the engine Worker. The rest is data, read at run time.
 mkdir -p "${ROOT}/vendor/espeak" "${ROOT}/public/assets/espeak" "${ROOT}/public/assets/licenses"
 cp "${WORK}/out/espeak-ng-core.mjs" "${ROOT}/vendor/espeak/"
 cp "${WORK}/out/espeak-ng-core.wasm" "${WORK}/out/espeak-ng-data.pack" "${ROOT}/public/assets/espeak/"
 cp "${WORK}/out/espeak-ng.COPYING.txt" "${ROOT}/public/assets/licenses/"
-echo "wrote:"
-( cd "${WORK}/out" && wc -c espeak-ng-core.mjs espeak-ng-core.wasm espeak-ng-data.pack )
-# The build has come out the same, byte for byte, every time so far (x86-64). A difference is
-# not an error, but it is worth knowing about before a release.
-if ( cd "${WORK}/out" && sha256sum --check --quiet - ) <<'EOF'
-e06facb2130784d127327320f8bd8006d559bbfc90491aaf10df9422bf0ad555  espeak-ng-core.mjs
-b46dc88f143784d6a52f1c9e6cebe4ce787fb0a042220902cb6fba18d918d2ef  espeak-ng-core.wasm
-b71dc1076d8c64e80092823b059c93f0748c3f166bce3ca9fda623da76e09a42  espeak-ng-data.pack
-EOF
-then echo "identical to the recorded build"
-else echo "NOTE: this build differs from the recorded one (see the hashes in this script)" >&2
-fi
+echo "installed in vendor/espeak and public/assets/espeak"

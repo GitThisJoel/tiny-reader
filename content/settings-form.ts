@@ -133,8 +133,11 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
     describe();
   }
 
+  /** Whether it is known which models are downloaded. Until then the form cannot say that a chosen one is gone. */
+  let known = false;
   const read = (): Settings => ({
-    model: model.value,
+    // While storage has not been read, or cannot be, the model shown is not a choice the user made.
+    model: known || model.value !== BUNDLED.id ? model.value : shown.model,
     voice: Number(voice.value),
     speed: Number(speed.input.value),
     pitchShift: Number(pitchShift.input.value) * SEMITONE,
@@ -207,13 +210,15 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
         ...new Set([sitePattern(entry.url), ...(entry.helper ? [sitePattern(entry.helper.url)] : [])]),
         ...(entry.alsoAllow ?? []),
       ];
-      const held = browser.permissions.contains({ origins });
+      const held = origins.map((origin) => browser.permissions.contains({ origins: [origin] }).catch(() => true));
       // No second prompt from a second click while the first is open.
       button.disabled = true;
       const allowed = await browser.permissions.request({ origins }).catch(() => false);
       button.disabled = false;
-      if (!allowed)
-        return render(`Nothing was downloaded: Firefox was not allowed to reach ${new URL(entry.url).hostname}.`);
+      if (!allowed) {
+        const hosts = origins.map((origin) => new URL(origin).hostname).join(" and ");
+        return render(`Nothing was downloaded: Firefox was not allowed to reach ${hosts}.`);
+      }
       download = new AbortController();
       const { signal } = download;
       progress.value = 0;
@@ -245,8 +250,10 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
         download = null;
         render(signal.aborted ? "" : error instanceof ModelError ? error.message : "The model could not be stored.");
       } finally {
-        // The access was for this download only.
-        if (!(await held.catch(() => true))) await browser.permissions.remove({ origins }).catch(() => {});
+        // The access was for this download only. A site the add-on could reach before stays reachable.
+        const before = await Promise.all(held);
+        const given = origins.filter((_, index) => !before[index]);
+        if (given.length) await browser.permissions.remove({ origins: given }).catch(() => {});
       }
     });
     render();
@@ -283,6 +290,10 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
   // The settings are shown at once. Which models are downloaded takes a moment longer to find
   // out; storage that cannot be read offers the bundled model only.
   const models = storedModels()
+    .then((ids) => {
+      known = true;
+      return ids;
+    })
     .catch(() => [])
     .then((ids) => {
       for (const id of ids) downloaded.add(id);

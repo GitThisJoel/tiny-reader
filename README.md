@@ -56,7 +56,7 @@ Hugging Face.
   | [fiato](https://huggingface.co/cfahlgren1/fiato)                  | English              | cfahlgren1                | Apache-2.0 |
   | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)  | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
   | [vocina](https://github.com/OfficinePixel/vocina)                 | Italian              | OfficinePixel             | Apache-2.0 |
-  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)   | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
+  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)   | European Spanish     | marcosmaceo               | Apache-2.0 |
   | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr) | French               | DanielSuncost             | Apache-2.0 |
   | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)  | German               | apptor                    | Apache-2.0 |
 
@@ -133,7 +133,8 @@ does not extend to such frames.
 - English, Brazilian Portuguese, Italian, Spanish, French and German, each with a model of its own; all but English
   have to be downloaded. Text that Firefox's local language detector identifies as another language than the model's gets
   a warning in the bar and is read anyway, with the wrong sounds. Text in a script the model cannot read is skipped
-  by the English, Portuguese and Italian models; the Spanish and French ones name its letters instead. Nobody has
+  by the English, Portuguese and Italian models. The Spanish and French ones name the letters of some scripts
+  (Cyrillic, Arabic, Japanese) and skip others (Greek, Devanagari). Nobody has
   listened to the downloadable models in full: they were checked by numbers and against their makers' reference
   outputs.
 - The German download is 34 MB: the voice and a second model that works out how words are pronounced. Its makers

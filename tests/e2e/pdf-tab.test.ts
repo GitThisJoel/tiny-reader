@@ -43,8 +43,6 @@ const lines = (tab: string) =>
   );
 const OPENED = `return !document.getElementById("start").disabled;`;
 
-const answerPrompt = (answer: "allow" | "refuse") => firefox.answerPrompt(answer);
-
 const shown = (popup: string) =>
   firefox.evaluateBehind<{
     page: string;
@@ -121,7 +119,7 @@ describe("a PDF in Firefox's viewer", () => {
     expect(await lines(documentPage)).toEqual([]);
 
     await firefox.click(documentPage, "#allow");
-    expect(await answerPrompt("allow")).toMatch(/127\.0\.0\.1/);
+    expect(await firefox.answerPrompt("allow")).toMatch(/127\.0\.0\.1/);
     await firefox.waitFor(documentPage, OPENED);
     expect(await lines(documentPage)).toEqual([
       "A sample document",
@@ -156,7 +154,7 @@ describe("a PDF in Firefox's viewer", () => {
     );
     await firefox.waitFor(refused, `return !!document.getElementById("allow");`);
     await firefox.click(refused, "#allow");
-    expect(await answerPrompt("refuse")).toMatch(/localhost/);
+    expect(await firefox.answerPrompt("refuse")).toMatch(/localhost/);
     expect(
       await firefox.waitFor<string>(
         refused,
