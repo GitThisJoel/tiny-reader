@@ -54,7 +54,11 @@ declare module "tiny-voca/dizione/engine.js" {
 declare module "dizione-ptbr/engine.ts" {
   export class Dizione {
     constructor(lexiconTsv: string, openTable: Readonly<Record<string, string>>);
-    phonemize(text: string): { symbols: string[]; stress: number[]; readonly ids: number[] };
+    phonemize(
+      text: string,
+      useLexicon?: boolean,
+      doNormalize?: boolean,
+    ): { symbols: string[]; stress: number[]; readonly ids: number[] };
   }
 }
 declare module "dizione-ptbr/normalize.ts" {
@@ -85,7 +89,10 @@ declare module "espeak/espeak-ng-core.mjs" {
     stringToUTF8(text: string, pointer: number, size: number): void;
     _malloc(size: number): number;
     _free(pointer: number): void;
-    _tr_init(dataPath: number, voice: number): number;
+    UTF8ToString(pointer: number): string;
+    _tr_init(dataPath: number): number;
+    _tr_voice(voice: number): number;
+    _tr_version(): number;
     _tr_phonemize(input: number, length: number, outputLength: number): number;
   }
   export default function createEspeakCore(options: {
@@ -96,9 +103,9 @@ declare module "espeak/espeak-ng-core.mjs" {
   }): Promise<EspeakCore>;
 }
 
-// The parts shared by the front ends that work from eSpeak NG's output: each model's own
-// JavaScript port of tiny-voca's text.py for its language.
-declare module "*/espeak-front-end" {
+// The front ends that work from eSpeak NG's output: each model's own JavaScript port of tiny-voca's
+// text.py for its language. They export the same things.
+declare module "tiny-voca-es/frontend.js" {
   export type EspeakWord = [phone: string, stress: number][];
   export type EspeakPiece = [isPunctuation: true, mark: string] | [isPunctuation: false, words: EspeakWord[]];
   /** Thrown when the text has no word, number or letter to say. */
@@ -111,11 +118,8 @@ declare module "*/espeak-front-end" {
   export function parseEspeak(output: string): EspeakWord[];
   export function tokenize(pieces: EspeakPiece[]): { symbols: string[]; ids: number[]; stress: number[] };
 }
-declare module "tiny-voca-es/frontend.js" {
-  export * from "*/espeak-front-end";
-}
 declare module "tiny-voca-fr/frontend-fr.js" {
-  export * from "*/espeak-front-end";
+  export * from "tiny-voca-es/frontend.js";
 }
 
 // apptor's German front end: normalising, numbers and a letter-to-sound model run with ONNX Runtime.

@@ -56,7 +56,7 @@ Hugging Face.
   | [fiato](https://huggingface.co/cfahlgren1/fiato)                       | English              | cfahlgren1                | Apache-2.0 |
   | [tiny-voca-ptbr](https://huggingface.co/semfence/tiny-voca-ptbr)       | Brazilian Portuguese | SemFence (Gustavo Toledo) | CC BY 4.0  |
   | [vocina](https://github.com/OfficinePixel/vocina)                      | Italian              | OfficinePixel             | Apache-2.0 |
-  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)        | Spanish (Spain)      | marcosmaceo               | Apache-2.0 |
+  | [tiny-voca-es](https://huggingface.co/marcosmaceo/tiny-voca-es)        | European Spanish     | marcosmaceo               | Apache-2.0 |
   | [tiny-voca-fr](https://huggingface.co/DanielSuncost/tiny-voca-fr)      | French               | DanielSuncost             | Apache-2.0 |
   | [apptor-tiny-tts](https://huggingface.co/apptor/apptor-tiny-tts)       | German               | apptor                    | Apache-2.0 |
   | [zerre-tts](https://huggingface.co/erkint/zerre-tts)                   | Turkish              | erkint                    | Apache-2.0 |
@@ -137,7 +137,8 @@ does not extend to such frames.
   Turkish, Bengali and Malayalam. All but English have to be downloaded. Text that Firefox's local language
   detector identifies as another language than the model's gets a warning in the bar and is read anyway, with the
   wrong sounds. Text in a script the model cannot read is skipped by the English, Portuguese, Italian and German
-  models; the others, which use eSpeak NG, name its letters instead.
+  models. The others, which use eSpeak NG, name the letters of some scripts (Cyrillic, Arabic, Japanese) and skip
+  others (Greek, Devanagari).
 - The downloadable models were checked by numbers and against their makers' reference outputs, and the project's
   owner has listened to each of them. For Turkish, Bengali and Malayalam the code that prepares the text is Tiny
   Reader's own port of each project's Python code, which is not in JavaScript; it gives the same output on every

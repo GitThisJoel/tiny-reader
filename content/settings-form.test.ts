@@ -138,6 +138,13 @@ describe("mountSettingsForm", () => {
     ]);
   });
 
+  it("keeps a chosen model it cannot offer while it does not know what is downloaded", async () => {
+    await saveSettings({ model: "fiato", voice: 1 });
+    await mountSettingsForm(form);
+    await change("speed", "1.3");
+    expect(await loadSettings()).toMatchObject({ model: "fiato", voice: 1, speed: 1.3 });
+  });
+
   it("saves a change at once", async () => {
     await mountSettingsForm(form);
     await change("speed", "1.3");

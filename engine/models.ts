@@ -259,7 +259,12 @@ export async function downloadModel(
   const bytes = new Uint8Array(model.size);
   let received = 0;
   const reader = response.body.getReader();
-  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+  const next = () =>
+    reader.read().catch((error: unknown) => {
+      if (signal?.aborted) throw error;
+      throw new ModelError(`The download from ${host} broke off.`);
+    });
+  for (let chunk = await next(); !chunk.done; chunk = await next()) {
     if (received + chunk.value.length > model.size) {
       void reader.cancel();
       throw new ModelError(`The download is longer than the ${model.size} bytes expected.`);
