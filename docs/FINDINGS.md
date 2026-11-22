@@ -2,7 +2,7 @@
 
 What was checked while building Tiny Reader, and the decisions that rest on it. Everything here was measured or
 tested with code unless marked **(unverified)**. It explains choices that look odd without it: why the engine lives in
-the background page, why PDFs get a page of their own, why Firefox 140.
+the background page, why PDFs get a page of their own, why Firefox 142.
 
 Checked 2026-11-19 to 2026-11-21 with Node 22.22.1, Firefox 158.0.1 (Linux x86-64, headless), onnxruntime-web 1.31.1
 and pdf.js 6.5.438. Nothing in the automated runs was listened to. On 2026-11-22 the project's owner
@@ -108,8 +108,10 @@ that port, fetched at a pinned commit and never committed, typed with one hand-w
 | MV3, `scripting`, background event pages   | 109/102 | Firefox has no service-worker background.                                                    |
 | `menus`, `commands`                        |   55/48 | Desktop only.                                                                                |
 
-**`strict_min_version` is 140**, set by the Highlight API; 140 is also an ESR. **Desktop only**: Firefox for Android
-lacks `menus` and `commands`.
+**`strict_min_version` is 142.** The Highlight API sets the floor at 140. It is 142 because `web-ext lint` warns
+about any lower value: Firefox for Android knows `data_collection_permissions` only from 142, and the linter applies
+the desktop minimum to Android too. Nothing is lost: 140 ESR was retired in 2026 and the ESR after it is 153.
+**Desktop only**: Firefox for Android lacks `menus` and `commands`.
 
 ## 6. Where things can run
 
@@ -274,8 +276,7 @@ size becomes a goal, upstream's block-scaled Q8 weights are the better route and
   clicks are real input events.
 - Synthesized key presses do not reach Firefox's shortcut handling in headless mode. The tests trigger the registered
   shortcut's `<key>` element, which fails unless that exact shortcut is registered.
-- `web-ext lint`: no errors, four accepted warnings. One is that `strict_min_version` 140 predates Firefox for
-  Android 142 (the add-on is desktop only); three are inside ONNX Runtime and pdf.js.
+- `web-ext lint`: no errors, three accepted warnings, all inside ONNX Runtime and pdf.js.
 
 ## 13. Extra voices
 

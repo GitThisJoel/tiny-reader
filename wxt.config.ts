@@ -94,8 +94,9 @@ export default defineConfig({
     browser_specific_settings: {
       gecko: {
         id: "tiny-reader@tiny-reader",
-        // CSS Custom Highlight API. See docs/FINDINGS.md §5.
-        strict_min_version: "140.0",
+        // The CSS Custom Highlight API needs 140; 142 keeps the linter quiet about Android. See
+        // docs/FINDINGS.md §5.
+        strict_min_version: "142.0",
         data_collection_permissions: { required: ["none"] },
       },
     },

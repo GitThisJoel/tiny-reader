@@ -8,7 +8,7 @@ How to build, run and test Tiny Reader, and the conventions the repository follo
 
 - Node.js 22.18 or newer
 - [pnpm](https://pnpm.io/installation) 12 (the exact version is pinned in `package.json`)
-- Firefox 140 or newer, desktop
+- Firefox 142 or newer, desktop
 - Docker, for `pnpm build-espeak` (once, and again only when that script changes)
 
 ## Setup
@@ -69,9 +69,8 @@ export default defineWebExtConfig({
 | `pnpm german-fixtures` | Rewrite the German parity references with apptor's Python front end, in a container        |
 | `pnpm screenshots`     | Redraw the popup pictures in `docs/screenshots/` from the build (run `pnpm build` first)   |
 
-`pnpm lint:ext` reports no errors and four accepted warnings:
+`pnpm lint:ext` reports no errors and three accepted warnings:
 
-- `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION`: the add-on is desktop only.
 - `UNSAFE_VAR_ASSIGNMENT` in the document page's script and in `pdf.worker.min-*.mjs`: both are pdf.js, bundled
   unmodified from the `pdfjs-dist` npm package.
 - `UNSAFE_VAR_ASSIGNMENT` in `engine-worker.js`: ONNX Runtime loads its own wasm loader with a
