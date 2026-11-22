@@ -74,7 +74,7 @@ Hugging Face.
 ## Trying it
 
 Tiny Reader is not on addons.mozilla.org yet. Until it is, build it and load it as a temporary add-on. You need
-Node.js 22.18 or newer, [pnpm](https://pnpm.io/installation) 12 and Firefox 140 or newer on desktop.
+Node.js 22.18 or newer, [pnpm](https://pnpm.io/installation) 12 and Firefox 142 or newer on desktop.
 
 1. Install the dependencies, download the model (about 30 MB), build eSpeak NG (needs Docker, about a minute) and
    build the add-on:

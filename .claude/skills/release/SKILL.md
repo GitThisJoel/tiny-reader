@@ -60,7 +60,7 @@ pnpm lint:ext
 `pnpm build-espeak` fails when what it built is not the recorded build (`scripts/espeak.sha256`). If it does, stop
 and report it: the reviewer's rebuild would differ too. Never pass `--allow-different` for a release.
 
-`pnpm lint:ext` must report 0 errors. Four warnings are known and accepted (they are listed in CONTRIBUTING.md); a
+`pnpm lint:ext` must report 0 errors. Three warnings are known and accepted (they are listed in CONTRIBUTING.md); a
 new one needs explaining to the reviewer.
 
 ## 4. Build the packages and prove the source package
