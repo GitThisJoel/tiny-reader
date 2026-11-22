@@ -485,7 +485,8 @@ NG's readings and wrote the front end in JavaScript.
   [tests/parity/german-sentences.json](../tests/parity/german-sentences.json), though one side runs the
   letter-to-sound model natively and the other as wasm. Every spoken word is named, numbers included, because
   this front end reads word by word.
-- In Firefox: both files downloaded through the settings page (stored as `apptor-de` and `apptor-de/helper`), and
+- In Firefox: both files downloaded through the settings page (stored as `apptor-de` and `apptor-de/helper`; the
+  helper's key has changed since, see the Austrian model below), and
   "Hallo, der Zug fährt um 14:35 Uhr ab." came out as 2.8 s with all eight words timed.
 - **Used: the makers' tail trim.** Their page runs every piece of audio through `trimTail`: the Austrian style
   learned a breathy noise after the last sound from its recordings (after a final "p" it sounds like an "f"), so
@@ -510,7 +511,10 @@ NG's readings and wrote the front end in JavaScript.
   makers' own code leaves it out of the voices.
 - In Firefox: model and helper downloaded through the settings page, and both voices spoke a sentence with all
   eight words timed. The makers call this version an early preview with a mild accent.
-- A user who has both German models stores the 12 MB helper twice, once beside each.
+- **One copy of the helper.** The file is stored under its SHA-256 (`helper/<hash>`), not under a model's id, so
+  a user who has both German models keeps the 12 MB once. Deleting a model deletes the helper only when no other
+  model in storage needs it, in the same transaction. Each download still fetches the file, so that it is
+  verified and never trusted from storage; the second one writes the same bytes over the first.
 
 **Turkish, Bengali and Malayalam** came with no JavaScript front end, only Python. Their front ends are ported
 here, which the first six languages did not need.

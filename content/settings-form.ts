@@ -190,7 +190,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       if (download) return download.abort();
       if (downloaded.has(entry.id)) {
         try {
-          await deleteModel(entry.id); // and its helper file
+          await deleteModel(entry); // and its helper file, unless another model needs it
         } catch {
           return render("It could not be deleted.");
         }
@@ -234,7 +234,7 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
         const helper = entry.helper && (await fetched(entry.helper, 0));
         const bytes = await fetched(entry, entry.helper?.size ?? 0);
         // Stored together, so a model in storage has its helper there too and a helper is never there alone.
-        await storeModel(entry.id, bytes, helper);
+        await storeModel(entry, bytes, helper);
         downloaded.add(entry.id);
         download = null;
         offerModels();

@@ -257,8 +257,18 @@ export const modelById = (id: unknown): Model | undefined => MODELS.find((model)
 /** Why a model could not be downloaded or used. The message is for the user. */
 export class ModelError extends Error {}
 
-/** Where a model's helper file is kept in storage, beside the model under its id. */
-export const helperKey = (id: string) => `${id}/helper`;
+/**
+ * Where a helper file is kept in storage. Named by what it is, not by the model it came with: the two
+ * German models need the same 12 MB file and share one copy.
+ */
+export const helperKey = (helper: PinnedFile) => `helper/${helper.sha256}`;
+
+/** Whether another of the models in storage (`stored`: their ids) needs the same helper file as `model`. */
+export const sharesHelper = (model: Model, stored: readonly unknown[]) =>
+  model.helper !== undefined &&
+  MODELS.some(
+    (other) => other.id !== model.id && stored.includes(other.id) && other.helper?.sha256 === model.helper?.sha256,
+  );
 
 /** Throws unless `bytes` is exactly the file the list pins. */
 export async function verifyModel(bytes: Uint8Array<ArrayBuffer>, model: PinnedFile) {

@@ -30,7 +30,11 @@ export default defineUnlistedScript(() => {
   ort.env.wasm.wasmPaths = new URL("/ort/", scope.location.href).href;
 
   const frontEnd = keepLast((model) =>
-    loadFrontEnd(model.frontend, asset, { ort, helper: () => readModel(helperKey(model.id)), inputs: model.inputs }),
+    loadFrontEnd(model.frontend, asset, {
+      ort,
+      helper: async () => (model.helper ? readModel(helperKey(model.helper)) : null),
+      inputs: model.inputs,
+    }),
   );
 
   const load = createLoader({

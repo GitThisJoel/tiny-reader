@@ -2,7 +2,7 @@
 // the engine Worker. Both are the add-on's origin, so they see the same database. No web page
 // can reach it. See docs/FINDINGS.md §13 for what was tried.
 
-import { helperKey } from "./models.ts";
+import { helperKey, type Model, sharesHelper } from "./models.ts";
 
 const STORE = "files";
 
@@ -23,25 +23,35 @@ function run<T>(mode: IDBTransactionMode, request: (store: IDBObjectStore) => ID
   });
 }
 
-/** The ids of the models in storage. A model's helper file is stored under its own key (`helperKey`), which is no id. */
+/** The ids of the models in storage. A helper file is stored under a key of its own (`helperKey`), which is no id. */
 export const storedModels = async () =>
   ((await run("readonly", (store) => store.getAllKeys())) as string[]).filter((key) => !key.includes("/"));
 
 /**
  * Stores a model and, with it, the helper file its front end needs. One transaction: both are there or
- * neither is, so a download that is interrupted leaves nothing behind.
+ * neither is, so a download that is interrupted leaves nothing behind. A helper file another model
+ * brought before is the same file, and is written over with itself.
  */
-export const storeModel = (id: string, bytes: Uint8Array<ArrayBuffer>, helper?: Uint8Array<ArrayBuffer>) =>
+export const storeModel = (model: Model, bytes: Uint8Array<ArrayBuffer>, helper?: Uint8Array<ArrayBuffer>) =>
   run("readwrite", (store) => {
-    if (helper) store.put(new Blob([helper]), helperKey(id));
-    return store.put(new Blob([bytes]), id);
+    if (helper && model.helper) store.put(new Blob([helper]), helperKey(model.helper));
+    return store.put(new Blob([bytes]), model.id);
   });
 
-/** Deletes a model and its helper file, if it has one. One transaction: both go or neither does. */
-export const deleteModel = (id: string) =>
+/**
+ * Deletes a model, and its helper file unless another model in storage needs the same one. One
+ * transaction: all of it happens or none.
+ */
+export const deleteModel = (model: Model) =>
   run("readwrite", (store) => {
-    store.delete(helperKey(id));
-    return store.delete(id);
+    const { helper } = model;
+    if (helper) {
+      const keys = store.getAllKeys();
+      keys.onsuccess = () => {
+        if (!sharesHelper(model, keys.result)) store.delete(helperKey(helper));
+      };
+    }
+    return store.delete(model.id);
   });
 
 /** A stored model's file, or null when it is not there. */

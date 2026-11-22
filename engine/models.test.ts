@@ -11,6 +11,7 @@ import {
   ModelError,
   modelById,
   readsOnly,
+  sharesHelper,
   verifyModel,
 } from "./models.ts";
 
@@ -61,9 +62,26 @@ describe("the list of models", () => {
       expect(helper?.url.slice(0, helper.url.lastIndexOf("/")), id).toBe(url.slice(0, url.lastIndexOf("/")));
       expect(helper?.sha256, id).toMatch(/^[0-9a-f]{64}$/);
       expect(helper?.size, id).toBeGreaterThan(1e6);
-      expect(helperKey(id)).toBe(`${id}/helper`);
+      // Kept under what it is, which is no model's id.
+      if (helper) expect(helperKey(helper)).toBe(`helper/${helper.sha256}`);
     }
     expect(new Set(MODELS.map((model) => model.id)).size).toBe(MODELS.length);
+  });
+
+  it("keeps one copy of the helper file the two German models share, until the last of them is deleted", () => {
+    const [german, austrian] = ["apptor-de", "apptor-de-at"].map((id) => modelById(id) ?? BUNDLED);
+    if (!german?.helper || !austrian?.helper) throw new Error("no helper");
+    expect(helperKey(german.helper)).toBe(helperKey(austrian.helper));
+    expect(sharesHelper(german, ["apptor-de", "apptor-de-at", "fiato"])).toBe(true);
+    expect(sharesHelper(austrian, ["apptor-de", "apptor-de-at"])).toBe(true);
+    // The last one: its helper goes with it. A model without a helper shares none.
+    expect(sharesHelper(german, ["apptor-de", "fiato"])).toBe(false);
+    expect(
+      sharesHelper(
+        BUNDLED,
+        MODELS.map((model) => model.id),
+      ),
+    ).toBe(false);
     expect(new Set(MODELS.map((model) => model.sha256)).size).toBe(MODELS.length);
   });
 

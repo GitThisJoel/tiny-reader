@@ -30,7 +30,7 @@ beforeAll(async () => {
     size: STAND_IN.length,
     sha256: createHash("sha256").update(STAND_IN).digest("hex"),
     url: `${site.url}stand-in.onnx`,
-    // A second file, as the German model has: downloaded first, stored beside the model, deleted with it.
+    // A second file, as the German models have: downloaded first, stored with the model, deleted with the last model that needs it.
     helper: {
       url: `${site.url}stand-in-helper.bin`,
       size: STAND_IN_HELPER.length,
@@ -86,7 +86,7 @@ const choose = (model: string) =>
      }`,
     [model],
   );
-/** Everything in the add-on's model storage, by key: a model under its id, its helper beside it. */
+/** Everything in the add-on's model storage, by key: a model under its id, a helper file under its fingerprint. */
 const storedIds = () =>
   firefox.evaluate<string[]>(
     options,
@@ -216,7 +216,11 @@ describe("extra voice models", () => {
     expect(downloaded.rows["stand-in"]).toEqual(["Delete", "Downloaded"]);
     expect(downloaded.models).toEqual(["tiny-voca (English)", "Stand-in (English)"]);
     expect(downloaded.model).toBe("tiny-voca"); // offered, not chosen for the user
-    expect(await storedIds()).toEqual(["stand-in", "stand-in/helper"]);
+    // The helper is kept under its own fingerprint, so that models which need the same file share it.
+    expect(await storedIds()).toEqual([
+      `helper/${createHash("sha256").update(STAND_IN_HELPER).digest("hex")}`,
+      "stand-in",
+    ]);
     // One request per file and download. No cookies, and no Origin header, which would carry the
     // add-on's address: an id of this installation. The helper file's requests are held to the same.
     expect([site.modelRequests.length, site.helperRequests.length]).toEqual([2, 2]);
