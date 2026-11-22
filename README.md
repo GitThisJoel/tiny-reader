@@ -138,10 +138,10 @@ does not extend to such frames.
   detector identifies as another language than the model's gets a warning in the bar and is read anyway, with the
   wrong sounds. Text in a script the model cannot read is skipped by the English, Portuguese, Italian and German
   models; the others, which use eSpeak NG, name its letters instead.
-- Nobody has listened to the downloadable models in full. They were checked by numbers and against their makers'
-  reference outputs. For Turkish, Bengali and Malayalam the code that prepares the text is Tiny Reader's own port
-  of each project's Python code, which is not in JavaScript; it gives the same output on every test sentence. The
-  Malayalam model is called experimental by its makers and has one voice.
+- The downloadable models were checked by numbers and against their makers' reference outputs, and the project's
+  owner has listened to each of them. For Turkish, Bengali and Malayalam the code that prepares the text is Tiny
+  Reader's own port of each project's Python code, which is not in JavaScript; it gives the same output on every
+  test sentence. The Malayalam model is called experimental by its makers and has one voice.
 - The German download is 34 MB: the voice and a second model that works out how words are pronounced. Its makers
   recommend a further 17 MB sound filter, which Tiny Reader does not use; without it they call the voice clear but
   noticeably buzzy.

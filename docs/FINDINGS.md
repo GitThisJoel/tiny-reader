@@ -5,8 +5,8 @@ tested with code unless marked **(unverified)**. It explains choices that look o
 the background page, why PDFs get a page of their own, why Firefox 140.
 
 Checked 2026-11-19 to 2026-11-21 with Node 22.22.1, Firefox 158.0.1 (Linux x86-64, headless), onnxruntime-web 1.31.1
-and pdf.js 6.5.438. Nothing in the automated runs was listened to, the downloadable voices of §13 and the other
-languages of §14 included.
+and pdf.js 6.5.438. Nothing in the automated runs was listened to. On 2026-11-22 the project's owner
+listened to every downloadable model of §13 and §14 in the add-on and found each to sound and work well.
 
 Pinned sources:
 
