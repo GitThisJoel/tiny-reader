@@ -8,7 +8,7 @@ import { JobQueue } from "@/engine/job-queue.ts";
 import { createLoader } from "@/engine/loader.ts";
 import { readModel } from "@/engine/model-store.ts";
 import { helperKey, readsOnly } from "@/engine/models.ts";
-import { type EngineResponse, parseRequest } from "@/engine/protocol.ts";
+import { type EngineResponse, LIMITS, parseRequest } from "@/engine/protocol.ts";
 
 export default defineUnlistedScript(() => {
   const scope = self as unknown as {
@@ -41,6 +41,7 @@ export default defineUnlistedScript(() => {
     status: (state) => scope.postMessage({ type: "status", state }),
   });
 
+  const within = (value: number, [least, most]: readonly [number, number]) => Math.min(most, Math.max(least, value));
   scope.onmessage = ({ data }) => {
     const request = parseRequest(data);
     if (!request) return;
@@ -57,8 +58,9 @@ export default defineUnlistedScript(() => {
         const tuned = {
           ...options,
           voice,
-          pitchShift: options.pitchShift + (model.tuning?.pitchShift ?? 0),
-          pitchRange: options.pitchRange * (model.tuning?.pitchRange ?? 1),
+          // Never past what the settings allow: the sliders' ends are the engine's ends.
+          pitchShift: within(options.pitchShift + (model.tuning?.pitchShift ?? 0), LIMITS.pitchShift),
+          pitchRange: within(options.pitchRange * (model.tuning?.pitchRange ?? 1), LIMITS.pitchRange),
         };
         const result = await engine.speak(text, tuned, signal).catch((error: unknown) => {
           // Said with the language of the model that tried: text in another one is the usual reason.

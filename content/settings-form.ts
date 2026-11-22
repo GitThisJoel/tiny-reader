@@ -282,6 +282,8 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
   offerModels();
   // Never a moment with sliders at arbitrary places: the defaults, until the stored settings are read.
   show(DEFAULT_SETTINGS);
+  // Not to be used yet: a change now would save these defaults over the stored settings.
+  form.toggleAttribute("inert", true);
   // The settings are shown at once. Which models are downloaded takes a moment longer to find
   // out; storage that cannot be read offers the bundled model only.
   const models = storedModels()
@@ -296,5 +298,8 @@ export function mountSettingsForm(form: HTMLFormElement, { downloads = false } =
       showModel();
       for (const { render } of rows) render();
     });
-  return Promise.all([loadSettings().then(show), models]);
+  const settings = loadSettings()
+    .then(show)
+    .finally(() => form.toggleAttribute("inert", false));
+  return Promise.all([settings, models]);
 }
