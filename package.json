@@ -1,6 +1,6 @@
 {
   "name": "tiny-reader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Firefox add-on that reads web page text aloud with tiny-voca, fully offline",
   "license": "GPL-3.0-or-later",
