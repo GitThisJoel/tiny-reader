@@ -7,5 +7,11 @@ CONTRIBUTING.md, the design in docs/ARCHITECTURE.md, the reasons behind it in do
 - Before committing: `pnpm lint`, `pnpm typecheck` and `pnpm test`. For anything that runs in the browser, also
   `pnpm build` and then `pnpm test:e2e`.
 - Work on a branch, never on `main`. Commit messages are `type(scope): subject`.
-- These must hold: no remote code, no new network requests, no new permissions, and nothing added to a web page but
-  the control bar's one host element.
+- These must hold:
+  - No remote code. Everything that runs is in the package. A voice model the user downloads is data: only a file
+    listed in `engine/models.ts`, pinned to a SHA-256 and stored only if it matches.
+  - No network request but the two kinds the user starts: a PDF from the web, and a model from that list. No new
+    kind.
+  - No new permission at install. Access to a site is asked for in the click that needs it; for a model download it
+    is given back when the download ends.
+  - Nothing added to a web page but the control bar's one host element.
